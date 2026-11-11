@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pindars Piano Party · fake0hs Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+<video id="cam" playsinline muted></video>
+
+<div id="overlay">
+  <div class="card" id="card">
+    <h1>Pindars Piano Party</h1>
+    <p>Stand back so the camera can see your whole body. The floor is a giant piano: walk, stomp and jump to play notes with your feet.</p>
+    <p>Pop balloons with your hands to set off fireworks and drums. The more you move, the faster the beat and the more balloons fly by.</p>
+    <p>Pop 100 balloons to win. Watch out for bombs: if one goes off, bang the drums fast to get back up. Three bombs and it’s game over.</p>
+    <div class="row">
+      <button id="btnCam">Start camera</button>
+      <button id="btnKeys" class="secondary">Play with keyboard and mouse</button>
+    </div>
+    <p id="status"></p>
+  </div>
+</div>
+<a class="exit-btn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
+
+<script src="game.js"></script>
+</body>
+</html>

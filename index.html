@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>fake0hs Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Bungee+Shade&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #efe8ff;
+    --bg-dots: #ddd0fb;
+    --ink: #22104a;
+    --ink-soft: #57487d;
+    --sign: #2a1556;
+    --sign-text: #fff6d6;
+    --bulb: #ffd23f;
+    --bulb-off: #8a6d1d;
+    --cart: #cfc6e4;
+    --cart-edge: #a79bc6;
+    --cart-shadow: #8a7cb0;
+    --label: #ffffff;
+    --pink: #ff4f8b;
+    --teal: #13b3a2;
+    --hazard: #ffc400;
+    --hazard-dark: #22104a;
+    --focus: #ff4f8b;
+    color-scheme: light;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #170a33;
+      --bg-dots: #241246;
+      --ink: #f3ecff;
+      --ink-soft: #b9abde;
+      --sign: #0d0522;
+      --cart: #3a2a66;
+      --cart-edge: #4d3a82;
+      --cart-shadow: #0b041c;
+      --label: #fdfbff;
+      --focus: #ffd23f;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #170a33; --bg-dots: #241246; --ink: #f3ecff; --ink-soft: #b9abde; --sign: #0d0522;
+    --cart: #3a2a66; --cart-edge: #4d3a82; --cart-shadow: #0b041c; --label: #fdfbff; --focus: #ffd23f;
+    color-scheme: dark;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0; min-height: 100%;
+    font-family: "Nunito", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    background-color: var(--bg);
+    background-image: radial-gradient(var(--bg-dots) 2px, transparent 2px);
+    background-size: 22px 22px;
+  }
+  img, svg { max-width: 100%; }
+
+  /* ---------- Marquee sign ---------- */
+  header { padding: clamp(28px, 6vw, 64px) 20px 8px; display: grid; place-items: center; }
+  .sign {
+    position: relative; background: var(--sign); color: var(--sign-text);
+    border-radius: 28px; padding: clamp(34px, 6vw, 56px) clamp(28px, 6vw, 72px);
+    text-align: center; max-width: 820px; width: 100%;
+    box-shadow: 0 0 0 6px var(--pink), 0 0 0 12px var(--sign), 0 18px 0 12px var(--cart-shadow);
+  }
+  .bulbs { position: absolute; inset: 12px; pointer-events: none; }
+  .bulb {
+    position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
+    background: var(--bulb); box-shadow: 0 0 10px 2px rgba(255, 210, 63, 0.7);
+  }
+  .bulb:nth-child(odd) { animation: chase 1.2s steps(1) infinite; }
+  .bulb:nth-child(even) { animation: chase 1.2s steps(1) infinite 0.6s; }
+  @keyframes chase { 0% { background: var(--bulb); box-shadow: 0 0 10px 2px rgba(255,210,63,.7); } 50% { background: var(--bulb-off); box-shadow: none; } }
+  .sign h1 {
+    margin: 0; font-family: "Bungee Shade", "Bungee", Impact, sans-serif; font-weight: 400;
+    font-size: clamp(2.6rem, 9vw, 5.6rem); line-height: 0.95; letter-spacing: 0.01em;
+    color: var(--bulb);
+  }
+  .sign h1 span { display: block; font-family: "Bungee", Impact, sans-serif; color: var(--pink); font-size: 0.62em; margin-top: 0.12em; }
+  .sign p { margin: 16px 0 0; font-weight: 800; font-size: clamp(1rem, 2.4vw, 1.2rem); color: var(--sign-text); opacity: 0.85; }
+
+  /* ---------- Shelf ---------- */
+  main { max-width: 1120px; margin: 0 auto; padding: 40px 20px 24px; }
+  .shelf-note { text-align: center; margin: 0 0 32px; font-weight: 800; font-size: 1.1rem; color: var(--ink-soft); }
+  .shelf { list-style: none; margin: 0; padding: 0; display: grid; gap: 34px 26px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (max-width: 900px) { .shelf { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) { .shelf { grid-template-columns: 1fr; } }
+
+  /* Game cartridge */
+  .cart {
+    position: relative; background: var(--cart); border: 3px solid var(--cart-edge);
+    border-radius: 10px 10px 22px 22px; padding: 26px 16px 18px;
+    box-shadow: 0 8px 0 var(--cart-shadow);
+    clip-path: polygon(0 18px, 18px 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+    display: flex; flex-direction: column; height: 100%;
+  }
+  .cart::before { /* grip ridges along the top */
+    content: ""; position: absolute; top: 8px; left: 30%; right: 30%; height: 8px;
+    background: repeating-linear-gradient(90deg, var(--cart-edge) 0 4px, transparent 4px 9px); border-radius: 2px;
+  }
+  .label { margin-bottom: 16px; background: var(--label); color: #22104a; border-radius: 8px; overflow: hidden; border: 3px solid #22104a; }
+  .label .art { aspect-ratio: 16 / 10; display: block; width: 100%; }
+  .label .art svg { display: block; width: 100%; height: 100%; }
+  .label .text { padding: 12px 14px 14px; }
+  .slot { font-weight: 900; font-size: 0.85rem; color: #6b5a99; margin: 0 0 2px; }
+  .label h2 { font-family: "Bungee", Impact, sans-serif; font-weight: 400; font-size: 1.45rem; line-height: 1.1; margin: 0 0 6px; }
+  .label .desc { margin: 0; font-size: 0.95rem; line-height: 1.4; color: #44366b; }
+  .needs { margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; list-style: none; }
+  .needs li { font-weight: 800; font-size: 0.78rem; background: #efe8ff; border-radius: 99px; padding: 3px 10px; color: #3a2a66; }
+
+  .play {
+    margin-top: auto; display: block; text-align: center; text-decoration: none;
+    font-family: "Bungee", Impact, sans-serif; font-size: 1.15rem; letter-spacing: 0.02em;
+    background: var(--pink); color: #fff; border: 3px solid #22104a; border-radius: 14px; padding: 12px;
+    box-shadow: 0 5px 0 #22104a; transition: transform 0.08s, box-shadow 0.08s;
+  }
+  .play:hover { transform: translateY(-2px); box-shadow: 0 7px 0 #22104a; }
+  .play:active { transform: translateY(4px); box-shadow: 0 1px 0 #22104a; }
+  .play:focus-visible, .theme-btn:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
+  .soon {
+    margin-top: auto; text-align: center; font-family: "Bungee", Impact, sans-serif; font-size: 1rem;
+    border: 3px dashed var(--cart-edge); border-radius: 14px; padding: 11px; color: var(--ink-soft);
+  }
+
+  /* Under construction label */
+  .wip .art {
+    position: relative; display: grid; place-items: center;
+    background: repeating-linear-gradient(-45deg, var(--hazard) 0 22px, var(--hazard-dark) 22px 44px);
+  }
+  .wip .art .tape {
+    background: #fff; border: 3px solid #22104a; border-radius: 10px; padding: 8px 14px;
+    font-family: "Bungee", Impact, sans-serif; font-size: 1.05rem; color: #22104a; transform: rotate(-4deg);
+    display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 0 rgba(0,0,0,0.35);
+  }
+  .wip .art .tape svg { width: 30px; height: 34px; flex: none; }
+  .wip .label h2 { color: #8a7cb0; }
+
+  /* Notice for the preview */
+  .notice {
+    position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+    max-width: min(520px, calc(100% - 32px)); background: var(--sign); color: var(--sign-text);
+    border: 3px solid var(--bulb); border-radius: 14px; padding: 14px 18px; font-weight: 800; line-height: 1.4;
+    box-shadow: 0 8px 0 rgba(0,0,0,0.3); display: none; z-index: 20;
+  }
+  .notice.show { display: block; }
+
+  footer { text-align: center; padding: 28px 20px 40px; color: var(--ink-soft); font-weight: 800; }
+  .theme-btn {
+    font: 800 0.9rem "Nunito", system-ui, sans-serif; color: var(--ink); background: transparent;
+    border: 2px solid var(--cart-edge); border-radius: 99px; padding: 6px 14px; cursor: pointer; margin-top: 10px;
+  }
+
+  /* ---------- One-screen layout for computer monitors ---------- */
+  @media (min-width: 900px) and (min-height: 620px) {
+    html, body { height: 100%; }
+    body { overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+    header { padding: 2.2vh 20px 0; }
+    .sign {
+      padding: 1.8vh 56px 2vh; max-width: 780px; border-radius: 22px;
+      box-shadow: 0 0 0 5px var(--pink), 0 0 0 10px var(--sign), 0 10px 0 10px var(--cart-shadow);
+    }
+    .bulbs { inset: 9px; }
+    .bulb { width: 10px; height: 10px; margin: -5px 0 0 -5px; }
+    .sign h1 { font-size: clamp(2rem, 5.6vh, 3.8rem); white-space: nowrap; }
+    .sign h1 span { display: inline; font-size: 0.78em; margin: 0 0 0 0.3em; }
+    .sign p { margin-top: 0.8vh; font-size: clamp(0.9rem, 1.8vh, 1.1rem); }
+    main { width: 100%; max-width: min(1520px, 165vh); min-height: 0; padding: 3.4vh 28px 1.4vh; display: flex; flex-direction: column; }
+    .shelf-note { margin: 0 0 1.8vh; font-size: clamp(0.85rem, 1.7vh, 1rem); }
+    .shelf { flex: 1; min-height: 0; grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 2.6vh 24px; }
+    .shelf > li { min-height: 0; }
+    .cart { padding: 18px 12px 12px; box-shadow: 0 6px 0 var(--cart-shadow); clip-path: polygon(0 14px, 14px 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); }
+    .cart::before { top: 6px; height: 6px; }
+    .label { flex: 1; min-height: 0; display: flex; margin-bottom: 1.2vh; }
+    .label .art { aspect-ratio: auto; width: 42%; flex: none; border-right: 3px solid #22104a; }
+    .label .text { padding: 1vh 12px; min-width: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+    .slot { font-size: clamp(0.7rem, 1.4vh, 0.85rem); }
+    .label h2 { font-size: clamp(1rem, 2.5vh, 1.45rem); margin-bottom: 0.5vh; }
+    .label .desc { font-size: clamp(0.78rem, 1.6vh, 0.95rem); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .needs { margin-top: 0.8vh; gap: 4px; }
+    .needs li { font-size: 0.7rem; padding: 2px 8px; }
+    .play { font-size: clamp(0.9rem, 2vh, 1.15rem); padding: 1vh 10px; border-radius: 12px; box-shadow: 0 4px 0 #22104a; }
+    .play:hover { box-shadow: 0 6px 0 #22104a; }
+    .soon { font-size: clamp(0.75rem, 1.6vh, 0.95rem); padding: 0.9vh 10px; border-radius: 12px; }
+    .wip .art .tape { font-size: clamp(0.7rem, 1.5vh, 0.95rem); padding: 5px 9px; gap: 6px; max-width: 88%; line-height: 1.15; }
+    .wip .art .tape svg { width: 18px; height: 22px; }
+    footer { padding: 0 20px 1.8vh; display: flex; justify-content: center; align-items: center; gap: 16px; font-size: 0.9rem; }
+    .theme-btn { margin-top: 0; padding: 4px 12px; }
+  }
+  @media (min-width: 900px) and (min-height: 620px) and (max-height: 950px) {
+    .needs { display: none; }
+  }
+  @media (min-width: 900px) and (min-height: 620px) and (max-height: 800px) {
+    .slot { display: none; }
+    .sign p { display: none; }
+    .shelf { gap: 2.2vh 22px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bulb { animation: none !important; }
+    .play { transition: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="sign">
+    <div class="bulbs" id="bulbs" aria-hidden="true"></div>
+    <h1>fake0hs<span>Arcade</span></h1>
+    <p>Homemade games by fake0h. Pick a cartridge and press play.</p>
+  </div>
+</header>
+
+<main>
+  <p class="shelf-note" id="shelfNote"></p>
+  <ul class="shelf" id="shelf"></ul>
+</main>
+
+<footer>
+  <div>© 2026 fake0hs Arcade</div>
+  <button class="theme-btn" id="themeBtn" type="button">Switch to dark mode</button>
+</footer>
+
+<div class="notice" id="notice" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  // ---------- Game list: edit this to add new games ----------
+  // When a new game is ready, set ready: true and fill in href, desc, needs and art.
+  var GAMES = [
+    {
+      ready: true,
+      title: "Cactus Run",
+      href: "games/cactus-run/index.html",
+      desc: "Dodge cacti and grab coins using your whole body.",
+      needs: ["Webcam", "Full body", "1 player"],
+      art: "cactus"
+    },
+    {
+      ready: true,
+      title: "Pindars Piano Party",
+      href: "games/piano-party/index.html",
+      desc: "Pop 100 balloons on a giant floor piano.",
+      needs: ["Webcam", "Full body", "Sound on"],
+      art: "piano"
+    }
+  ];
+  var TOTAL = 9;
+
+  var cactusArt =
+    '<svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" role="img" aria-label="A stick figure running down a desert trail toward a cactus and a gold coin">' +
+    '<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b2c6f"/><stop offset=".6" stop-color="#e0704a"/><stop offset="1" stop-color="#ffc46b"/></linearGradient>' +
+    '<linearGradient id="sand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d99a5b"/><stop offset="1" stop-color="#f2c487"/></linearGradient></defs>' +
+    '<rect width="320" height="90" fill="url(#sky)"/>' +
+    '<path d="M228 90a34 34 0 0 1 68 0z" fill="#ffe08a"/>' +
+    '<path d="M0 90V74h26l12-12h40l12 20h70l60 2 12-14h34l14 10v10z" fill="#8a3b2a"/>' +
+    '<rect y="90" width="320" height="110" fill="url(#sand)"/>' +
+    '<path d="M154 90h12l130 110H24z" fill="#e8b277"/>' +
+    '<g fill="#3f7d3a" stroke="#1f3f1c" stroke-width="2"><rect x="74" y="104" width="16" height="56" rx="8"/><rect x="60" y="116" width="10" height="22" rx="5"/><rect x="62" y="132" width="16" height="8" rx="4"/><rect x="94" y="110" width="10" height="20" rx="5"/><rect x="86" y="124" width="16" height="8" rx="4"/></g>' +
+    '<ellipse cx="82" cy="160" rx="18" ry="3" fill="rgba(0,0,0,.2)"/>' +
+    '<g transform="translate(232 112)"><circle r="15" fill="#ffcc33" stroke="#a86b00" stroke-width="3"/><circle r="9" fill="none" stroke="#e0a400" stroke-width="2"/></g>' +
+    '<g stroke-linecap="round" stroke-linejoin="round" fill="none">' +
+    '<path d="M160 120v30M160 126l-14 14M160 126l16 8M160 150l-12 18-4 16M160 150l14 14 10 14" stroke="#2b1a12" stroke-width="10"/>' +
+    '<path d="M160 120v30M160 126l-14 14M160 126l16 8M160 150l-12 18-4 16M160 150l14 14 10 14" stroke="#fff" stroke-width="5"/></g>' +
+    '<circle cx="160" cy="108" r="10" fill="#fff" stroke="#2b1a12" stroke-width="3"/>' +
+    '<circle cx="146" cy="140" r="4" fill="#ffb43b" stroke="#2b1a12" stroke-width="2"/><circle cx="176" cy="134" r="4" fill="#ffb43b" stroke="#2b1a12" stroke-width="2"/>' +
+    '</svg>';
+
+  var pianoKeys = "";
+  for (var k = 0; k < 8; k++) {
+    var x0 = 30 + k * 32.5, x1 = x0 + 31.5;
+    var tx0 = 104 + k * 14, tx1 = tx0 + 13.5;
+    var fill = k === 2 ? "#ff4f8b" : k === 5 ? "#ffd23f" : "#f4f0ff";
+    pianoKeys += '<path d="M' + tx0 + ' 118H' + tx1 + 'L' + x1 + ' 200H' + x0 + 'z" fill="' + fill + '"/>';
+    if (k !== 2 && k !== 6 && k < 7) {
+      var bx = 104 + (k + 1) * 14, fx = 30 + (k + 1) * 32.5;
+      pianoKeys += '<path d="M' + (bx - 4) + ' 118H' + (bx + 4) + 'L' + (bx + (fx - bx) * 0.42 + 8) + ' 152H' + (bx + (fx - bx) * 0.42 - 8) + 'z" fill="#16121f"/>';
+    }
+  }
+  var pianoArt =
+    '<svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" role="img" aria-label="A stick figure dancing on a giant glowing piano under balloons and fireworks">' +
+    '<defs><linearGradient id="night" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b0626"/><stop offset=".7" stop-color="#2a1260"/><stop offset="1" stop-color="#5a2290"/></linearGradient></defs>' +
+    '<rect width="320" height="200" fill="#1a0f33"/><rect width="320" height="118" fill="url(#night)"/>' +
+    '<path d="M60 118 20 0h50z" fill="#ff4f8b" opacity=".18"/><path d="M260 118 250 0h50z" fill="#4fa3ff" opacity=".18"/>' +
+    '<g stroke-linecap="round" stroke-width="2.5"><path d="M232 40l-14-12M232 40l16-10M232 40l2-18M232 40l-18 4M232 40l18 6M232 40l-10 16M232 40l12 14" stroke="#ffd23f"/>' +
+    '<path d="M70 34l-12-8M70 34l10-12M70 34l14 4M70 34l-14 6M70 34l4 14" stroke="#5ad17a"/></g>' +
+    '<g><path d="M118 78q-4 10 0 22" stroke="#fff" stroke-opacity=".6" fill="none"/><ellipse cx="118" cy="62" rx="12" ry="15" fill="#4fa3ff"/>' +
+    '<path d="M196 66q4 10 0 20" stroke="#fff" stroke-opacity=".6" fill="none"/><ellipse cx="196" cy="50" rx="12" ry="15" fill="#ff4f6b"/>' +
+    '<path d="M282 84q-3 8 0 16" stroke="#fff" stroke-opacity=".6" fill="none"/><ellipse cx="282" cy="70" rx="10" ry="13" fill="#c77dff"/></g>' +
+    '<path d="M100 116H222L292 200H28z" fill="#0a0614"/>' + pianoKeys +
+    '<g stroke-linecap="round" stroke-linejoin="round" fill="none">' +
+    '<path d="M160 112v30M160 118l-16-16M160 118l18-18M160 142l-12 14 0 16M160 142l12 12 6 14" stroke="#140a28" stroke-width="10"/>' +
+    '<path d="M160 112v30M160 118l-16-16M160 118l18-18M160 142l-12 14 0 16M160 142l12 12 6 14" stroke="#fff" stroke-width="5"/></g>' +
+    '<circle cx="160" cy="100" r="10" fill="#fff" stroke="#140a28" stroke-width="3"/>' +
+    '<circle cx="144" cy="102" r="4.5" fill="#ffdd55" stroke="#140a28" stroke-width="2"/><circle cx="178" cy="100" r="4.5" fill="#ffdd55" stroke="#140a28" stroke-width="2"/>' +
+    '</svg>';
+  var ARTS = { cactus: cactusArt, piano: pianoArt };
+
+  var coneIcon =
+    '<svg viewBox="0 0 30 34" aria-hidden="true"><rect x="2" y="29" width="26" height="4" rx="1" fill="#ff6a00" stroke="#22104a" stroke-width="1.5"/>' +
+    '<path d="M9 29 13 3h4l4 26z" fill="#ff6a00" stroke="#22104a" stroke-width="1.5"/><path d="M11 18h8l1 5H10z" fill="#fff"/></svg>';
+
+  var shelf = document.getElementById("shelf");
+  for (var i = 0; i < TOTAL; i++) {
+    var g = GAMES[i];
+    var li = document.createElement("li");
+    if (g && g.ready) {
+      li.innerHTML =
+        '<article class="cart">' +
+          '<div class="label">' +
+            '<div class="art">' + (ARTS[g.art] || "") + '</div>' +
+            '<div class="text">' +
+              '<p class="slot">Game ' + (i + 1) + '</p>' +
+              '<h2>' + g.title + '</h2>' +
+              '<p class="desc">' + g.desc + '</p>' +
+              '<ul class="needs">' + g.needs.map(function (n) { return "<li>" + n + "</li>"; }).join("") + '</ul>' +
+            '</div>' +
+          '</div>' +
+          '<a class="play" href="' + g.href + '" data-game="' + g.title + '">Play ' + g.title + '</a>' +
+        '</article>';
+    } else {
+      li.innerHTML =
+        '<article class="cart wip" aria-label="Game ' + (i + 1) + ', under construction">' +
+          '<div class="label">' +
+            '<div class="art"><div class="tape">' + coneIcon + 'Under construction</div></div>' +
+            '<div class="text">' +
+              '<p class="slot">Game ' + (i + 1) + '</p>' +
+              '<h2>Coming soon</h2>' +
+              '<p class="desc">fake0h is still building this one.</p>' +
+            '</div>' +
+          '</div>' +
+          '<div class="soon">Not playable yet</div>' +
+        '</article>';
+    }
+    shelf.appendChild(li);
+  }
+
+  var readyCount = GAMES.filter(function (g) { return g.ready; }).length;
+  document.getElementById("shelfNote").textContent =
+    readyCount + (readyCount === 1 ? " game" : " games") + " ready to play, " + (TOTAL - readyCount) + " more being built.";
+
+  // Marquee bulbs around the sign
+  var bulbs = document.getElementById("bulbs");
+  function placeBulbs() {
+    bulbs.innerHTML = "";
+    var w = bulbs.clientWidth, h = bulbs.clientHeight, gap = 34;
+    var nx = Math.max(2, Math.round(w / gap)), ny = Math.max(2, Math.round(h / gap));
+    var pts = [];
+    for (var x = 0; x <= nx; x++) { pts.push([x / nx * 100, 0]); pts.push([x / nx * 100, 100]); }
+    for (var y = 1; y < ny; y++) { pts.push([0, y / ny * 100]); pts.push([100, y / ny * 100]); }
+    pts.forEach(function (p) {
+      var b = document.createElement("span");
+      b.className = "bulb"; b.style.left = p[0] + "%"; b.style.top = p[1] + "%";
+      bulbs.appendChild(b);
+    });
+  }
+  placeBulbs();
+  window.addEventListener("resize", placeBulbs);
+
+  // In the Claude preview the game can't use the camera, so explain where to play it
+  var inPreview = window.top !== window.self || /claude/i.test(location.hostname);
+  var notice = document.getElementById("notice"), hideTimer;
+  shelf.addEventListener("click", function (e) {
+    var a = e.target.closest(".play");
+    if (!a || !inPreview) return;
+    e.preventDefault();
+    notice.textContent = a.getAttribute("data-game") + " uses your webcam, so it opens from the downloaded fake0hs Arcade folder. Open index.html in that folder and click Play.";
+    notice.classList.add("show");
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(function () { notice.classList.remove("show"); }, 6000);
+  });
+
+  // Light / dark switch
+  var btn = document.getElementById("themeBtn"), root = document.documentElement;
+  function isDark() {
+    var t = root.getAttribute("data-theme");
+    return t ? t === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  function label() { btn.textContent = isDark() ? "Switch to light mode" : "Switch to dark mode"; }
+  try { var saved = localStorage.getItem("arcade-theme"); if (saved) root.setAttribute("data-theme", saved); } catch (e) {}
+  label();
+  btn.addEventListener("click", function () {
+    var next = isDark() ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("arcade-theme", next); } catch (e) {}
+    label();
+  });
+})();
+</script>
+</body>
+</html>
