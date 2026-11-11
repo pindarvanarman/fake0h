@@ -1,0 +1,50 @@
+  :root {
+    --ink: #2b1a12;
+    --paper: #fff4e0;
+    --sun: #ffb43b;
+    --rust: #ff4f8b;
+    --cactus: #3f7d3a;
+    --panel: rgba(255, 244, 224, 0.94);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #fff4e0;
+      --paper: #24140e;
+      --panel: rgba(36, 20, 14, 0.92);
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #24140e; overflow: hidden; font-family: "Nunito", system-ui, sans-serif; }
+  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  video#cam { display: none; }
+  #overlay {
+    position: fixed; inset: 0; display: grid; place-items: center; padding: 24px;
+  }
+  #overlay.hidden { display: none; }
+  .card {
+    background: var(--panel); color: var(--ink); max-width: 440px; width: 100%;
+    padding: 28px 28px 24px; border-radius: 18px; border: 3px solid var(--ink);
+    box-shadow: 8px 8px 0 var(--rust); text-align: center;
+  }
+  h1 { font-family: "Bungee", "Impact", sans-serif; font-weight: 400; font-size: clamp(2rem, 7vw, 3rem); line-height: 1; margin: 0 0 12px; color: var(--rust); letter-spacing: 0.02em; }
+  p { margin: 0 0 14px; line-height: 1.45; font-size: 1rem; }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+  button {
+    font: 800 1rem "Nunito", system-ui, sans-serif; cursor: pointer;
+    padding: 12px 20px; border-radius: 12px; border: 3px solid var(--ink);
+    background: var(--sun); color: #2b1a12;
+  }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible { outline: 3px solid var(--rust); outline-offset: 3px; }
+  #status { font-size: 0.9rem; opacity: 0.8; min-height: 1.3em; margin: 10px 0 0; }
+  a.back { display: inline-block; margin-bottom: 14px; font-weight: 800; font-size: 0.9rem; color: var(--ink); opacity: 0.75; text-decoration: none; }
+  a.back:hover { opacity: 1; text-decoration: underline; }
+  .exit-btn {
+    position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); right: 16px; z-index: 30;
+    font: 800 0.95rem "Nunito", system-ui, sans-serif; color: #fff4e0; text-decoration: none;
+    background: rgba(20, 10, 40, 0.78); border: 2px solid rgba(255, 244, 224, 0.7); border-radius: 99px; padding: 7px 16px;
+  }
+  .exit-btn:hover { background: rgba(196, 72, 43, 0.95); border-color: #fff4e0; }
+  .exit-btn:focus-visible { outline: 3px solid #ffd23f; outline-offset: 3px; }
