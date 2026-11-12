@@ -386,14 +386,13 @@
       art: "bloom"
     },
     {
-      // TEMPORARY test game for checking scores. Replace with a real game later.
       ready: true,
-      id: "space-win-1",
-      title: "Spacebar Win 1",
-      href: "games/space-win/index.html?slot=1",
-      desc: "Test game: press the space bar to win. For checking scores.",
-      needs: ["Keyboard or tap", "Test game"],
-      art: "space"
+      id: "stick-fight",
+      title: "Stick Fight",
+      href: "games/stick-fight/index.html",
+      desc: "Fight the crazy computer or your own shadow. Your stick figure copies every move.",
+      needs: ["Webcam", "Full body", "Buttons work too"],
+      art: "fight"
     },
     {
       // TEMPORARY test game for checking scores. Replace with a real game later.
@@ -568,7 +567,19 @@
     '<text x="50" y="70" text-anchor="middle" font-family="Nunito, sans-serif" font-weight="900" font-size="9" fill="#2b4a7a">SPACE</text>' +
     '<text x="50" y="96" text-anchor="middle" font-family="Bungee, Impact, sans-serif" font-size="10" fill="#ffd23f">TO WIN</text>' +
     '</svg>';
-  var ARTS = { space: spaceArt, cactus: cactusArt, piano: pianoArt, leo: leoArt, abducted: abductedArt, sunny: sunnyArt, bloom: bloomArt };
+  var fightArt =
+    '<svg viewBox="0 0 100 120" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">' +
+    '<defs><linearGradient id="fsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b0624"/><stop offset="1" stop-color="#3a1550"/></linearGradient></defs>' +
+    '<rect width="100" height="120" fill="url(#fsky)"/>' +
+    '<circle cx="80" cy="18" r="9" fill="#fff6c8"/>' +
+    '<rect x="0" y="92" width="100" height="28" fill="#140a28"/><rect x="0" y="91" width="100" height="2" fill="#ff4f8b"/>' +
+    '<g fill="none" stroke="#4fd6ff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="28" cy="46" r="6" fill="#0b0624"/><path d="M28 52 L30 72 M30 72 L22 91 M30 72 L37 90 M29 57 L40 56 L52 52 M29 58 L22 66 L28 62"/></g>' +
+    '<g fill="none" stroke="#ff4f6b" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="70" cy="44" r="6" fill="#0b0624"/><path d="M70 50 L68 70 M68 70 L76 90 M68 70 L54 64 L44 66 M69 55 L78 62 L74 50 M69 55 L60 50"/></g>' +
+    '<text x="50" y="30" text-anchor="middle" font-family="Bungee, Impact, sans-serif" font-size="11" fill="#ffd23f" stroke="#07040f" stroke-width="1">POW!</text>' +
+    '</svg>';
+  var ARTS = { fight: fightArt, space: spaceArt, cactus: cactusArt, piano: pianoArt, leo: leoArt, abducted: abductedArt, sunny: sunnyArt, bloom: bloomArt };
 
   var coneIcon =
     '<svg viewBox="0 0 30 34" aria-hidden="true"><rect x="2" y="29" width="26" height="4" rx="1" fill="#ff6a00" stroke="#22104a" stroke-width="1.5"/>' +
@@ -583,6 +594,7 @@
     abducted: { body: "#1d2a22", hi: "#2f4436", accent: "#7dff6b", neon: "#7dff6b" },
     sunny: { body: "#2f9a84", hi: "#4fbaa4", accent: "#ffd23f", neon: "#ffe27a" },
     bloom: { body: "#4f9a3a", hi: "#6fba5a", accent: "#ff8fb8", neon: "#b8ff9a" },
+    fight: { body: "#a8233a", hi: "#cc3a52", accent: "#4fd6ff", neon: "#ff8fa3" },
     space: { body: "#2b4a7a", hi: "#3f66a0", accent: "#4fd6ff", neon: "#7fe4ff" }
   };
   var READY_COUNT = GAMES.filter(function (g) { return g.ready; }).length;

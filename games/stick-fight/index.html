@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stick Fight · fake0hs Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+<!--
+  Stick Fight: a webcam fighting game for fake0hs Arcade.
+  The camera watches you and your stick figure copies every move: punch, kick, spin for a
+  helicopter kick, cross your arms to block, jump. Buttons and keys work too, any time.
+  Two ways to play: fight the crazy computer, or record yourself and fight your own shadow.
+  Each fighter has 3 hearts. Beating your opponent counts as a win in the arcade.
+-->
+<style>
+  :root { color-scheme: dark; --ink: #f2eeff; --cyan: #4fd6ff; --red: #ff4f6b; --gold: #ffd23f; --panel: #120a24; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #07040f; color: var(--ink); font-family: Nunito, system-ui, sans-serif; }
+  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #cam {
+    position: fixed; right: 14px; bottom: 92px; width: min(190px, 26vw); border-radius: 10px; z-index: 6;
+    transform: scaleX(-1); border: 2px solid rgba(79, 214, 255, 0.6); opacity: 0.85; display: none;
+  }
+  #cam.on { display: block; }
+  .exit-btn {
+    position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 30;
+    font: 900 0.9rem Nunito, sans-serif; color: var(--ink); text-decoration: none;
+    background: rgba(8, 6, 20, 0.8); border: 2px solid rgba(242, 238, 255, 0.5); border-radius: 99px; padding: 5px 14px;
+  }
+  .exit-btn:hover { border-color: #fff; background: #3a1030; }
+  .exit-btn:focus-visible, button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
+  #overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 18px; background: rgba(5, 3, 12, 0.72); }
+  #overlay.hidden { display: none; }
+  .card {
+    width: min(560px, 100%); max-height: 92vh; overflow: auto; text-align: center;
+    background: var(--panel); border: 2px solid #3a2470; border-radius: 18px; padding: 22px 24px;
+    box-shadow: 0 0 50px rgba(79, 214, 255, 0.18);
+  }
+  .card h1 { font-family: Bungee, Impact, sans-serif; font-weight: 400; margin: 0 0 6px; font-size: clamp(1.8rem, 6vw, 2.6rem); color: var(--gold);
+             text-shadow: 3px 3px 0 #ff4f6b; }
+  .card p { margin: 8px 0; line-height: 1.45; }
+  .card .moves { text-align: left; font-size: 0.95rem; background: rgba(0,0,0,0.25); border-radius: 12px; padding: 10px 14px; margin: 10px 0; }
+  .card .moves b { color: var(--cyan); }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+  .card button {
+    font: 900 1rem Nunito, sans-serif; cursor: pointer; padding: 11px 20px; border-radius: 12px;
+    border: 2px solid var(--cyan); background: var(--cyan); color: #07142a;
+  }
+  .card button.secondary { background: transparent; color: var(--ink); border-color: #4a3a80; }
+  .card button.red { background: var(--red); border-color: var(--red); color: #fff; }
+  #status { min-height: 1.4em; color: var(--gold); font-weight: 900; }
+  .small { font-size: 0.85rem; opacity: 0.75; }
+
+  /* on-screen buttons: always there, so you can fight even if the camera can't see you */
+  #controls {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: none;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); gap: 6px; justify-content: center; flex-wrap: wrap;
+    background: linear-gradient(transparent, rgba(5, 3, 12, 0.85) 35%);
+  }
+  #controls.on { display: flex; }
+  #controls.glow button { border-color: var(--gold); box-shadow: 0 0 14px rgba(255, 210, 63, 0.6); }
+  #controls button {
+    font: 900 0.95rem Nunito, sans-serif; color: var(--ink); cursor: pointer; user-select: none; -webkit-user-select: none;
+    min-width: 58px; padding: 10px 12px; border-radius: 12px; border: 2px solid #4a3a80; background: rgba(30, 18, 60, 0.9);
+    touch-action: none;
+  }
+  #controls button:active, #controls button.down { background: #3a2470; transform: translateY(2px); }
+  #controls .gap { width: 14px; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<video id="cam" playsinline muted></video>
+<a class="exit-btn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
+
+<div id="controls" aria-label="Fight buttons">
+  <button data-act="left" aria-label="Move left">◀</button>
+  <button data-act="right" aria-label="Move right">▶</button>
+  <button data-act="jump">Jump</button>
+  <span class="gap"></span>
+  <button data-act="punch">Punch</button>
+  <button data-act="kick">Kick</button>
+  <button data-act="heli">Helicopter</button>
+  <button data-act="block">Block</button>
+</div>
+
+<div id="overlay">
+  <div class="card" id="card">
+    <h1>Stick Fight</h1>
+    <p>Stand back so the camera can see you. Your stick figure copies everything you do, so fight for real!</p>
+    <div class="moves">
+      <b>Punch</b>: punch fast toward the right side of the screen<br>
+      <b>Kick</b>: kick a foot up high<br>
+      <b>Helicopter kick</b>: spin all the way around, or hold your arms out wide like helicopter blades<br>
+      <b>Block</b>: cross both arms in front of your face<br>
+      <b>Jump</b>: jump! Jumping dodges punches and kicks<br>
+      There may be a few secret moves, too…
+    </div>
+    <p>Each fighter has 3 hearts. Knock out your opponent to win!</p>
+    <div class="row">
+      <button id="btnCam">Start camera</button>
+      <button id="btnKeys" class="secondary">Play with buttons and keys</button>
+    </div>
+    <p id="status" aria-live="polite"></p>
+  </div>
+</div>
+
+<script src="../../arcade-progress.js"></script>
+<script>
+(function () {
+"use strict";
+
+const MP_VERSION = "0.10.14";
+const MP_BASE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}`;
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const video = document.getElementById("cam");
+const overlay = document.getElementById("overlay");
+const card = document.getElementById("card");
+const statusEl = document.getElementById("status");
+const controlsEl = document.getElementById("controls");
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+// size of one "torso unit" in pixels; a fighter is about 3.6 units tall
+const S = () => Math.min(H * 0.1, W * 0.075);
+const groundY = () => H * 0.8;
+
+// =====================================================================
+// AUDIO (synthesized, no files needed)
+// =====================================================================
+let actx = null, noiseBuf = null;
+function audio() {
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+function tone(freq, dur, type, vol, delay, slideTo) {
+  const a = audio(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain(), t0 = a.currentTime + (delay || 0);
+  o.type = type || "square"; o.frequency.setValueAtTime(freq, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  g.gain.setValueAtTime(vol || 0.06, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(a.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+}
+function noise(dur, vol, freq, q, sweepTo) {
+  const a = audio(); if (!a) return;
+  const src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(), t0 = a.currentTime;
+  src.buffer = noiseBuf; f.type = "bandpass"; f.frequency.setValueAtTime(freq, t0); f.Q.value = q || 1;
+  if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(f).connect(g).connect(a.destination); src.start(t0); src.stop(t0 + dur + 0.05);
+}
+const sfx = {
+  whoosh() { noise(0.18, 0.25, 600, 1.2, 2400); },
+  hit() { noise(0.12, 0.6, 900, 0.8); tone(110, 0.22, "sine", 0.35, 0, 50); },
+  block() { tone(880, 0.08, "square", 0.08); tone(1320, 0.12, "triangle", 0.06, 0.03); },
+  heli() { for (let i = 0; i < 5; i++) noise(0.08, 0.18, 1200 + i * 200, 2); tone(220, 0.6, "sawtooth", 0.04, 0, 660); },
+  jump() { tone(300, 0.15, "square", 0.05, 0, 600); },
+  ko() { tone(440, 0.9, "sawtooth", 0.1, 0, 60); noise(0.6, 0.4, 300, 0.7); },
+  bell() { tone(988, 0.6, "triangle", 0.12); tone(1480, 0.5, "sine", 0.06, 0.02); },
+  fire() { noise(0.5, 0.35, 300, 0.6, 1600); tone(150, 0.45, "sawtooth", 0.07, 0, 400); },
+  win() { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, 0.22, "square", 0.06, i * 0.11)); },
+  egg() { [660, 880, 1100, 1320].forEach((f, i) => tone(f, 0.12, "triangle", 0.07, i * 0.07)); },
+  beep() { tone(660, 0.12, "square", 0.06); }
+};
+
+// =====================================================================
+// SKELETON
+// Local coordinates: origin between the hips, y points down, x points FORWARD
+// (toward the opponent). 1 unit = torso length. Feet rest at y = 1.9.
+// =====================================================================
+const JOINTS = ["head", "neck", "lSh", "rSh", "lEl", "rEl", "lWr", "rWr", "lHip", "rHip", "lKn", "rKn", "lAn", "rAn"];
+function blank() { const s = {}; JOINTS.forEach(j => s[j] = [0, 0]); return s; }
+function copyPose(p) { const s = {}; JOINTS.forEach(j => s[j] = [p[j][0], p[j][1]]); return s; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function lerpP(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t)]; }
+function blendPose(a, b, t) { const s = {}; JOINTS.forEach(j => s[j] = lerpP(a[j], b[j], t)); return s; }
+const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
+// a strike curve: out fast, hold, back
+const strike = t => t < 0.35 ? ease(t / 0.35) : t < 0.6 ? 1 : 1 - ease((t - 0.6) / 0.4);
+
+function stance(T, bob) {
+  const b = Math.sin(T * 6) * 0.04 * (bob == null ? 1 : bob);
+  const p = blank();
+  p.neck = [0.05, -1 + b]; p.head = [0.1, -1.38 + b];
+  p.lSh = p.neck.slice(); p.rSh = p.neck.slice();
+  p.rEl = [0.38, -0.72 + b]; p.rWr = [0.62, -1.02 + b];   // lead fist up
+  p.lEl = [0.1, -0.6 + b]; p.lWr = [0.35, -0.92 + b];     // rear fist guarding the chin
+  p.lHip = [0, 0]; p.rHip = [0, 0];
+  p.rKn = [0.32, 0.95]; p.rAn = [0.42, 1.9];              // lead leg
+  p.lKn = [-0.18, 0.95]; p.lAn = [-0.38, 1.9];            // back leg
+  return p;
+}
+function walkPose(T, dir) {
+  const p = stance(T, 0.4), w = Math.sin(T * 12) * 0.35;
+  p.rKn = [0.25 + w * 0.5, 0.92]; p.rAn = [0.25 + w, 1.9 - Math.max(0, w) * 0.25];
+  p.lKn = [-0.1 - w * 0.5, 0.92]; p.lAn = [-0.25 - w, 1.9 - Math.max(0, -w) * 0.25];
+  return p;
+}
+function punchPose(T, t, upper) {
+  const p = stance(T, 0), k = strike(t);
+  p.neck[0] += 0.18 * k; p.head[0] += 0.22 * k;
+  p.lSh = p.neck.slice(); p.rSh = p.neck.slice();
+  if (upper) { p.rEl = lerpP([0.38, -0.72], [0.55, -1.3], k); p.rWr = lerpP([0.62, -1.02], [0.7, -2.0], k); }
+  else { p.rEl = lerpP([0.38, -0.72], [0.85, -0.98], k); p.rWr = lerpP([0.62, -1.02], [1.5, -1.0], k); }
+  p.rKn[0] += 0.15 * k; p.rAn[0] += 0.2 * k;
+  return p;
+}
+function kickPose(T, t) {
+  const p = stance(T, 0), k = strike(t);
+  p.neck = [lerp(0.05, -0.25, k), -1]; p.head = [lerp(0.1, -0.35, k), -1.36];
+  p.lSh = p.neck.slice(); p.rSh = p.neck.slice();
+  p.rKn = lerpP([0.32, 0.95], [0.8, 0.05], k); p.rAn = lerpP([0.42, 1.9], [1.75, -0.2], k);
+  p.lKn = [-0.1, 0.95]; p.lAn = [-0.2, 1.9];
+  p.rEl = lerpP(p.rEl, [0.2, -0.5], k); p.rWr = lerpP(p.rWr, [-0.2, -0.4], k);
+  return p;
+}
+function heliPose(T, t) {
+  // spinning in the air with both legs straight out like helicopter blades
+  const p = blank(), a = t * Math.PI * 6;
+  p.neck = [0, -1]; p.head = [0, -1.38]; p.lSh = p.neck.slice(); p.rSh = p.neck.slice();
+  const c = Math.cos(a), s = Math.sin(a) * 0.3;
+  p.rKn = [c * 0.95, 0.25 + s * 0.5]; p.rAn = [c * 1.9, 0.35 + s];
+  p.lKn = [-c * 0.95, 0.25 - s * 0.5]; p.lAn = [-c * 1.9, 0.35 - s];
+  p.rEl = [c * 0.7, -0.9]; p.rWr = [c * 1.35, -0.85];
+  p.lEl = [-c * 0.7, -0.9]; p.lWr = [-c * 1.35, -0.85];
+  return p;
+}
+function blockPose(T) {
+  const p = stance(T, 0.3);
+  p.rEl = [0.42, -0.85]; p.rWr = [0.38, -1.45];
+  p.lEl = [0.3, -0.75]; p.lWr = [0.45, -1.3];
+  p.neck[0] -= 0.05; p.head[0] -= 0.05;
+  return p;
+}
+function jumpPose(T, t) {
+  const p = stance(T, 0);
+  p.rKn = [0.45, 0.45]; p.rAn = [0.1, 1.05]; p.lKn = [0.1, 0.55]; p.lAn = [-0.35, 1.1];
+  p.rEl = [0.35, -1.2]; p.rWr = [0.55, -1.7];
+  return p;
+}
+function hitPose(T, t) {
+  const p = stance(T, 0), k = 1 - ease(t);
+  p.neck = [-0.35 * k + 0.05, -0.95]; p.head = [-0.5 * k + 0.1, -1.3];
+  p.lSh = p.neck.slice(); p.rSh = p.neck.slice();
+  p.rEl = [0.1, -0.9 - 0.4 * k]; p.rWr = [0.3, -1.5 * k - 0.5];
+  p.lEl = [-0.4, -0.7 - 0.3 * k]; p.lWr = [-0.7, -1.2 * k - 0.4];
+  return p;
+}
+function firePose(T, t) {
+  const p = stance(T, 0), k = strike(t);
+  p.rEl = lerpP([0.38, -0.72], [0.8, -0.9], k); p.rWr = lerpP([0.62, -1.02], [1.35, -0.95], k);
+  p.lEl = lerpP([0.1, -0.6], [0.75, -0.8], k); p.lWr = lerpP([0.35, -0.92], [1.3, -0.82], k);
+  return p;
+}
+function dabPose(T) {
+  const p = stance(T, 0);
+  p.head = [0.25, -1.25];
+  p.rEl = [0.45, -1.35]; p.rWr = [0.05, -1.3];     // face in the elbow
+  p.lEl = [-0.6, -1.4]; p.lWr = [-1.2, -1.85];     // other arm up and out
+  return p;
+}
+function koPose() {
+  const p = blank();
+  p.neck = [-1.0, 1.75]; p.head = [-1.4, 1.75]; p.lSh = p.neck.slice(); p.rSh = p.neck.slice();
+  p.rEl = [-0.6, 1.5]; p.rWr = [-0.2, 1.75]; p.lEl = [-1.3, 1.5]; p.lWr = [-1.7, 1.8];
+  p.lHip = [0, 1.75]; p.rHip = [0, 1.75];
+  p.rKn = [0.9, 1.6]; p.rAn = [1.8, 1.85]; p.lKn = [0.85, 1.85]; p.lAn = [1.7, 1.88];
+  return p;
+}
+
+// =====================================================================
+// FIGHTERS
+// =====================================================================
+const ATTACKS = {
+  //            time  hit at   reach  lunge  name
+  punch:  { dur: 0.42, at: 0.3, reach: 2.6, lunge: 0.6 },
+  upper:  { dur: 0.48, at: 0.3, reach: 2.2, lunge: 0.4 },
+  kick:   { dur: 0.55, at: 0.32, reach: 3.0, lunge: 0.5 },
+  heli:   { dur: 0.95, at: 0.25, reach: 3.4, lunge: 1.4 },
+  fire:   { dur: 0.5, at: 0.35, reach: 0, lunge: 0 }
+};
+function makeFighter(side) {
+  return {
+    side,                       // "L" (you) or "R" (opponent)
+    x: 0, y: 0, vy: 0,          // y = how high off the ground (in units, up is positive)
+    hp: 3, act: null, actT: 0, hitDone: false,
+    blocking: false, inv: 0, hitT: 0, dizzy: 0, ko: false,
+    pose: stance(0), source: "proc",   // "proc" (animated), "cam" (your body), "replay" (your shadow)
+    knock: 0, walk: 0, color: side === "L" ? "#4fd6ff" : "#ff4f6b", trail: []
+  };
+}
+let P1 = makeFighter("L"), P2 = makeFighter("R");
+
+// =====================================================================
+// GAME STATE
+// =====================================================================
+let state = "menu";             // menu, record, countdown, fight, over
+let mode = "cpu";               // cpu or shadow
+let cameraOn = false, useCamera = false;
+let T = 0, slow = 1, shake = 0, countdown = 0, overT = 0, banner = null;
+let particles = [], texts = [], fireballs = [];
+let recording = [], recT = 0, replayT = 0;
+const REC_SECONDS = 12;
+let lostT = 0;                  // how long the camera hasn't seen you
+const eggs = { bigHeads: false, rainbow: false, moon: false };
+const keysDown = {};
+
+function playerName() { return (window.ArcadeProgress && ArcadeProgress.player()) || "You"; }
+
+function resetFighters() {
+  P1 = makeFighter("L"); P2 = makeFighter("R");
+  P1.x = W * 0.3; P2.x = W * 0.7;
+  fireballs = []; particles = []; texts = [];
+}
+
+// =====================================================================
+// CAMERA AND BODY TRACKING
+// =====================================================================
+let landmarker = null, rawPose = null, lastVideoTime = -1;
+
+async function startCamera() {
+  audio();
+  if (window.top !== window.self) {
+    statusEl.textContent = "This is running inside a preview window, which can't use the camera. Open the game from the arcade, or play with buttons and keys.";
+    return;
+  }
+  if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    statusEl.textContent = "This browser won't allow the camera here. Try Chrome or Edge, or play with buttons and keys.";
+    return;
+  }
+  statusEl.textContent = "Asking for camera access…";
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }, audio: false
+    });
+    video.srcObject = stream;
+    await video.play();
+  } catch (e) {
+    const msgs = {
+      NotAllowedError: "Camera permission was denied. Click the camera icon in the address bar, choose Allow, then reload.",
+      NotFoundError: "No camera was found. You can still play with buttons and keys.",
+      NotReadableError: "The camera is busy. Close other apps using it (Zoom, Teams, FaceTime), then try again."
+    };
+    statusEl.textContent = msgs[e.name] || ("Camera error: " + (e.name || "") + " " + (e.message || e));
+    return;
+  }
+  statusEl.textContent = "Camera on. Loading body tracking (first time takes a few seconds)…";
+  let PoseLandmarker, FilesetResolver;
+  try {
+    ({ PoseLandmarker, FilesetResolver } = await import(`${MP_BASE}/vision_bundle.mjs`));
+  } catch (e) {
+    statusEl.textContent = "Couldn't download the body-tracking library. Check your internet connection or ad blocker, then reload.";
+    return;
+  }
+  try {
+    const files = await FilesetResolver.forVisionTasks(`${MP_BASE}/wasm`);
+    const modelAssetPath = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+    try {
+      landmarker = await PoseLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath, delegate: "GPU" }, runningMode: "VIDEO", numPoses: 1 });
+    } catch (e) {
+      landmarker = await PoseLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath, delegate: "CPU" }, runningMode: "VIDEO", numPoses: 1 });
+    }
+  } catch (e) {
+    statusEl.textContent = "Body tracking failed to load (" + (e.message || e) + "). Check your internet connection and reload.";
+    return;
+  }
+  cameraOn = true; useCamera = true;
+  video.classList.add("on");
+  showModeCard();
+}
+
+function detectPose() {
+  if (!landmarker || video.readyState < 2) return;
+  if (video.currentTime === lastVideoTime) return;
+  lastVideoTime = video.currentTime;
+  const res = landmarker.detectForVideo(video, performance.now());
+  rawPose = res.landmarks && res.landmarks.length ? res.landmarks[0] : null;
+}
+const vis = lm => lm && (lm.visibility == null ? 1 : lm.visibility) > 0.5;
+
+// Turn camera landmarks into the stick figure's skeleton.
+const LM = { head: 0, lSh: 11, rSh: 12, lEl: 13, rEl: 14, lWr: 15, rWr: 16, lHip: 23, rHip: 24, lKn: 25, rKn: 26, lAn: 27, rAn: 28 };
+let camPose = null, camTorso = 0.25, camHipX = 0.5, camHipY = 0.6, hipBase = null, shBase = 0, camSeen = false;
+let hist = [];   // recent skeletons, for spotting moves
+function readCamera(dt) {
+  camSeen = false;
+  const lm = rawPose;
+  if (!lm || !vis(lm[11]) || !vis(lm[12]) || !(vis(lm[23]) || vis(lm[24]))) return;
+  const ar = (video.videoWidth || 640) / (video.videoHeight || 480);
+  const pt = i => [(1 - lm[i].x) * ar, lm[i].y];      // mirror, like a selfie
+  const hipA = pt(23), hipB = pt(24), shA = pt(11), shB = pt(12);
+  const hip = [(hipA[0] + hipB[0]) / 2, (hipA[1] + hipB[1]) / 2];
+  const sh = [(shA[0] + shB[0]) / 2, (shA[1] + shB[1]) / 2];
+  const torso = Math.hypot(sh[0] - hip[0], sh[1] - hip[1]);
+  if (torso < 0.05) return;
+  camTorso = camTorso * 0.85 + torso * 0.15;
+  const u = camTorso;
+  const loc = i => { const p = pt(i); return [(p[0] - hip[0]) / u, (p[1] - hip[1]) / u]; };
+  const p = blank();
+  Object.keys(LM).forEach(k => { p[k] = loc(LM[k]); });
+  p.neck = [(p.lSh[0] + p.rSh[0]) / 2, (p.lSh[1] + p.rSh[1]) / 2];
+  p.head = [p.head[0], p.head[1] - 0.12];
+  // legs out of view? use fighting-stance legs instead
+  const st = stance(T, 0.5);
+  if (!vis(lm[25]) || !vis(lm[27])) { p.lKn = st.lKn; p.lAn = st.lAn; }
+  if (!vis(lm[26]) || !vis(lm[28])) { p.rKn = st.rKn; p.rAn = st.rAn; }
+  // plant the lower foot on the floor (a real jump is handled separately)
+  const drop = Math.max(-1, Math.min(1, 1.9 - Math.max(p.lAn[1], p.rAn[1])));
+  JOINTS.forEach(j => { p[j][1] += drop; });
+  // smooth a little so the figure doesn't jitter
+  if (camPose) JOINTS.forEach(j => { p[j] = lerpP(camPose[j], p[j], 0.65); });
+  camPose = p;
+  camHipX = camHipX * 0.7 + (hip[0] / ar) * 0.3;
+  camHipY = hip[1];
+  if (hipBase == null) hipBase = hip[1];
+  // the "standing" hip height slowly follows you, but not while you're up in the air
+  if (hip[1] > hipBase - 0.02) hipBase = hipBase * 0.97 + hip[1] * 0.03;
+  const shW = Math.hypot(shA[0] - shB[0], shA[1] - shB[1]) / u;
+  if (shW > shBase * 0.8) shBase = Math.max(shBase * 0.995, shW); else shBase *= 0.999;
+  hist.push({ t: T, p: copyPose(p), shW });
+  while (hist.length && T - hist[0].t > 1.8) hist.shift();
+  camSeen = true;
+}
+
+// ---------- spotting moves in your body ----------
+let cool = { punch: 0, kick: 0, heli: 0, fire: 0, dab: 0 };
+let spinStart = -1, wideT = 0, wideReady = true;
+function past(sec) { for (let i = hist.length - 1; i >= 0; i--) if (T - hist[i].t >= sec) return hist[i]; return hist[0]; }
+function detectMoves(f) {
+  for (const k in cool) cool[k] = Math.max(0, cool[k] - 1 / 60);
+  if (!camSeen || hist.length < 4) return;
+  const now = hist[hist.length - 1].p, before = past(0.14).p, dtv = Math.max(0.05, T - past(0.14).t);
+  const busy = f.act && f.act !== "punch" && f.act !== "upper";
+
+  // block: both fists up in front of your face
+  const nearFace = w => Math.abs(w[0] - now.head[0]) < 0.6 && w[1] < now.neck[1] + 0.25 && w[1] > now.head[1] - 0.6;
+  f.blocking = nearFace(now.lWr) && nearFace(now.rWr) && Math.abs(now.lWr[0] - now.rWr[0]) < 0.7;
+
+  // secret: fireball, both hands together pushed forward
+  const together = Math.hypot(now.lWr[0] - now.rWr[0], now.lWr[1] - now.rWr[1]) < 0.45;
+  const fwdL = now.lWr[0] - now.neck[0], fwdR = now.rWr[0] - now.neck[0];
+  if (together && fwdL > 0.9 && fwdR > 0.9 && (now.rWr[0] - before.rWr[0]) / dtv > 2 && !cool.fire && !busy) {
+    if (startAction(f, "fire")) { cool.fire = 1.2; discover("Fireball"); return; }
+  }
+
+  // secret: dab, face in one elbow and the other arm up and out
+  const dabA = Math.hypot(now.rEl[0] - now.head[0], now.rEl[1] - now.head[1]) < 0.55 && now.lWr[1] < now.head[1] && Math.abs(now.lWr[0] - now.neck[0]) > 0.9;
+  const dabB = Math.hypot(now.lEl[0] - now.head[0], now.lEl[1] - now.head[1]) < 0.55 && now.rWr[1] < now.head[1] && Math.abs(now.rWr[0] - now.neck[0]) > 0.9;
+  if ((dabA || dabB) && !cool.dab && !busy) { cool.dab = 3; doDab(f); }
+
+  // helicopter: spin around (your shoulders get narrow, then wide again)
+  if (now.shW < shBase * 0.4) { if (spinStart < 0) spinStart = T; }
+  else if (spinStart >= 0) {
+    if (now.shW > shBase * 0.75 && T - spinStart < 2 && T - spinStart > 0.15 && !cool.heli && startAction(f, "heli")) cool.heli = 1.2;
+    if (now.shW > shBase * 0.75 || T - spinStart > 2) spinStart = -1;
+  }
+  // helicopter: or hold both arms out wide like blades
+  const wide = Math.abs(now.lWr[1] - now.neck[1]) < 0.45 && Math.abs(now.rWr[1] - now.neck[1]) < 0.45 &&
+               Math.abs(now.lWr[0] - now.rWr[0]) > 2.3;
+  wideT = wide ? wideT + 1 / 60 : 0;
+  if (!wide) wideReady = true;                  // arms must come down before the next one
+  if (wideT > 0.35 && wideReady && !cool.heli && !busy && startAction(f, "heli")) { cool.heli = 1.4; wideT = 0; wideReady = false; }
+  if (busy) return;
+
+  // kick: a foot comes up high
+  ["lAn", "rAn"].forEach(a => {
+    if (!cool.kick && now[a][1] < 0.95 && (before[a][1] - now[a][1]) / dtv > 1.5) {
+      if (startAction(f, "kick", true)) cool.kick = 0.55;
+    }
+  });
+  // punch: a fist shoots out to the side the opponent is on; uppercut: a fist shoots up
+  ["lWr", "rWr"].forEach(w => {
+    if (cool.punch) return;
+    const vx = (now[w][0] - before[w][0]) / dtv, vy = (now[w][1] - before[w][1]) / dtv;
+    if (now[w][0] - now.neck[0] > 0.85 && vx > 3.2 && now[w][1] > now.head[1] - 0.5 && now[w][1] < 0.4) {
+      if (startAction(f, "punch", true)) cool.punch = 0.3;
+    } else if (vy < -4.5 && now[w][1] < now.head[1] && Math.abs(now[w][0] - now.neck[0]) < 0.9) {
+      if (startAction(f, "upper", true)) cool.punch = 0.4;
+    }
+  });
+}
+
+// =====================================================================
+// ACTIONS AND HITS
+// =====================================================================
+// keepBody: when your camera skeleton already shows the move, don't replace it with an animation
+function startAction(f, a, keepBody) {
+  if (f.ko || f.dizzy > 0 || state !== "fight" && state !== "record") return false;
+  // a quick punch can be cut short by a bigger move; anything else has to finish first
+  const cancel = (f.act === "punch" || f.act === "upper") && a !== "punch" && a !== "upper";
+  if (f.act && !cancel && f.actT < 0.85 * (ATTACKS[f.act] ? ATTACKS[f.act].dur : 0.4)) return false;
+  f.act = a; f.actT = 0; f.hitDone = false; f.keepBody = !!keepBody;
+  if (a === "heli") { sfx.heli(); if (f.y < 0.3) f.vy = eggs.moon ? 5 : 7; }
+  else if (a === "fire") sfx.fire();
+  else sfx.whoosh();
+  if (state === "record") recEvent(a);
+  return true;
+}
+function jump(f) {
+  if (f.ko || f.y > 0.05) return;
+  f.vy = eggs.moon ? 8 : 10.5; sfx.jump();
+  if (state === "record") recEvent("jump");
+}
+function doDab(f) {
+  f.dab = 1.4; discover("Dab");
+  const o = f === P1 ? P2 : P1;
+  if (!o.ko) { o.dizzy = 1.6; addText(o.x, "LOL!", "#ffd23f"); }
+  if (state === "record") recEvent("dab");
+}
+
+function airborne(f) { return f.y > 0.55; }
+function resolveHit(att, def, type) {
+  if (def.ko || state !== "fight") return;
+  const s = S(), dist = Math.abs(att.x - def.x) / s;
+  if (dist > ATTACKS[type].reach) return;
+  if (airborne(def) && type !== "heli" && type !== "upper") { addText(def.x, "MISS", "#b8a6e0"); return; }
+  if (def.inv > 0) return;
+  if (def.blocking && def.dizzy <= 0) {
+    sfx.block(); addText(def.x, "BLOCK!", "#7fe4ff"); def.knock = 0.6 * Math.sign(def.x - att.x); burst(def, "#7fe4ff", 8);
+    return;
+  }
+  damage(def, att);
+}
+function damage(def, att) {
+  def.hp = Math.max(0, def.hp - 1); def.inv = 0.9; def.hitT = 0.45; def.act = null; def.dizzy = 0;
+  def.knock = 2.2 * Math.sign(def.x - att.x || 1);
+  sfx.hit(); shake = reduceMotion ? 0 : 14;
+  addText(def.x, ["POW!", "BAM!", "WHAM!", "KAPOW!", "BOOM!", "THWACK!"][Math.floor(Math.random() * 6)], "#ffd23f", true);
+  burst(def, def.color, 22);
+  if (def.hp <= 0) {
+    def.ko = true; slow = 0.25; sfx.ko();
+    setTimeout(() => endFight(def === P2), 1600);
+  }
+}
+
+function updateFighter(f, dt) {
+  const s = S();
+  f.inv = Math.max(0, f.inv - dt); f.hitT = Math.max(0, f.hitT - dt); f.dizzy = Math.max(0, f.dizzy - dt);
+  f.dab = Math.max(0, (f.dab || 0) - dt);
+  // gravity
+  if (f.source !== "replay") {
+    f.vy -= (eggs.moon ? 11 : 26) * dt;
+    f.y = Math.max(0, f.y + f.vy * dt);
+    if (f.y === 0 && f.vy < 0) f.vy = 0;
+  }
+  // knockback
+  f.x += f.knock * s * dt * 3; f.knock *= Math.pow(0.02, dt);
+  // current action
+  if (f.act) {
+    f.actT += dt;
+    const A = ATTACKS[f.act];
+    if (A) {
+      if (!f.hitDone && f.actT >= A.at * A.dur) {
+        f.hitDone = true;
+        if (f.act === "fire") spawnFire(f);
+        else resolveHit(f, f === P1 ? P2 : P1, f.act);
+      }
+      // helicopter keeps hitting while it spins
+      if (f.act === "heli" && f.actT > 0.55 * A.dur && f.hitDone === true) { f.hitDone = "again"; resolveHit(f, f === P1 ? P2 : P1, "heli"); }
+      if (f.actT >= A.dur) f.act = null;
+    } else if (f.actT > 0.5) f.act = null;
+  }
+  // keep inside the stage, and keep the two fighters from walking through each other
+  f.x = Math.max(s * 1.5, Math.min(W - s * 1.5, f.x));
+}
+function keepApart() {
+  const s = S(), gap = s * 1.1;
+  if (P2.x - P1.x < gap) { const mid = (P1.x + P2.x) / 2; P1.x = mid - gap / 2; P2.x = mid + gap / 2; }
+}
+
+// pose shown on screen for a fighter that is animated (computer, or you with buttons)
+function animatedPose(f) {
+  if (f.ko) return koPose();
+  if (f.hitT > 0) return hitPose(T, 1 - f.hitT / 0.45);
+  if (f.act && ATTACKS[f.act]) {
+    const t = f.actT / ATTACKS[f.act].dur;
+    if (f.act === "punch") return punchPose(T, t, false);
+    if (f.act === "upper") return punchPose(T, t, true);
+    if (f.act === "kick") return kickPose(T, t);
+    if (f.act === "heli") return heliPose(T, t);
+    if (f.act === "fire") return firePose(T, t);
+  }
+  if (f.dab > 0) return dabPose(T);
+  if (f.blocking) return blockPose(T);
+  if (f.y > 0.2) return jumpPose(T);
+  if (Math.abs(f.walk) > 0.1) return walkPose(T);
+  return stance(T);
+}
+
+// =====================================================================
+// YOU (camera, buttons, keys)
+// =====================================================================
+const held = { left: false, right: false, block: false };
+function updatePlayer(dt) {
+  const s = S();
+  let fromCam = false;
+  if (useCamera && cameraOn) {
+    detectPose(); readCamera(dt);
+    if (camSeen) { lostT = 0; fromCam = true; } else lostT += dt;
+  }
+  P1.walk = 0;
+  if (fromCam) {
+    detectMoves(P1);
+    // walk around the stage by moving left and right in your room
+    const target = W * (0.08 + camHipX * 0.84);
+    P1.x += (target - P1.x) * Math.min(1, dt * 8);
+    // your real jump lifts the figure
+    if (hipBase != null) { const up = (hipBase - camHipY) / camTorso; if (up > 0.25 && P1.vy <= 0) { P1.y = Math.max(P1.y, up * 1.6); } }
+    if (held.block) P1.blocking = true;
+  } else {
+    P1.blocking = held.block || keysDown.s || keysDown.arrowdown;
+  }
+  const dir = (held.right || keysDown.d || keysDown.arrowright ? 1 : 0) - (held.left || keysDown.a || keysDown.arrowleft ? 1 : 0);
+  if (dir && !P1.ko) { P1.x += dir * s * 4.5 * dt; P1.walk = dir; }
+  updateFighter(P1, dt);
+  // which pose to draw: your own body, unless a button move or a hit is playing
+  const anim = P1.ko || P1.hitT > 0 || (P1.act && !P1.keepBody) || P1.dab > 0 || !fromCam;
+  P1.pose = anim ? animatedPose(P1) : camPose;
+  P1.source = anim ? "proc" : "cam";
+  // lunge: punches and kicks scoot you forward a little
+  if (P1.act && ATTACKS[P1.act] && P1.actT < ATTACKS[P1.act].dur * 0.4) P1.x += ATTACKS[P1.act].lunge * s * dt * 3;
+}
+
+// =====================================================================
+// THE COMPUTER (a little bit crazy)
+// =====================================================================
+const ai = { think: 0.8, plan: null };
+function updateCPU(dt) {
+  const s = S(), f = P2, d = (f.x - P1.x) / s;
+  f.walk = 0; f.blocking = false;
+  if (!f.ko && f.dizzy <= 0 && f.hitT <= 0) {
+    ai.think -= dt;
+    // see a big attack coming? sometimes block or jump
+    if (P1.act && P1.actT < 0.12 && d < 3.4 && !ai.plan && Math.random() < 0.045) {
+      ai.plan = Math.random() < 0.6 ? "block" : "jump"; ai.planT = 0.45;
+      if (ai.plan === "jump") jump(f);
+    }
+    if (ai.plan === "block") { f.blocking = true; ai.planT -= dt; if (ai.planT <= 0) ai.plan = null; }
+    else if (ai.plan === "jump") { ai.planT -= dt; if (ai.planT <= 0) ai.plan = null; }
+    else if (!f.act) {
+      // walk to fighting range
+      if (d > 2.4) { f.x -= s * 3.2 * dt; f.walk = -1; }
+      else if (d < 1.6) { f.x += s * 2.4 * dt; f.walk = 1; }
+      if (ai.think <= 0) {
+        ai.think = 0.55 + Math.random() * 0.9;
+        const r = Math.random();
+        if (d < 3.2) {
+          if (r < 0.32) startAction(f, "punch");
+          else if (r < 0.55) startAction(f, "kick");
+          else if (r < 0.66) startAction(f, "heli");
+          else if (r < 0.72) startAction(f, "upper");
+          else if (r < 0.8) jump(f);
+          else if (r < 0.9) { ai.plan = "block"; ai.planT = 0.6; }
+        } else if (r < 0.15) startAction(f, "heli");
+      }
+    }
+  }
+  updateFighter(f, dt);
+  f.pose = animatedPose(f);
+  if (f.act && ATTACKS[f.act] && f.actT < ATTACKS[f.act].dur * 0.4) f.x -= ATTACKS[f.act].lunge * s * dt * 3;
+}
+
+// =====================================================================
+// YOUR SHADOW (a recording of you)
+// =====================================================================
+function recEvent(a) { if (recording.length) recording[recording.length - 1].ev.push(a); }
+function recordFrame() {
+  recording.push({ t: recT, x: P1.x / W, y: P1.y, pose: copyPose(P1.pose), block: !!P1.blocking, ev: [] });
+}
+let replayIdx = 0;
+function updateShadow(dt) {
+  const f = P2, s = S();
+  f.walk = 0;
+  if (!f.ko && f.hitT <= 0 && f.dizzy <= 0 && recording.length > 2) {
+    const len = recording[recording.length - 1].t;
+    replayT += dt;
+    if (replayT > len) { replayT = 0; replayIdx = 0; }
+    while (replayIdx < recording.length - 1 && recording[replayIdx + 1].t <= replayT) {
+      replayIdx++;
+      recording[replayIdx].ev.forEach(e => {
+        if (e === "jump") return;          // the jump is already in the recorded height
+        if (e === "dab") { doDab(f); return; }
+        f.act = e; f.actT = 0; f.hitDone = false; f.keepBody = true;
+        if (e === "fire") sfx.fire(); else if (e === "heli") sfx.heli(); else sfx.whoosh();
+      });
+    }
+    const fr = recording[replayIdx];
+    // mirror your recorded spot onto the other side of the stage
+    const tx = W - fr.x * W;
+    f.x += (tx - f.x) * Math.min(1, dt * 10);
+    f.y = fr.y; f.blocking = fr.block;
+    f.pose = fr.pose; f.source = "replay";
+  } else {
+    f.pose = animatedPose(f); f.source = "proc";
+  }
+  // shadow attacks still need timing and hits
+  const keep = f.pose;
+  updateFighter(f, dt);
+  if (f.source === "replay" && f.hitT <= 0) f.pose = keep; else f.pose = animatedPose(f);
+}
+
+// =====================================================================
+// FIREBALLS, PARTICLES, WORDS
+// =====================================================================
+function spawnFire(f) {
+  const dir = f.side === "L" ? 1 : -1, s = S();
+  fireballs.push({ x: f.x + dir * s * 1.4, y: groundY() - (1.9 + 0.95 + f.y) * s, vx: dir * s * 9, owner: f, life: 2.2 });
+}
+function updateFire(dt) {
+  const s = S();
+  fireballs.forEach(b => {
+    b.x += b.vx * dt; b.life -= dt;
+    const target = b.owner === P1 ? P2 : P1;
+    if (!target.ko && Math.abs(b.x - target.x) < s * 0.7 && !airborne(target)) {
+      b.life = 0;
+      if (target.blocking) { sfx.block(); addText(target.x, "BLOCK!", "#7fe4ff"); burst(target, "#ff9a3f", 10); }
+      else if (target.inv <= 0 && state === "fight") damage(target, b.owner);
+    }
+    for (let i = 0; i < 2; i++) particles.push({ x: b.x, y: b.y, vx: -b.vx * 0.1 + (Math.random() - 0.5) * 60, vy: (Math.random() - 0.5) * 60, life: 0.4, c: Math.random() < 0.5 ? "#ffd23f" : "#ff6b2a", r: 4 + Math.random() * 5 });
+  });
+  fireballs = fireballs.filter(b => b.life > 0 && b.x > -50 && b.x < W + 50);
+}
+function burst(f, color, n) {
+  const s = S(), y = groundY() - (1.9 + 1 + f.y) * s;
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = 80 + Math.random() * 260;
+    particles.push({ x: f.x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 80, life: 0.5 + Math.random() * 0.4, c: color, r: 2 + Math.random() * 4 });
+  }
+}
+function addText(x, txt, color, big) {
+  texts.push({ x, y: groundY() - S() * 4.6, txt, color, life: 1, big: !!big, rot: (Math.random() - 0.5) * 0.4 });
+}
+let found = {};
+function discover(name) {
+  if (found[name]) return;
+  found[name] = true; sfx.egg();
+  banner = { txt: "Secret move: " + name + "!", t: 2.2 };
+}
+
+// =====================================================================
+// FLOW: record, countdown, fight, results
+// =====================================================================
+function showModeCard() {
+  overlay.classList.remove("hidden");
+  card.innerHTML = `
+    <h1>Choose your fight</h1>
+    <p><b>Fight the computer</b>: a crazy stick figure who punches, kicks and helicopter-kicks.</p>
+    <p><b>Fight your shadow</b>: first show your best moves for ${REC_SECONDS} seconds. Then a shadow fighter copies you exactly, and you fight yourself!</p>
+    <div class="row">
+      <button id="goCpu">Fight the computer</button>
+      <button id="goShadow" class="red">Fight your shadow</button>
+    </div>
+    <p class="small">${useCamera ? "The buttons at the bottom work too, any time the camera can't see you." : "Keys: A D or arrows to move, W jump, J punch, K kick, L helicopter, S block."}</p>
+    <p id="status" aria-live="polite"></p>`;
+  document.getElementById("goCpu").onclick = () => begin("cpu");
+  document.getElementById("goShadow").onclick = () => begin("shadow");
+  document.getElementById("goCpu").focus();
+}
+function begin(m) {
+  audio(); mode = m; resetFighters();
+  ai.plan = null; ai.think = 1;
+  overlay.classList.add("hidden"); controlsEl.classList.add("on");
+  if (mode === "shadow") {
+    state = "record"; recording = []; recT = 0;
+    P2.hp = 3;
+    banner = { txt: "Show your moves! Your shadow is watching…", t: 3 };
+  } else startCountdown();
+}
+function startCountdown() {
+  state = "countdown"; countdown = 3.2; sfx.beep();
+  if (mode === "shadow") { replayT = 0; replayIdx = 0; P1.x = W * 0.3; P2.x = W * 0.7; }
+}
+function endFight(youWon) {
+  state = "over"; slow = 1; controlsEl.classList.remove("on");
+  if (youWon) { sfx.win(); if (window.ArcadeProgress) ArcadeProgress.complete(); }
+  const name = playerName();
+  overlay.classList.remove("hidden");
+  const foundList = Object.keys(found);
+  card.innerHTML = `
+    <h1>${youWon ? "K.O.! You win!" : "K.O.!"}</h1>
+    <p>${youWon ? (mode === "shadow" ? "You beat your own shadow. Nobody fights like you!" : "The crazy computer is down for the count!")
+               : (mode === "shadow" ? "Your shadow won. You're tougher than you thought!" : "The computer got you this time.")}</p>
+    ${youWon && name !== "You" ? `<p>Saved: <b>${name}</b> beat Stick Fight!</p>` : ""}
+    ${foundList.length ? `<p class="small">Secrets found: ${foundList.join(", ")}</p>` : ""}
+    <div class="row">
+      <button id="again">Rematch</button>
+      <button id="switch" class="secondary">${mode === "shadow" ? "Fight the computer" : "Fight your shadow"}</button>
+    </div>`;
+  document.getElementById("again").onclick = () => begin(mode);
+  document.getElementById("switch").onclick = () => begin(mode === "shadow" ? "cpu" : "shadow");
+  document.getElementById("again").focus();
+}
+
+// =====================================================================
+// DRAWING
+// =====================================================================
+let cityL = [];
+function makeCity() {
+  cityL = []; let x = 0;
+  while (x < 3000) { const w = 40 + Math.random() * 80; cityL.push({ x, w, h: 60 + Math.random() * 180, lit: Math.random() }); x += w + 4; }
+}
+makeCity();
+function drawBackground() {
+  const g = ctx.createLinearGradient(0, 0, 0, groundY());
+  g.addColorStop(0, "#0b0624"); g.addColorStop(1, "#3a1550");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // stars
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  for (let i = 0; i < 60; i++) { const x = (i * 197) % W, y = (i * 89) % (groundY() * 0.6); ctx.fillRect(x, y, 1.5, 1.5); }
+  // moon (click it…)
+  const m = moonPos();
+  ctx.save();
+  ctx.shadowColor = eggs.moon ? "#b8ff9a" : "#fff6c8"; ctx.shadowBlur = 30;
+  ctx.fillStyle = eggs.moon ? "#d8ffc8" : "#fff6c8";
+  ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, 7); ctx.fill();
+  ctx.restore();
+  if (eggs.moon) {   // the moon smiles back
+    ctx.fillStyle = "#3a5a3a";
+    ctx.beginPath(); ctx.arc(m.x - m.r * 0.3, m.y - m.r * 0.15, m.r * 0.1, 0, 7); ctx.arc(m.x + m.r * 0.3, m.y - m.r * 0.15, m.r * 0.1, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#3a5a3a"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(m.x, m.y + m.r * 0.05, m.r * 0.45, 0.2, Math.PI - 0.2); ctx.stroke();
+  } else {
+    ctx.fillStyle = "rgba(200,190,150,0.35)";
+    ctx.beginPath(); ctx.arc(m.x - m.r * 0.3, m.y - m.r * 0.2, m.r * 0.18, 0, 7); ctx.arc(m.x + m.r * 0.25, m.y + m.r * 0.3, m.r * 0.12, 0, 7); ctx.fill();
+  }
+  // city
+  const gy = groundY();
+  cityL.forEach(b => {
+    if (b.x > W) return;
+    ctx.fillStyle = "#1a0d33"; ctx.fillRect(b.x, gy - b.h, b.w, b.h);
+    ctx.fillStyle = "rgba(255,210,63,0.35)";
+    for (let wy = gy - b.h + 10; wy < gy - 12; wy += 18) for (let wx = b.x + 8; wx < b.x + b.w - 8; wx += 14)
+      if (((wx * 7 + wy * 3) % 10) / 10 < b.lit * 0.6) ctx.fillRect(wx, wy, 5, 7);
+  });
+  // floor: neon rooftop
+  ctx.fillStyle = "#140a28"; ctx.fillRect(0, gy, W, H - gy);
+  ctx.strokeStyle = "#ff4f8b"; ctx.lineWidth = 3; ctx.shadowColor = "#ff4f8b"; ctx.shadowBlur = 12;
+  ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); ctx.shadowBlur = 0;
+  ctx.strokeStyle = "rgba(255,79,139,0.18)"; ctx.lineWidth = 1;
+  for (let i = -10; i <= 10; i++) { ctx.beginPath(); ctx.moveTo(W / 2 + i * 60, gy); ctx.lineTo(W / 2 + i * 260, H); ctx.stroke(); }
+}
+function moonPos() { return { x: W * 0.82, y: H * 0.16, r: Math.max(26, Math.min(W, H) * 0.06) }; }
+
+function drawFighter(f, ghost) {
+  const s = S(), p = f.pose, dir = f.side === "L" ? 1 : -1;
+  const hipX = f.x, hipY = groundY() - (1.9 + f.y) * s;
+  const P = j => [hipX + p[j][0] * s * dir, hipY + p[j][1] * s];
+  let color = f.color;
+  if (eggs.rainbow) color = `hsl(${(T * 200 + (f.side === "L" ? 0 : 180)) % 360}, 100%, 65%)`;
+  ctx.save();
+  if (f.inv > 0 && Math.floor(T * 20) % 2 === 0) ctx.globalAlpha = 0.45;
+  if (ghost) ctx.globalAlpha *= 0.85;
+  // shadow on the floor
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.beginPath(); ctx.ellipse(hipX, groundY() + 4, s * (0.9 - Math.min(0.5, f.y * 0.15)), s * 0.18, 0, 0, 7); ctx.fill();
+  // rainbow trail egg
+  if (eggs.rainbow) {
+    f.trail.push(P("head")); if (f.trail.length > 14) f.trail.shift();
+    f.trail.forEach((q, i) => { ctx.fillStyle = `hsla(${(i * 25 + T * 200) % 360},100%,60%,${i / 28})`; ctx.beginPath(); ctx.arc(q[0], q[1], s * 0.2, 0, 7); ctx.fill(); });
+  }
+  ctx.strokeStyle = color; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.shadowColor = color; ctx.shadowBlur = 14;
+  ctx.lineWidth = Math.max(4, s * 0.16);
+  const line = (...js) => { ctx.beginPath(); const a = P(js[0]); ctx.moveTo(a[0], a[1]); for (let i = 1; i < js.length; i++) { const b = P(js[i]); ctx.lineTo(b[0], b[1]); } ctx.stroke(); };
+  // legs, body, arms
+  const hip = [(p.lHip[0] + p.rHip[0]) / 2, (p.lHip[1] + p.rHip[1]) / 2];
+  p.hipMid = hip;
+  line("lHip", "lKn", "lAn"); line("rHip", "rKn", "rAn");
+  ctx.beginPath(); const hm = [hipX + hip[0] * s * dir, hipY + hip[1] * s], nk = P("neck"); ctx.moveTo(hm[0], hm[1]); ctx.lineTo(nk[0], nk[1]); ctx.stroke();
+  line("lHip", "rHip"); line("lSh", "rSh");
+  line("neck", "lSh", "lEl", "lWr"); line("neck", "rSh", "rEl", "rWr");
+  // fists
+  ctx.fillStyle = color;
+  ["lWr", "rWr"].forEach(w => { const q = P(w); ctx.beginPath(); ctx.arc(q[0], q[1], s * 0.13, 0, 7); ctx.fill(); });
+  // head
+  const hd = P("head"), hr = s * (eggs.bigHeads ? 0.62 : 0.3);
+  ctx.lineWidth = Math.max(3, s * 0.12);
+  ctx.fillStyle = "#0b0624"; ctx.beginPath(); ctx.arc(hd[0], hd[1] - (eggs.bigHeads ? hr * 0.4 : 0), hr, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.shadowBlur = 0;
+  // face
+  const fy = hd[1] - (eggs.bigHeads ? hr * 0.4 : 0);
+  ctx.fillStyle = color;
+  if (f.ko) {
+    ctx.lineWidth = 2; ctx.strokeStyle = color;
+    [-1, 1].forEach(k => { const ex = hd[0] + k * hr * 0.35, ey = fy - hr * 0.1, e = hr * 0.16; ctx.beginPath(); ctx.moveTo(ex - e, ey - e); ctx.lineTo(ex + e, ey + e); ctx.moveTo(ex + e, ey - e); ctx.lineTo(ex - e, ey + e); ctx.stroke(); });
+  } else {
+    [-1, 1].forEach(k => { ctx.beginPath(); ctx.arc(hd[0] + dir * hr * 0.25 + k * hr * 0.28, fy - hr * 0.1, hr * 0.11, 0, 7); ctx.fill(); });
+    ctx.lineWidth = 2; ctx.strokeStyle = color;
+    ctx.beginPath(); ctx.moveTo(hd[0] + dir * hr * 0.05, fy + hr * 0.35); ctx.lineTo(hd[0] + dir * hr * 0.5, fy + hr * (f.hitT > 0 ? 0.25 : 0.4)); ctx.stroke();
+  }
+  // dizzy stars
+  if (f.dizzy > 0) {
+    ctx.fillStyle = "#ffd23f"; ctx.font = `${Math.round(s * 0.4)}px sans-serif`; ctx.textAlign = "center";
+    for (let i = 0; i < 3; i++) { const a = T * 5 + i * 2.1; ctx.fillText("★", hd[0] + Math.cos(a) * hr * 1.4, fy - hr * 1.3 + Math.sin(a) * hr * 0.4); }
+  }
+  // helicopter motion blur
+  if (f.act === "heli") {
+    ctx.strokeStyle = color; ctx.globalAlpha *= 0.35; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(hipX, hipY + 0.35 * s, 1.95 * s, 0.6 * s, 0, 0, 7); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawHUD() {
+  const s = Math.max(16, Math.min(W, H) * 0.035), pad = 16, top = 16 + (window.visualViewport ? 0 : 0);
+  const heart = (x, y, on, c) => {
+    ctx.fillStyle = on ? c : "rgba(255,255,255,0.15)";
+    ctx.beginPath();
+    ctx.moveTo(x, y + s * 0.3);
+    ctx.bezierCurveTo(x, y, x - s * 0.5, y, x - s * 0.5, y + s * 0.3);
+    ctx.bezierCurveTo(x - s * 0.5, y + s * 0.6, x, y + s * 0.8, x, y + s);
+    ctx.bezierCurveTo(x, y + s * 0.8, x + s * 0.5, y + s * 0.6, x + s * 0.5, y + s * 0.3);
+    ctx.bezierCurveTo(x + s * 0.5, y, x, y, x, y + s * 0.3);
+    ctx.fill();
+  };
+  ctx.font = `900 ${Math.round(s * 0.75)}px Nunito, sans-serif`; ctx.textBaseline = "top";
+  ctx.textAlign = "left"; ctx.fillStyle = "#4fd6ff"; ctx.fillText(playerName(), pad, top);
+  for (let i = 0; i < 3; i++) heart(pad + s * 0.5 + i * s * 1.25, top + s * 1.05, i < P1.hp, "#4fd6ff");
+  ctx.textAlign = "right"; ctx.fillStyle = "#ff4f6b";
+  ctx.fillText(mode === "shadow" ? "Your shadow" : "Crazy CPU", W - pad, top);
+  for (let i = 0; i < 3; i++) heart(W - pad - s * 0.5 - i * s * 1.25, top + s * 1.05, i < P2.hp, "#ff4f6b");
+}
+function bigText(txt, y, size, color) {
+  ctx.save();
+  ctx.font = `${Math.round(size)}px Bungee, Impact, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.lineJoin = "round"; ctx.lineWidth = size * 0.14; ctx.strokeStyle = "#07040f"; ctx.strokeText(txt, W / 2, y);
+  ctx.fillStyle = color; ctx.fillText(txt, W / 2, y);
+  ctx.restore();
+}
+function draw() {
+  ctx.save();
+  if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+  drawBackground();
+  if (state === "fight" || state === "countdown" || state === "over" || state === "record") {
+    if (state !== "record") drawFighter(P2, mode === "shadow");
+    drawFighter(P1, false);
+  }
+  // fireballs
+  fireballs.forEach(b => {
+    const r = S() * 0.45;
+    const g = ctx.createRadialGradient(b.x, b.y, 2, b.x, b.y, r);
+    g.addColorStop(0, "#fff6c8"); g.addColorStop(0.5, "#ffb02a"); g.addColorStop(1, "rgba(255,80,40,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.fill();
+  });
+  // particles
+  particles.forEach(p => { ctx.globalAlpha = Math.max(0, p.life * 1.6); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); });
+  ctx.globalAlpha = 1;
+  // words
+  texts.forEach(t => {
+    ctx.save(); ctx.translate(t.x, t.y - (1 - t.life) * 40); ctx.rotate(t.rot);
+    const size = (t.big ? 1.2 : 0.75) * S() * (1 + (1 - t.life) * 0.3);
+    ctx.globalAlpha = Math.min(1, t.life * 2);
+    ctx.font = `${Math.round(size)}px Bungee, Impact, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineJoin = "round"; ctx.lineWidth = size * 0.16; ctx.strokeStyle = "#07040f"; ctx.strokeText(t.txt, 0, 0);
+    ctx.fillStyle = t.color; ctx.fillText(t.txt, 0, 0);
+    ctx.restore();
+  });
+  ctx.restore();
+
+  if (state === "fight" || state === "countdown" || state === "over") drawHUD();
+  const m = Math.min(W, H);
+  if (state === "countdown") {
+    const n = Math.ceil(countdown - 0.2);
+    bigText(n > 0 ? String(n) : "FIGHT!", H * 0.38, m * (n > 0 ? 0.18 : 0.14), n > 0 ? "#ffd23f" : "#ff4f6b");
+  }
+  if (state === "record") {
+    const left = Math.max(0, REC_SECONDS - recT);
+    bigText("REC ● " + Math.ceil(left), H * 0.14, m * 0.07, Math.floor(T * 2) % 2 ? "#ff4f6b" : "#ffffff");
+    bigText("Punch! Kick! Spin! Your shadow copies all of it", H * 0.24, m * 0.035, "#f2eeff");
+  }
+  if (banner) bigText(banner.txt, H * 0.3, m * 0.045, "#7fe4ff");
+  if (useCamera && lostT > 0.7 && (state === "fight" || state === "record")) {
+    bigText("Can't see you! Step back, or use the buttons below", H * 0.5, m * 0.035, "#ffd23f");
+  }
+}
+
+// =====================================================================
+// MAIN LOOP
+// =====================================================================
+let last = performance.now();
+function loop(now) {
+  const realDt = Math.min(0.05, (now - last) / 1000); last = now;
+  const dt = realDt * slow;
+  T += dt;
+  slow = Math.min(1, slow + realDt * 0.35);
+  shake = Math.max(0, shake - realDt * 40);
+  if (banner) { banner.t -= realDt; if (banner.t <= 0) banner = null; }
+  controlsEl.classList.toggle("glow", useCamera && lostT > 0.7);
+
+  if (state === "record") {
+    recT += dt;
+    updatePlayer(dt);
+    recordFrame();
+    if (recT >= REC_SECONDS) { startCountdown(); P1.hp = 3; }
+  } else if (state === "countdown") {
+    const before = Math.ceil(countdown - 0.2);
+    countdown -= realDt;
+    const after = Math.ceil(countdown - 0.2);
+    if (after !== before) { if (after > 0) sfx.beep(); else sfx.bell(); }
+    if (useCamera) { detectPose(); readCamera(dt); if (camPose) P1.pose = camPose; }
+    if (mode === "shadow" && recording.length) { P2.pose = recording[0].pose; } else P2.pose = stance(T);
+    if (countdown <= 0) state = "fight";
+  } else if (state === "fight" || state === "over") {
+    if (state === "fight") {
+      updatePlayer(dt);
+      if (mode === "shadow") updateShadow(dt); else updateCPU(dt);
+      keepApart();
+      updateFire(dt);
+    } else {
+      P1.pose = animatedPose(P1); P2.pose = P2.ko || mode !== "shadow" ? animatedPose(P2) : P2.pose;
+    }
+  } else {
+    // menu: keep the camera preview tracking
+    if (useCamera) { detectPose(); }
+  }
+  particles.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 500 * dt; p.life -= dt; });
+  particles = particles.filter(p => p.life > 0);
+  texts.forEach(t => { t.life -= realDt * 0.9; });
+  texts = texts.filter(t => t.life > 0);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// =====================================================================
+// CONTROLS
+// =====================================================================
+document.getElementById("btnCam").onclick = startCamera;
+document.getElementById("btnKeys").onclick = () => { audio(); useCamera = false; showModeCard(); };
+
+function press(act, down) {
+  if (act === "left" || act === "right" || act === "block") { held[act] = down; return; }
+  if (!down) return;
+  if (act === "jump") jump(P1);
+  else if (act === "punch" || act === "kick" || act === "heli") startAction(P1, act);
+}
+controlsEl.querySelectorAll("button").forEach(b => {
+  const act = b.dataset.act;
+  b.addEventListener("pointerdown", e => { e.preventDefault(); b.classList.add("down"); press(act, true); try { b.setPointerCapture(e.pointerId); } catch (err) {} });
+  const up = () => { b.classList.remove("down"); press(act, false); };
+  b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up); b.addEventListener("lostpointercapture", up);
+  b.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); press(act, true); setTimeout(() => press(act, false), 150); } });
+});
+
+// secret codes
+const KONAMI = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright", "b", "a"];
+let keyLog = [];
+window.addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+  if (e.target && e.target.tagName === "BUTTON" && (k === "enter" || k === " ")) return;
+  keyLog.push(k); if (keyLog.length > 12) keyLog.shift();
+  if (keyLog.slice(-10).join() === KONAMI.join()) { eggs.bigHeads = !eggs.bigHeads; discover("Big Head Mode"); if (!eggs.bigHeads) banner = { txt: "Big heads off", t: 1.5 }; }
+  if (keyLog.slice(-6).join("") === "fakeoh") { eggs.rainbow = !eggs.rainbow; discover("Rainbow Fighters"); }
+  if (keysDown[k]) return;
+  keysDown[k] = true;
+  if (state !== "fight" && state !== "record") return;
+  if (k === "w" || k === "arrowup") { e.preventDefault(); jump(P1); }
+  else if (k === "j" || k === "z" || k === " ") { e.preventDefault(); startAction(P1, "punch"); }
+  else if (k === "k" || k === "x") startAction(P1, "kick");
+  else if (k === "l" || k === "c") startAction(P1, "heli");
+  else if (k === "u") startAction(P1, "upper");
+  else if (k === "f") { startAction(P1, "fire"); discover("Fireball"); }
+  else if (k === "t") doDab(P1);
+  if (k.startsWith("arrow")) e.preventDefault();
+});
+window.addEventListener("keyup", e => { keysDown[e.key.toLowerCase()] = false; });
+window.addEventListener("blur", () => { for (const k in keysDown) keysDown[k] = false; held.left = held.right = held.block = false; });
+
+// secret: click the moon for moon gravity
+canvas.addEventListener("click", e => {
+  const m = moonPos();
+  if (Math.hypot(e.clientX - m.x, e.clientY - m.y) < m.r * 1.2) {
+    eggs.moon = !eggs.moon;
+    if (eggs.moon) discover("Moon Gravity"); else banner = { txt: "Normal gravity", t: 1.5 };
+  }
+});
+
+// for testing without a camera: ?test=1 lets a script feed fake body positions
+if (/[?&]test=1/.test(location.search)) {
+  window.SF_TEST = { feed: lm => { rawPose = lm; }, fakeCam: () => { cameraOn = true; useCamera = true; landmarker = null; showModeCard(); }, state: () => ({ state, p1: P1.hp, p2: P2.hp, act: P1.act, block: P1.blocking, found: Object.keys(found), rec: recording.length }) };
+  // when testing, skip the real detector and read whatever was fed in
+  const realDetect = detectPose;
+  detectPose = function () { if (landmarker) realDetect(); };
+}
+})();
+</script>
+</body>
+</html>
