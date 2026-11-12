@@ -16,7 +16,8 @@
   .card { max-width: 520px; width: 100%; background: var(--panel); border: 2px solid #2b3a2e; border-radius: 16px; padding: 28px; text-align: center; box-shadow: 0 0 60px rgba(125, 255, 107, 0.15); }
   h1 { font-family: "Creepster", "Impact", cursive; font-weight: 400; font-size: clamp(3rem, 10vw, 5rem); line-height: 1; margin: 0 0 6px; color: var(--accent); letter-spacing: 0.04em; text-shadow: 0 0 24px rgba(125,255,107,0.5); }
   p { margin: 0 0 12px; line-height: 1.5; }
-  .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; text-align: left; margin: 16px auto; max-width: 340px; font-size: 0.95rem; }
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; text-align: left; margin: 16px auto; max-width: 420px; font-size: 0.95rem; align-items: start; }
+  .keys b { white-space: nowrap; }
   .keys b { background: #1b2230; border: 1px solid #3a4560; border-radius: 6px; padding: 1px 8px; font-weight: 900; text-align: center; }
   .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
   button { font: 900 1rem "Nunito", system-ui, sans-serif; cursor: pointer; padding: 12px 22px; border-radius: 12px; border: 2px solid var(--accent); background: var(--accent); color: #08120a; }
@@ -42,6 +43,8 @@
       <b>WASD / Arrows</b><span>Move</span>
       <b>E</b><span>Use, pick up, hide in closets</span>
       <b>Space</b><span>Break free / fire the stun gun</span>
+      <b>Left click</b><span>Walk there (click a closet to hide in it)</span>
+      <b>Right click</b><span>Same as E, plus a burst of speed. Too many and you get tired!</span>
     </div>
     <p class="note">Turn your sound on. Best played with headphones… if you dare.</p>
     <div class="row"><button id="btnStart">Start</button><button id="btnSkip" class="secondary">Skip the intro</button></div>
@@ -77,6 +80,11 @@ const srand = (i) => { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; re
 // SETTINGS (easy to tweak)
 // =====================================================================
 const PLAYER_SPEED = 3.3;     // tiles per second
+const BURST_SPEED = 2.2;      // speed multiplier during a right-click burst
+const BURST_TIME = 0.6;       // seconds a burst lasts
+const BURST_COST = 30;        // stamina used per burst (stamina goes up to 100)
+const STAMINA_REGEN = 14;     // stamina recovered per second
+const TIRED_SPEED = 0.65;     // speed multiplier while tired
 const ALIEN_PATROL = 1.5;     // alien walking speed
 const ALIEN_HUNT = 2.7;       // alien speed when hunting you
 const VIEW_RANGE = 4.6;       // how far aliens can see (tiles)
@@ -135,6 +143,8 @@ const sfx = {
   heartbeat(v) { const t = now(); osc("sine", 60, t, 0.14, 0.5 * v, 0.004, 40); osc("sine", 55, t + 0.18, 0.12, 0.35 * v, 0.004, 38); },
   bang() { const t = now(); noise(t, 0.3, 0.6, "lowpass", 300, 0.8); osc("sine", 70, t, 0.3, 0.4, 0.003, 40); },
   console() { const t = now(); [523, 659, 784].forEach((f, i) => osc("square", f, t + i * 0.06, 0.08, 0.05)); },
+  dash() { const t = now(); noise(t, 0.25, 0.25, "lowpass", 900, 0.6, 0.02); },
+  pant() { const t = now(); noise(t, 0.35, 0.1, "bandpass", 700, 0.8, 0.12); },
   win() { const t = now(); [392, 523, 659, 784, 1047].forEach((f, i) => osc("triangle", f, t + i * 0.14, 0.4, 0.12)); }
 };
 function startHum() {
@@ -303,7 +313,8 @@ function loadDeck(i, fromSnapshot) {
     ...a, x: a.start[0] + 0.5, y: a.start[1] + 0.5, dir: 0, wp: 0, path: [], state: "patrol",
     stun: 0, spotT: 0, searchT: 0, phase: Math.random() * 6
   }));
-  player = { x: spawn[0] + 0.5, y: spawn[1] + 0.5, dir: -Math.PI / 2, hidden: null, chained: d.intro && !fromSnapshotChains(), breakCount: 0, walkT: 0 };
+  player = { x: spawn[0] + 0.5, y: spawn[1] + 0.5, dir: -Math.PI / 2, hidden: null, chained: d.intro && !fromSnapshotChains(), breakCount: 0, walkT: 0,
+    path: [], target: null, interactOnArrive: false, stamina: 100, burst: 0, tired: false, restT: 0, pantT: 0 };
   alarm = { on: false, t: 0 }; sirenOn(false);
   scripted = d.intro && !snapshot.introDone ? { stage: "chains" } : null;
   if (!scripted && d.intro) player.chained = false;
@@ -326,7 +337,7 @@ function blocked(tx, ty, who) {
   }
   return false;
 }
-function bfs(sx, sy, tx, ty) {
+function bfs(sx, sy, tx, ty, who = "alien") {
   const key = (x, y) => y * MW + x;
   const prev = new Map(); prev.set(key(sx, sy), -1);
   const q = [[sx, sy]];
@@ -335,7 +346,7 @@ function bfs(sx, sy, tx, ty) {
     if (x === tx && y === ty) break;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const nx = x + dx, ny = y + dy, k = key(nx, ny);
-      if (prev.has(k) || blocked(nx, ny, "alien")) continue;
+      if (prev.has(k) || blocked(nx, ny, who)) continue;
       prev.set(k, key(x, y)); q.push([nx, ny]);
     }
   }
@@ -520,19 +531,47 @@ function update(dt) {
   graceT = Math.max(0, graceT - dt);
   if (alarm.on) { alarm.t -= dt; if (alarm.t <= 0) { alarm.on = false; sirenOn(false); say("The alarm went quiet… for now."); } }
 
-  // movement
+  // stamina: bursts use it up, resting brings it back
+  player.burst = Math.max(0, player.burst - dt);
+  player.restT = Math.max(0, player.restT - dt);
+  if (player.restT <= 0) player.stamina = Math.min(100, player.stamina + STAMINA_REGEN * dt);
+  if (player.tired && player.stamina >= 60) { player.tired = false; say("You caught your breath.", 2); }
+  if (player.tired) { player.pantT -= dt; if (player.pantT <= 0) { sfx.pant(); player.pantT = 0.7; } }
+  const speed = PLAYER_SPEED * (player.burst > 0 ? BURST_SPEED : 1) * (player.tired ? TIRED_SPEED : 1);
+
+  // movement: keyboard first, otherwise follow a clicked path
   if (!player.chained && !player.hidden) {
     let mx = 0, my = 0;
     if (keys.ArrowLeft || keys.a || keys.A) mx -= 1;
     if (keys.ArrowRight || keys.d || keys.D) mx += 1;
     if (keys.ArrowUp || keys.w || keys.W) my -= 1;
     if (keys.ArrowDown || keys.s || keys.S) my += 1;
+    if (mx || my) { player.path = []; player.target = null; player.interactOnArrive = false; }
+    else if (player.path.length) {
+      const [tx, ty] = player.path[0], dx = tx - player.x, dy = ty - player.y, d = Math.hypot(dx, dy);
+      if (d < 0.08) {
+        player.path.shift();
+        if (!player.path.length) {
+          player.target = null;
+          if (player.interactOnArrive) { player.interactOnArrive = false; interact(); }
+        }
+      } else {
+        mx = dx / d; my = dy / d;
+        const step = Math.min(d, speed * dt);
+        const bx = player.x, by = player.y;
+        tryMove(mx * step, my * step);
+        if (Math.hypot(player.x - bx, player.y - by) < step * 0.2) { player.x = bx + mx * step; player.y = by + my * step; } // path is safe; nudge past corners
+        mx = my = 0; player.dir = Math.atan2(dy, dx);
+        player.walkT += dt * 10 * (speed / PLAYER_SPEED);
+        stepT -= dt * (speed / PLAYER_SPEED); if (stepT <= 0) { sfx.step(); stepT = 0.32; }
+      }
+    }
     if (mx || my) {
       const l = Math.hypot(mx, my); mx /= l; my /= l;
       player.dir = Math.atan2(my, mx);
-      tryMove(mx * PLAYER_SPEED * dt, my * PLAYER_SPEED * dt);
-      player.walkT += dt * 10;
-      stepT -= dt; if (stepT <= 0) { sfx.step(); stepT = 0.32; }
+      tryMove(mx * speed * dt, my * speed * dt);
+      player.walkT += dt * 10 * (speed / PLAYER_SPEED);
+      stepT -= dt * (speed / PLAYER_SPEED); if (stepT <= 0) { sfx.step(); stepT = 0.32; }
     }
   }
 
@@ -812,6 +851,14 @@ function drawAlien(a, t, sx, sy, scale = 1) {
 function drawPlayer(t) {
   const sx = player.x * T - camX, sy = player.y * T - camY, s = T * 0.46;
   if (player.hidden) return;
+  if (player.burst > 0) {
+    ctx.strokeStyle = "rgba(125,249,255,0.6)"; ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      const off = (i - 1.5) * s * 0.35, bx = sx - Math.cos(player.dir) * s * (0.9 + i % 2 * 0.3), by = sy - Math.sin(player.dir) * s * (0.9 + i % 2 * 0.3);
+      ctx.beginPath(); ctx.moveTo(bx - Math.sin(player.dir) * off, by + Math.cos(player.dir) * off);
+      ctx.lineTo(bx - Math.cos(player.dir) * s * 0.8 - Math.sin(player.dir) * off, by - Math.sin(player.dir) * s * 0.8 + Math.cos(player.dir) * off); ctx.stroke();
+    }
+  }
   ctx.save(); ctx.translate(sx, sy);
   ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.ellipse(0, s * 0.9, s * 0.65, s * 0.22, 0, 0, 7); ctx.fill();
   const step = Math.sin(player.walkT) * s * 0.18;
@@ -929,6 +976,23 @@ function drawHUD(t) {
     ctx.font = `400 ${Math.max(30, H * 0.07)}px Creepster, Impact, cursive`;
     ctx.fillStyle = "#7dff6b"; ctx.shadowColor = "#7dff6b"; ctx.shadowBlur = 20;
     ctx.fillText(banner.text, W / 2, H * 0.2); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+  // where you clicked
+  if (player.target && !player.hidden) {
+    const mx = player.target[0] * T - camX, my = player.target[1] * T - camY, p = (performance.now() / 500) % 1;
+    ctx.strokeStyle = `rgba(125,255,107,${0.8 - p * 0.6})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(mx, my + T * 0.25, T * (0.15 + p * 0.25), T * (0.06 + p * 0.1), 0, 0, 7); ctx.stroke();
+  }
+  // stamina bar (only while it's being used up)
+  if (player.stamina < 99.5 && !player.hidden && !player.chained) {
+    const bw = T * 1.1, bx = player.x * T - camX - bw / 2, by = player.y * T - camY + T * 0.62;
+    ctx.fillStyle = "rgba(8,10,20,0.85)"; ctx.beginPath(); ctx.roundRect(bx - 2, by - 2, bw + 4, 9, 4); ctx.fill();
+    ctx.fillStyle = player.tired ? "#ff3b3b" : player.burst > 0 ? "#7df9ff" : "#7dff6b";
+    ctx.beginPath(); ctx.roundRect(bx, by, bw * player.stamina / 100, 5, 3); ctx.fill();
+    if (player.tired) {
+      ctx.font = `900 ${Math.max(11, T * 0.24)}px Nunito, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      ctx.fillStyle = "#ff7a7a"; ctx.fillText("tired", player.x * T - camX, by + 9);
+    }
   }
   // break-the-chains prompt
   if (player.chained) {
@@ -1166,6 +1230,46 @@ function beginShip() {
   say("Where am I?! …Is this a SPACESHIP?", 3);
 }
 
+// ---------- mouse controls ----------
+function screenToTile(cx, cy) { return [Math.floor((cx + camX) / T), Math.floor((cy + camY) / T)]; }
+function walkTo(tx, ty, quiet) {
+  const sx = Math.floor(player.x), sy = Math.floor(player.y);
+  const c = tileAt(tx, ty);
+  player.interactOnArrive = false;
+  if ("CXKMA".includes(c)) {
+    // walk next to the thing, then use it
+    let best = null;
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      const nx = tx + dx, ny = ty + dy;
+      if (blocked(nx, ny, "player")) continue;
+      const p = (nx === sx && ny === sy) ? [] : bfs(sx, sy, nx, ny, "player");
+      if ((p.length || (nx === sx && ny === sy)) && (!best || p.length < best.length)) best = p;
+    }
+    if (!best) { if (!quiet) say("You can’t reach that from here.", 2); return false; }
+    player.path = best; player.target = [tx + 0.5, ty + 0.5]; player.interactOnArrive = true;
+    if (!best.length) { player.interactOnArrive = false; interact(); }
+    return true;
+  }
+  if (blocked(tx, ty, "player")) {
+    if (!quiet && "RBG".includes(c)) { sfx.denied(); say("That door needs a keycard.", 2); }
+    return false;
+  }
+  const p = (tx === sx && ty === sy) ? [[tx + 0.5, ty + 0.5]] : bfs(sx, sy, tx, ty, "player");
+  if (!p.length) { if (!quiet) say("You can’t get there yet.", 2); return false; }
+  player.path = p; player.target = [tx + 0.5, ty + 0.5];
+  return true;
+}
+function burst() {
+  if (player.chained || player.hidden) return;
+  if (player.tired || player.stamina < BURST_COST) {
+    if (!player.tired) { player.tired = true; say("You’re out of breath! Slow down for a bit.", 2.5); }
+    return;
+  }
+  player.stamina -= BURST_COST; player.burst = BURST_TIME; player.restT = 0.9;
+  sfx.dash();
+  if (player.stamina < BURST_COST) { player.tired = true; say("Phew… you’re getting tired.", 2.5); }
+}
+
 // =====================================================================
 // MAIN LOOP
 // =====================================================================
@@ -1229,9 +1333,35 @@ window.addEventListener("keydown", (e) => {
   if (n === 3) { player.x = 21.5; player.y = 10.5; }
   mode = "fade"; fadeT = 0;
 });
-canvas.addEventListener("pointerdown", () => {
-  if (mode === "intro") advanceIntro();
-  else if (mode === "ending") advanceEnding();
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+canvas.addEventListener("pointerdown", (e) => {
+  if (mode === "intro") { if (e.button === 0) advanceIntro(); return; }
+  if (mode === "ending") { if (e.button === 0) advanceEnding(); return; }
+  if (mode !== "play") return;
+  audio();
+  if (player.chained) { // clicking also tugs at the chains
+    player.breakCount++; sfx.tug(); shakeT = 0.08;
+    if (player.breakCount >= 6) {
+      player.chained = false; sfx.snap(); shakeT = 0.25;
+      say("SNAP! The plastic chains break easily. These aliens are not very good at this.", 4);
+      if (scripted) scripted.stage = "free";
+    }
+    return;
+  }
+  const [tx, ty] = screenToTile(e.clientX, e.clientY);
+  if (e.button === 0) {
+    if (player.hidden) { interact(); return; }   // click to come out of the closet
+    walkTo(tx, ty);
+  } else if (e.button === 2) {
+    // right click: same as E, plus a burst of speed
+    const wasMoving = player.path.length > 0 || keys.ArrowLeft || keys.ArrowRight || keys.ArrowUp || keys.ArrowDown || keys.a || keys.d || keys.w || keys.s;
+    const hiddenBefore = !!player.hidden;
+    interact();
+    if (!hiddenBefore && !player.hidden && mode === "play") {
+      if (!wasMoving) walkTo(tx, ty, true);  // standing still: dash toward where you clicked
+      burst();
+    }
+  }
 });
 })();
 </script>

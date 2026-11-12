@@ -8,6 +8,12 @@ How to play
 - WASD or arrow keys: move
 - E: use things (hide in closets, smash glass cases, read screens, fly the ship)
 - Space: break the chains at the start, then fire the stun gun once you find it
+- Left click: walk to that spot (the farmer finds his way around walls).
+  Click a closet, glass case or screen to walk over and use it.
+  Click while hiding to come out. Clicking also breaks the chains.
+- Right click: same as E, plus a quick burst of speed. Each burst uses stamina
+  (the bar under the farmer). Use too many and you get tired and slow down
+  until you catch your breath.
 
 Sneak through three decks of the ship. Aliens carry flashlights: if you step into
 their beam, or bump into one, you get caught (jump scare!) and start again at that
@@ -25,6 +31,8 @@ Easy things to tweak (top of the script in index.html)
 - VIEW_RANGE, VIEW_ANGLE                 : how far and how wide aliens can see
 - LIGHT_RADIUS                           : how much of the dark you can see
 - STUN_TIME, STUN_RANGE                  : the stun gun
+- BURST_SPEED, BURST_TIME, BURST_COST    : right-click speed bursts
+- STAMINA_REGEN, TIRED_SPEED             : how fast you recover, how slow when tired
 
 Adding more decks: each deck is a text map in the DECKS list. Copy one, change
 the map, and set where the aliens walk. The legend is written above the list.
