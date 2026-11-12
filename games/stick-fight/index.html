@@ -19,7 +19,7 @@
   html, body { margin: 0; height: 100%; overflow: hidden; background: #07040f; color: var(--ink); font-family: Nunito, system-ui, sans-serif; }
   canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   #cam {
-    position: fixed; right: 14px; bottom: 92px; width: min(190px, 26vw); border-radius: 10px; z-index: 6;
+    position: fixed; right: 14px; bottom: 120px; width: min(190px, 26vw); border-radius: 10px; z-index: 6;
     transform: scaleX(-1); border: 2px solid rgba(79, 214, 255, 0.6); opacity: 0.85; display: none;
   }
   #cam.on { display: block; }
@@ -68,6 +68,18 @@
   }
   #controls button:active, #controls button.down { background: #3a2470; transform: translateY(2px); }
   #controls .gap { width: 14px; }
+  #controls .break { flex-basis: 100%; height: 0; }
+  #controls button.sp { border-color: #8a6a20; color: #ffe8a0; }
+  #controls button.mv { border-style: dashed; }
+  #controls button { padding: 8px 10px; }
+  #movesPanel { position: fixed; inset: 0; z-index: 25; display: grid; place-items: center; padding: 14px; background: rgba(5, 3, 12, 0.8); }
+  #movesPanel[hidden] { display: none; }
+  #movesPanel .card { width: min(760px, 100%); }
+  .mt { width: 100%; border-collapse: collapse; font-size: 0.9rem; text-align: left; }
+  .mt th { color: var(--cyan); font-weight: 900; padding: 4px 6px; border-bottom: 2px solid #3a2470; }
+  .mt td { padding: 5px 6px; border-bottom: 1px solid #2a1a50; vertical-align: top; }
+  .mt td:first-child { font-weight: 900; white-space: nowrap; }
+  .mt tr.sp td:first-child { color: var(--gold); }
 </style>
 </head>
 <body>
@@ -84,6 +96,37 @@
   <button data-act="kick">Kick</button>
   <button data-act="heli">Helicopter</button>
   <button data-act="block">Block</button>
+  <button data-act="duck">Duck</button>
+  <span class="break"></span>
+  <button data-act="upper" class="sp">Uppercut</button>
+  <button data-act="flip" class="sp">Backflip</button>
+  <button data-act="fly" class="sp">Flying kick</button>
+  <button data-act="tornado" class="sp">Tornado</button>
+  <button data-act="slam" class="sp">Slam</button>
+  <button data-act="moves" class="mv" aria-label="Show all moves">? Moves</button>
+</div>
+
+<div id="movesPanel" hidden role="dialog" aria-modal="true" aria-labelledby="movesTitle">
+  <div class="card">
+    <h1 id="movesTitle" style="font-size:1.8rem">Move list</h1>
+    <table class="mt">
+      <tr><th>Move</th><th>Key</th><th>Camera</th><th>What it does</th></tr>
+      <tr><td>Punch</td><td>J or Space</td><td>Punch fast to the right</td><td>Jab, then cross. Straight and quick</td></tr>
+      <tr><td>Uppercut</td><td>U</td><td>Swing a fist straight up</td><td>Hits fighters in the air</td></tr>
+      <tr><td>Kick</td><td>K</td><td>Kick a foot up high</td><td>Longer reach than a punch</td></tr>
+      <tr><td>Block</td><td>S (hold)</td><td>Cross arms at your face</td><td>Stops almost everything</td></tr>
+      <tr><td>Duck</td><td>↓ or Shift (hold)</td><td>Crouch down low</td><td>Dodges punches, fireballs, helicopters, flying kicks and tornados</td></tr>
+      <tr><td>Jump</td><td>W or ↑</td><td>Jump!</td><td>Dodges punches, kicks and fireballs</td></tr>
+      <tr class="sp"><td>★ Helicopter kick</td><td>L</td><td>Spin around, or arms out wide</td><td>Flies up spinning, hits twice</td></tr>
+      <tr class="sp"><td>★ Backflip kick</td><td>Q</td><td>Button</td><td>Flips back out of danger, kicks at the top</td></tr>
+      <tr class="sp"><td>★ Flying kick</td><td>E</td><td>Button</td><td>Leaps across the stage feet-first</td></tr>
+      <tr class="sp"><td>★ Tornado punch</td><td>R</td><td>Button</td><td>Spins with both fists out, hits twice</td></tr>
+      <tr class="sp"><td>★ Ground slam</td><td>G</td><td>Button</td><td>Jumps and smashes down. Shockwave! Jump to dodge it</td></tr>
+    </table>
+    <p><b style="color:var(--gold)">SUPER moves:</b> landing hits and taking hits fills your power bar. When it flashes <b>SUPER READY</b>, your next ★ move glows gold and takes away <b>2 hearts</b>!</p>
+    <p class="small">Move with A / D or ← / →. Press M or the Moves button to open this list. There are secret moves too…</p>
+    <div class="row"><button id="closeMoves">Back to the fight</button></div>
+  </div>
 </div>
 
 <div id="overlay">
@@ -95,8 +138,10 @@
       <b>Kick</b>: kick a foot up high<br>
       <b>Helicopter kick</b>: spin all the way around, or hold your arms out wide like helicopter blades<br>
       <b>Block</b>: cross both arms in front of your face<br>
+      <b>Duck</b>: crouch down low to dodge punches<br>
       <b>Jump</b>: jump! Jumping dodges punches and kicks<br>
-      There may be a few secret moves, too…
+      Plus special moves: <b>backflips, flying kicks, tornado punches and ground slams</b>, and SUPER moves that take 2 hearts.
+      Press <b>? Moves</b> during the fight to see them all. There may be a few secret moves, too…
     </div>
     <p>Each fighter has 3 hearts. Knock out your opponent to win!</p>
     <div class="row">
@@ -215,12 +260,18 @@ function walkPose(T, dir) {
   p.lKn = [-0.1 - w * 0.5, 0.92]; p.lAn = [-0.25 - w, 1.9 - Math.max(0, -w) * 0.25];
   return p;
 }
-function punchPose(T, t, upper) {
+function punchPose(T, t, upper, rear) {
   const p = stance(T, 0), k = strike(t);
-  p.neck[0] += 0.18 * k; p.head[0] += 0.22 * k;
+  p.neck[0] += 0.22 * k; p.head[0] += 0.26 * k;
   p.lSh = p.neck.slice(); p.rSh = p.neck.slice();
+  const sh = p.neck;
   if (upper) { p.rEl = lerpP([0.38, -0.72], [0.55, -1.3], k); p.rWr = lerpP([0.62, -1.02], [0.7, -2.0], k); }
-  else { p.rEl = lerpP([0.38, -0.72], [0.85, -0.98], k); p.rWr = lerpP([0.62, -1.02], [1.5, -1.0], k); }
+  else {
+    // a dead-straight arm, level with the shoulder
+    const el = rear ? "lEl" : "rEl", wr = rear ? "lWr" : "rWr";
+    p[el] = lerpP(p[el], [sh[0] + 0.78, sh[1] + 0.02], k);
+    p[wr] = lerpP(p[wr], [sh[0] + 1.56, sh[1] + 0.04], k);
+  }
   p.rKn[0] += 0.15 * k; p.rAn[0] += 0.2 * k;
   return p;
 }
@@ -278,6 +329,49 @@ function dabPose(T) {
   p.lEl = [-0.6, -1.4]; p.lWr = [-1.2, -1.85];     // other arm up and out
   return p;
 }
+function rotatePose(p, ang, cx, cy) {
+  const c = Math.cos(ang), s = Math.sin(ang), q = {};
+  JOINTS.forEach(j => { const x = p[j][0] - cx, y = p[j][1] - cy; q[j] = [cx + x * c - y * s, cy + x * s + y * c]; });
+  return q;
+}
+function duckPose(T) {
+  const p = blank(), b = Math.sin(T * 6) * 0.03;
+  p.lHip = [0, 0.9]; p.rHip = [0, 0.9];
+  p.neck = [0.3, -0.05 + b]; p.head = [0.42, -0.42 + b]; p.lSh = p.neck.slice(); p.rSh = p.neck.slice();
+  p.rEl = [0.6, 0.15]; p.rWr = [0.75, -0.3]; p.lEl = [0.35, 0.25]; p.lWr = [0.55, -0.2];
+  p.rKn = [0.75, 1.15]; p.rAn = [0.5, 1.9]; p.lKn = [-0.35, 1.3]; p.lAn = [-0.55, 1.9];
+  return p;
+}
+function flipPose(T, t) {
+  // tuck and spin over backward, kicking out at the top
+  const p = jumpPose(T); const k = t > 0.3 && t < 0.6 ? 1 : 0;
+  if (k) { p.rKn = [0.6, 0.1]; p.rAn = [1.5, -0.3]; }
+  return rotatePose(p, -Math.PI * 2 * ease(t / 0.9), 0, -0.3);
+}
+function flyPose(T, t) {
+  // leaping dive kick: front leg straight out, body leaning back
+  const p = blank();
+  p.neck = [-0.45, -0.85]; p.head = [-0.65, -1.15]; p.lSh = p.neck.slice(); p.rSh = p.neck.slice();
+  p.rEl = [-0.9, -0.6]; p.rWr = [-1.3, -0.85]; p.lEl = [-0.1, -0.4]; p.lWr = [0.2, -0.75];
+  p.rKn = [0.9, 0.35]; p.rAn = [1.85, 0.7];
+  p.lKn = [0.2, 0.75]; p.lAn = [-0.45, 0.85];
+  return t < 0.15 ? blendPose(jumpPose(T), p, t / 0.15) : p;
+}
+function tornadoPose(T, t) {
+  // spinning punches: both arms whip around like a top
+  const p = stance(T, 0), a = t * Math.PI * 5, c = Math.cos(a);
+  p.neck = [0, -1]; p.head = [0.05, -1.38]; p.lSh = p.neck.slice(); p.rSh = p.neck.slice();
+  p.rEl = [c * 0.75, -0.98]; p.rWr = [c * 1.5, -0.98];
+  p.lEl = [-c * 0.75, -0.95]; p.lWr = [-c * 1.5, -0.92];
+  p.rKn = [0.3, 0.95]; p.rAn = [0.5, 1.9]; p.lKn = [-0.3, 0.95]; p.lAn = [-0.5, 1.9];
+  return p;
+}
+function slamPose(T, t) {
+  if (t < 0.55) { const p = jumpPose(T); p.rEl = [0.3, -1.4]; p.rWr = [0.2, -2.1]; p.lEl = [-0.1, -1.4]; p.lWr = [0.1, -2.1]; return p; }
+  const p = duckPose(T);   // crash down fists-first
+  p.rEl = [0.7, 0.6]; p.rWr = [1.0, 1.85]; p.lEl = [0.5, 0.7]; p.lWr = [0.8, 1.85];
+  return p;
+}
 function koPose() {
   const p = blank();
   p.neck = [-1.0, 1.75]; p.head = [-1.4, 1.75]; p.lSh = p.neck.slice(); p.rSh = p.neck.slice();
@@ -296,8 +390,15 @@ const ATTACKS = {
   upper:  { dur: 0.48, at: 0.3, reach: 2.2, lunge: 0.4 },
   kick:   { dur: 0.55, at: 0.32, reach: 3.0, lunge: 0.5 },
   heli:   { dur: 0.95, at: 0.25, reach: 3.4, lunge: 1.4 },
-  fire:   { dur: 0.5, at: 0.35, reach: 0, lunge: 0 }
+  fire:   { dur: 0.5, at: 0.35, reach: 0, lunge: 0 },
+  // special moves
+  flip:   { dur: 0.8, at: 0.4, reach: 2.4, lunge: -1.6, name: "Backflip kick" },
+  fly:    { dur: 0.7, at: 0.45, reach: 3.0, lunge: 3.2, name: "Flying kick" },
+  tornado:{ dur: 0.9, at: 0.25, reach: 2.6, lunge: 1.0, name: "Tornado punch" },
+  slam:   { dur: 0.95, at: 0.78, reach: 3.8, lunge: 0.4, name: "Ground slam" }
 };
+const SPECIALS = ["heli", "flip", "fly", "tornado", "slam"];
+const MULTI = { heli: true, tornado: true };   // these hit twice
 function makeFighter(side) {
   return {
     side,                       // "L" (you) or "R" (opponent)
@@ -305,7 +406,8 @@ function makeFighter(side) {
     hp: 3, act: null, actT: 0, hitDone: false,
     blocking: false, inv: 0, hitT: 0, dizzy: 0, ko: false,
     pose: stance(0), source: "proc",   // "proc" (animated), "cam" (your body), "replay" (your shadow)
-    knock: 0, walk: 0, color: side === "L" ? "#4fd6ff" : "#ff4f6b", trail: []
+    knock: 0, walk: 0, color: side === "L" ? "#4fd6ff" : "#ff4f6b", trail: [],
+    power: 0, superOn: false, ducking: false, punchSide: 0
   };
 }
 let P1 = makeFighter("L"), P2 = makeFighter("R");
@@ -508,8 +610,17 @@ function startAction(f, a, keepBody) {
   // a quick punch can be cut short by a bigger move; anything else has to finish first
   const cancel = (f.act === "punch" || f.act === "upper") && a !== "punch" && a !== "upper";
   if (f.act && !cancel && f.actT < 0.85 * (ATTACKS[f.act] ? ATTACKS[f.act].dur : 0.4)) return false;
-  f.act = a; f.actT = 0; f.hitDone = false; f.keepBody = !!keepBody;
-  if (a === "heli") { sfx.heli(); if (f.y < 0.3) f.vy = eggs.moon ? 5 : 7; }
+  f.act = a; f.actT = 0; f.hitDone = false; f.keepBody = !!keepBody; f.slammed = false;
+  if (a === "punch") f.punchSide = 1 - f.punchSide;          // jab, cross, jab, cross
+  // a full power bar turns the next special move into a SUPER move (2 hearts!)
+  f.superOn = SPECIALS.indexOf(a) >= 0 && f.power >= 1;
+  if (f.superOn) { f.power = 0; addText(f.x, "SUPER " + (ATTACKS[a].name || "Helicopter").toUpperCase() + "!", "#ffd23f", true); sfx.egg(); }
+  const g = eggs.moon ? 0.7 : 1;
+  if (a === "heli") { sfx.heli(); if (f.y < 0.3) f.vy = 7 * g; }
+  else if (a === "flip") { sfx.jump(); f.vy = 9 * g; f.inv = Math.max(f.inv, 0.45); }
+  else if (a === "fly") { sfx.jump(); f.vy = 6.5 * g; }
+  else if (a === "slam") { sfx.jump(); f.vy = 11 * g; }
+  else if (a === "tornado") sfx.heli();
   else if (a === "fire") sfx.fire();
   else sfx.whoosh();
   if (state === "record") recEvent(a);
@@ -532,7 +643,9 @@ function resolveHit(att, def, type) {
   if (def.ko || state !== "fight") return;
   const s = S(), dist = Math.abs(att.x - def.x) / s;
   if (dist > ATTACKS[type].reach) return;
-  if (airborne(def) && type !== "heli" && type !== "upper") { addText(def.x, "MISS", "#b8a6e0"); return; }
+  if (type === "slam" && airborne(def)) { addText(def.x, "MISS", "#b8a6e0"); return; }
+  if (airborne(def) && type !== "heli" && type !== "upper" && type !== "fly" && type !== "slam" && type !== "flip") { addText(def.x, "MISS", "#b8a6e0"); return; }
+  if (def.ducking && (type === "punch" || type === "heli" || type === "fly" || type === "tornado")) { addText(def.x, "DUCKED!", "#b8ff9a"); return; }
   if (def.inv > 0) return;
   if (def.blocking && def.dizzy <= 0) {
     sfx.block(); addText(def.x, "BLOCK!", "#7fe4ff"); def.knock = 0.6 * Math.sign(def.x - att.x); burst(def, "#7fe4ff", 8);
@@ -541,7 +654,10 @@ function resolveHit(att, def, type) {
   damage(def, att);
 }
 function damage(def, att) {
-  def.hp = Math.max(0, def.hp - 1); def.inv = 0.9; def.hitT = 0.45; def.act = null; def.dizzy = 0;
+  const big = att.superOn && att.act && SPECIALS.indexOf(att.act) >= 0;
+  if (big) { att.superOn = false; addText(def.x - 30, "x2!", "#ff4f8b", true); }
+  def.hp = Math.max(0, def.hp - (big ? 2 : 1));
+  att.power = Math.min(1, att.power + 0.34); def.power = Math.min(1, def.power + 0.25); def.inv = 0.9; def.hitT = 0.45; def.act = null; def.dizzy = 0;
   def.knock = 2.2 * Math.sign(def.x - att.x || 1);
   sfx.hit(); shake = reduceMotion ? 0 : 14;
   addText(def.x, ["POW!", "BAM!", "WHAM!", "KAPOW!", "BOOM!", "THWACK!"][Math.floor(Math.random() * 6)], "#ffd23f", true);
@@ -572,11 +688,16 @@ function updateFighter(f, dt) {
       if (!f.hitDone && f.actT >= A.at * A.dur) {
         f.hitDone = true;
         if (f.act === "fire") spawnFire(f);
-        else resolveHit(f, f === P1 ? P2 : P1, f.act);
+        else {
+          if (f.act === "slam") { shake = reduceMotion ? 0 : 18; sfx.hit(); shockwave(f); }
+          resolveHit(f, f === P1 ? P2 : P1, f.act);
+        }
       }
-      // helicopter keeps hitting while it spins
-      if (f.act === "heli" && f.actT > 0.55 * A.dur && f.hitDone === true) { f.hitDone = "again"; resolveHit(f, f === P1 ? P2 : P1, "heli"); }
-      if (f.actT >= A.dur) f.act = null;
+      // helicopter and tornado keep hitting while they spin
+      if (MULTI[f.act] && f.actT > 0.6 * A.dur && f.hitDone === true) { f.hitDone = "again"; resolveHit(f, f === P1 ? P2 : P1, f.act); }
+      // ground slam: dive down hard, then a shockwave
+      if (f.act === "slam" && !f.slammed && f.actT > 0.5 * A.dur) { f.slammed = true; f.vy = -24; }
+      if (f.actT >= A.dur) { f.act = null; f.superOn = false; }
     } else if (f.actT > 0.5) f.act = null;
   }
   // keep inside the stage, and keep the two fighters from walking through each other
@@ -593,7 +714,11 @@ function animatedPose(f) {
   if (f.hitT > 0) return hitPose(T, 1 - f.hitT / 0.45);
   if (f.act && ATTACKS[f.act]) {
     const t = f.actT / ATTACKS[f.act].dur;
-    if (f.act === "punch") return punchPose(T, t, false);
+    if (f.act === "punch") return punchPose(T, t, false, f.punchSide === 1);
+    if (f.act === "flip") return flipPose(T, t);
+    if (f.act === "fly") return flyPose(T, t);
+    if (f.act === "tornado") return tornadoPose(T, t);
+    if (f.act === "slam") return slamPose(T, t);
     if (f.act === "upper") return punchPose(T, t, true);
     if (f.act === "kick") return kickPose(T, t);
     if (f.act === "heli") return heliPose(T, t);
@@ -601,6 +726,7 @@ function animatedPose(f) {
   }
   if (f.dab > 0) return dabPose(T);
   if (f.blocking) return blockPose(T);
+  if (f.ducking && f.y < 0.2) return duckPose(T);
   if (f.y > 0.2) return jumpPose(T);
   if (Math.abs(f.walk) > 0.1) return walkPose(T);
   return stance(T);
@@ -609,7 +735,7 @@ function animatedPose(f) {
 // =====================================================================
 // YOU (camera, buttons, keys)
 // =====================================================================
-const held = { left: false, right: false, block: false };
+const held = { left: false, right: false, block: false, duck: false };
 function updatePlayer(dt) {
   const s = S();
   let fromCam = false;
@@ -626,18 +752,31 @@ function updatePlayer(dt) {
     // your real jump lifts the figure
     if (hipBase != null) { const up = (hipBase - camHipY) / camTorso; if (up > 0.25 && P1.vy <= 0) { P1.y = Math.max(P1.y, up * 1.6); } }
     if (held.block) P1.blocking = true;
+    // crouch down low to duck
+    P1.ducking = held.duck || (hipBase != null && (camHipY - hipBase) / camTorso > 0.4);
   } else {
-    P1.blocking = held.block || keysDown.s || keysDown.arrowdown;
+    P1.blocking = held.block || keysDown.s;
+    P1.ducking = held.duck || keysDown.arrowdown || keysDown.shift;
   }
   const dir = (held.right || keysDown.d || keysDown.arrowright ? 1 : 0) - (held.left || keysDown.a || keysDown.arrowleft ? 1 : 0);
   if (dir && !P1.ko) { P1.x += dir * s * 4.5 * dt; P1.walk = dir; }
   updateFighter(P1, dt);
   // which pose to draw: your own body, unless a button move or a hit is playing
   const anim = P1.ko || P1.hitT > 0 || (P1.act && !P1.keepBody) || P1.dab > 0 || !fromCam;
-  P1.pose = anim ? animatedPose(P1) : camPose;
+  P1.pose = anim ? animatedPose(P1) : (P1.act === "punch" ? straightArm(camPose, P1) : camPose);
   P1.source = anim ? "proc" : "cam";
   // lunge: punches and kicks scoot you forward a little
   if (P1.act && ATTACKS[P1.act] && P1.actT < ATTACKS[P1.act].dur * 0.4) P1.x += ATTACKS[P1.act].lunge * s * dt * 3;
+}
+
+// when the camera spots your punch, snap that arm out dead straight for a moment
+function straightArm(p, f) {
+  const q = copyPose(p), k = strike(f.actT / ATTACKS.punch.dur);
+  const side = q.rWr[0] >= q.lWr[0] ? "r" : "l";
+  const sh = q[side + "Sh"];
+  q[side + "El"] = lerpP(q[side + "El"], [sh[0] + 0.78, sh[1] + 0.02], k);
+  q[side + "Wr"] = lerpP(q[side + "Wr"], [sh[0] + 1.56, sh[1] + 0.04], k);
+  return q;
 }
 
 // =====================================================================
@@ -646,15 +785,18 @@ function updatePlayer(dt) {
 const ai = { think: 0.8, plan: null };
 function updateCPU(dt) {
   const s = S(), f = P2, d = (f.x - P1.x) / s;
-  f.walk = 0; f.blocking = false;
+  f.walk = 0; f.blocking = false; f.ducking = false;
   if (!f.ko && f.dizzy <= 0 && f.hitT <= 0) {
     ai.think -= dt;
+    if (ai.plan === "duck") { f.ducking = true; ai.planT -= dt; if (ai.planT <= 0) ai.plan = null; }
     // see a big attack coming? sometimes block or jump
     if (P1.act && P1.actT < 0.12 && d < 3.4 && !ai.plan && Math.random() < 0.045) {
-      ai.plan = Math.random() < 0.6 ? "block" : "jump"; ai.planT = 0.45;
+      const rr = Math.random();
+      ai.plan = rr < 0.5 ? "block" : rr < 0.75 ? "duck" : "jump"; ai.planT = 0.45;
       if (ai.plan === "jump") jump(f);
     }
-    if (ai.plan === "block") { f.blocking = true; ai.planT -= dt; if (ai.planT <= 0) ai.plan = null; }
+    if (ai.plan === "duck") { /* handled above */ }
+    else if (ai.plan === "block") { f.blocking = true; ai.planT -= dt; if (ai.planT <= 0) ai.plan = null; }
     else if (ai.plan === "jump") { ai.planT -= dt; if (ai.planT <= 0) ai.plan = null; }
     else if (!f.act) {
       // walk to fighting range
@@ -664,13 +806,18 @@ function updateCPU(dt) {
         ai.think = 0.55 + Math.random() * 0.9;
         const r = Math.random();
         if (d < 3.2) {
-          if (r < 0.32) startAction(f, "punch");
-          else if (r < 0.55) startAction(f, "kick");
-          else if (r < 0.66) startAction(f, "heli");
-          else if (r < 0.72) startAction(f, "upper");
-          else if (r < 0.8) jump(f);
-          else if (r < 0.9) { ai.plan = "block"; ai.planT = 0.6; }
-        } else if (r < 0.15) startAction(f, "heli");
+          if (r < 0.26) startAction(f, "punch");
+          else if (r < 0.44) startAction(f, "kick");
+          else if (r < 0.5) startAction(f, "heli");
+          else if (r < 0.55) startAction(f, "upper");
+          else if (r < 0.6) startAction(f, "tornado");
+          else if (r < 0.65) startAction(f, "flip");
+          else if (r < 0.69) startAction(f, "slam");
+          else if (r < 0.75) jump(f);
+          else if (r < 0.85) { ai.plan = "block"; ai.planT = 0.6; }
+          else if (r < 0.9) { ai.plan = "duck"; ai.planT = 0.6; }
+        } else if (r < 0.12) startAction(f, "heli");
+        else if (r < 0.25) startAction(f, "fly");
       }
     }
   }
@@ -684,7 +831,7 @@ function updateCPU(dt) {
 // =====================================================================
 function recEvent(a) { if (recording.length) recording[recording.length - 1].ev.push(a); }
 function recordFrame() {
-  recording.push({ t: recT, x: P1.x / W, y: P1.y, pose: copyPose(P1.pose), block: !!P1.blocking, ev: [] });
+  recording.push({ t: recT, x: P1.x / W, y: P1.y, pose: copyPose(P1.pose), block: !!P1.blocking, duck: !!P1.ducking, ev: [] });
 }
 let replayIdx = 0;
 function updateShadow(dt) {
@@ -707,7 +854,7 @@ function updateShadow(dt) {
     // mirror your recorded spot onto the other side of the stage
     const tx = W - fr.x * W;
     f.x += (tx - f.x) * Math.min(1, dt * 10);
-    f.y = fr.y; f.blocking = fr.block;
+    f.y = fr.y; f.blocking = fr.block; f.ducking = !!fr.duck;
     f.pose = fr.pose; f.source = "replay";
   } else {
     f.pose = animatedPose(f); f.source = "proc";
@@ -730,7 +877,7 @@ function updateFire(dt) {
   fireballs.forEach(b => {
     b.x += b.vx * dt; b.life -= dt;
     const target = b.owner === P1 ? P2 : P1;
-    if (!target.ko && Math.abs(b.x - target.x) < s * 0.7 && !airborne(target)) {
+    if (!target.ko && Math.abs(b.x - target.x) < s * 0.7 && !airborne(target) && !target.ducking) {
       b.life = 0;
       if (target.blocking) { sfx.block(); addText(target.x, "BLOCK!", "#7fe4ff"); burst(target, "#ff9a3f", 10); }
       else if (target.inv <= 0 && state === "fight") damage(target, b.owner);
@@ -738,6 +885,13 @@ function updateFire(dt) {
     for (let i = 0; i < 2; i++) particles.push({ x: b.x, y: b.y, vx: -b.vx * 0.1 + (Math.random() - 0.5) * 60, vy: (Math.random() - 0.5) * 60, life: 0.4, c: Math.random() < 0.5 ? "#ffd23f" : "#ff6b2a", r: 4 + Math.random() * 5 });
   });
   fireballs = fireballs.filter(b => b.life > 0 && b.x > -50 && b.x < W + 50);
+}
+function shockwave(f) {
+  const y = groundY();
+  for (let i = 0; i < 40; i++) {
+    const dir = i % 2 ? 1 : -1, v = 200 + Math.random() * 400;
+    particles.push({ x: f.x, y: y - 4, vx: dir * v, vy: -Math.random() * 180, life: 0.5 + Math.random() * 0.3, c: f.superOn ? "#ffd23f" : f.color, r: 3 + Math.random() * 4 });
+  }
 }
 function burst(f, color, n) {
   const s = S(), y = groundY() - (1.9 + 1 + f.y) * s;
@@ -769,7 +923,7 @@ function showModeCard() {
       <button id="goCpu">Fight the computer</button>
       <button id="goShadow" class="red">Fight your shadow</button>
     </div>
-    <p class="small">${useCamera ? "The buttons at the bottom work too, any time the camera can't see you." : "Keys: A D or arrows to move, W jump, J punch, K kick, L helicopter, S block."}</p>
+    <p class="small">${useCamera ? "The buttons at the bottom work too, for special moves or any time the camera can't see you." : "Keys: A D move, W jump, J punch, K kick, S block, ↓ duck. Specials: L helicopter, Q backflip, E flying kick, R tornado, G slam. M shows all moves."}</p>
     <p id="status" aria-live="polite"></p>`;
   document.getElementById("goCpu").onclick = () => begin("cpu");
   document.getElementById("goShadow").onclick = () => begin("shadow");
@@ -877,7 +1031,8 @@ function drawFighter(f, ghost) {
     f.trail.forEach((q, i) => { ctx.fillStyle = `hsla(${(i * 25 + T * 200) % 360},100%,60%,${i / 28})`; ctx.beginPath(); ctx.arc(q[0], q[1], s * 0.2, 0, 7); ctx.fill(); });
   }
   ctx.strokeStyle = color; ctx.lineCap = "round"; ctx.lineJoin = "round";
-  ctx.shadowColor = color; ctx.shadowBlur = 14;
+  ctx.shadowColor = f.superOn || f.power >= 1 ? "#ffd23f" : color;
+  ctx.shadowBlur = f.superOn ? 34 : f.power >= 1 ? 18 + Math.sin(T * 10) * 8 : 14;
   ctx.lineWidth = Math.max(4, s * 0.16);
   const line = (...js) => { ctx.beginPath(); const a = P(js[0]); ctx.moveTo(a[0], a[1]); for (let i = 1; i < js.length; i++) { const b = P(js[i]); ctx.lineTo(b[0], b[1]); } ctx.stroke(); };
   // legs, body, arms
@@ -911,7 +1066,11 @@ function drawFighter(f, ghost) {
     ctx.fillStyle = "#ffd23f"; ctx.font = `${Math.round(s * 0.4)}px sans-serif`; ctx.textAlign = "center";
     for (let i = 0; i < 3; i++) { const a = T * 5 + i * 2.1; ctx.fillText("★", hd[0] + Math.cos(a) * hr * 1.4, fy - hr * 1.3 + Math.sin(a) * hr * 0.4); }
   }
-  // helicopter motion blur
+  // spinning motion blur
+  if (f.act === "tornado") {
+    ctx.strokeStyle = color; ctx.globalAlpha *= 0.35; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(hipX, hipY - 1 * s, 1.6 * s, 0.4 * s, 0, 0, 7); ctx.stroke();
+  }
   if (f.act === "heli") {
     ctx.strokeStyle = color; ctx.globalAlpha *= 0.35; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.ellipse(hipX, hipY + 0.35 * s, 1.95 * s, 0.6 * s, 0, 0, 7); ctx.stroke();
@@ -934,6 +1093,15 @@ function drawHUD() {
   ctx.font = `900 ${Math.round(s * 0.75)}px Nunito, sans-serif`; ctx.textBaseline = "top";
   ctx.textAlign = "left"; ctx.fillStyle = "#4fd6ff"; ctx.fillText(playerName(), pad, top);
   for (let i = 0; i < 3; i++) heart(pad + s * 0.5 + i * s * 1.25, top + s * 1.05, i < P1.hp, "#4fd6ff");
+  const bar = (x, w, v, c) => {
+    const y = top + s * 2.3, h = Math.max(6, s * 0.32);
+    ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = v >= 1 ? (Math.floor(T * 6) % 2 ? "#ffd23f" : "#fff2a8") : c; ctx.fillRect(x, y, w * v, h);
+    if (v >= 1) { ctx.font = `900 ${Math.round(s * 0.5)}px Nunito, sans-serif`; ctx.fillStyle = "#ffd23f"; ctx.fillText("SUPER READY!", x + (c === "#4fd6ff" ? 0 : w), y + h + 4); }
+  };
+  ctx.textAlign = "left"; bar(pad, s * 3.6, P1.power, "#4fd6ff");
+  ctx.textAlign = "right"; bar(W - pad - s * 3.6, s * 3.6, P2.power, "#ff4f6b");
+  ctx.font = `900 ${Math.round(s * 0.75)}px Nunito, sans-serif`;
   ctx.textAlign = "right"; ctx.fillStyle = "#ff4f6b";
   ctx.fillText(mode === "shadow" ? "Your shadow" : "Crazy CPU", W - pad, top);
   for (let i = 0; i < 3; i++) heart(W - pad - s * 0.5 - i * s * 1.25, top + s * 1.05, i < P2.hp, "#ff4f6b");
@@ -998,7 +1166,7 @@ function draw() {
 let last = performance.now();
 function loop(now) {
   const realDt = Math.min(0.05, (now - last) / 1000); last = now;
-  const dt = realDt * slow;
+  const dt = paused ? 0 : realDt * slow;
   T += dt;
   slow = Math.min(1, slow + realDt * 0.35);
   shake = Math.max(0, shake - realDt * 40);
@@ -1047,10 +1215,11 @@ document.getElementById("btnCam").onclick = startCamera;
 document.getElementById("btnKeys").onclick = () => { audio(); useCamera = false; showModeCard(); };
 
 function press(act, down) {
-  if (act === "left" || act === "right" || act === "block") { held[act] = down; return; }
+  if (act === "left" || act === "right" || act === "block" || act === "duck") { held[act] = down; return; }
   if (!down) return;
   if (act === "jump") jump(P1);
-  else if (act === "punch" || act === "kick" || act === "heli") startAction(P1, act);
+  else if (act === "moves") toggleMoves();
+  else startAction(P1, act);
 }
 controlsEl.querySelectorAll("button").forEach(b => {
   const act = b.dataset.act;
@@ -1059,6 +1228,18 @@ controlsEl.querySelectorAll("button").forEach(b => {
   b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up); b.addEventListener("lostpointercapture", up);
   b.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); press(act, true); setTimeout(() => press(act, false), 150); } });
 });
+
+// move list (pauses the fight)
+let paused = false;
+const movesPanel = document.getElementById("movesPanel");
+function toggleMoves() {
+  paused = movesPanel.hidden;
+  movesPanel.hidden = !paused;
+  if (paused) document.getElementById("closeMoves").focus();
+  held.left = held.right = held.block = held.duck = false;
+}
+document.getElementById("closeMoves").onclick = toggleMoves;
+movesPanel.addEventListener("keydown", e => { if (e.key === "Escape" || e.key.toLowerCase() === "m") { e.stopPropagation(); toggleMoves(); } });
 
 // secret codes
 const KONAMI = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright", "b", "a"];
@@ -1072,17 +1253,23 @@ window.addEventListener("keydown", e => {
   if (keysDown[k]) return;
   keysDown[k] = true;
   if (state !== "fight" && state !== "record") return;
+  if (paused) return;
   if (k === "w" || k === "arrowup") { e.preventDefault(); jump(P1); }
   else if (k === "j" || k === "z" || k === " ") { e.preventDefault(); startAction(P1, "punch"); }
   else if (k === "k" || k === "x") startAction(P1, "kick");
   else if (k === "l" || k === "c") startAction(P1, "heli");
   else if (k === "u") startAction(P1, "upper");
+  else if (k === "q") startAction(P1, "flip");
+  else if (k === "e") startAction(P1, "fly");
+  else if (k === "r") startAction(P1, "tornado");
+  else if (k === "g") startAction(P1, "slam");
+  else if (k === "m") toggleMoves();
   else if (k === "f") { startAction(P1, "fire"); discover("Fireball"); }
   else if (k === "t") doDab(P1);
   if (k.startsWith("arrow")) e.preventDefault();
 });
 window.addEventListener("keyup", e => { keysDown[e.key.toLowerCase()] = false; });
-window.addEventListener("blur", () => { for (const k in keysDown) keysDown[k] = false; held.left = held.right = held.block = false; });
+window.addEventListener("blur", () => { for (const k in keysDown) keysDown[k] = false; held.left = held.right = held.block = held.duck = false; });
 
 // secret: click the moon for moon gravity
 canvas.addEventListener("click", e => {

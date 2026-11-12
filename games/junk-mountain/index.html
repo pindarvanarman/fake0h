@@ -16,7 +16,7 @@
   :root { color-scheme: dark; --ink: #fff8e8; --gold: #ffd23f; --panel: #1b2440; --blue: #4fb0ff; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1226; color: var(--ink); font-family: Nunito, system-ui, sans-serif; }
-  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
   .exit-btn {
     position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); right: 12px; z-index: 30;
     font: 900 0.9rem Nunito, sans-serif; color: var(--ink); text-decoration: none;
@@ -57,7 +57,7 @@
 <canvas id="game"></canvas>
 <a class="exit-btn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
 <div id="touch" aria-hidden="true">
-  <div><button data-k="left">◀</button><button data-k="right">▶</button></div>
+  <div><button data-k="left">◀</button><button data-k="right">▶</button><button data-k="cp" aria-label="Back to checkpoint">⚑</button></div>
   <button class="jump" data-k="jump">JUMP</button>
 </div>
 <div id="overlay">
@@ -122,7 +122,9 @@ const sfx = {
   crumble() { noise(0.4, 0.3, 500); },
   whistle() { tone(1400, 1.2, "sine", 0.04, 0, 300); },
   win() { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, 0.22, "square", 0.06, i * 0.1)); },
-  pop() { tone(880, 0.06, "triangle", 0.06); }
+  pop() { tone(880, 0.06, "triangle", 0.06); },
+  fling() { tone(200, 0.25, "sawtooth", 0.06, 0, 900); noise(0.15, 0.2, 1500); },
+  checkpoint() { [523, 784, 1047].forEach((f, i) => tone(f, 0.12, "triangle", 0.07, i * 0.06)); }
 };
 
 // =====================================================================
@@ -146,7 +148,7 @@ const JUNK = {
   toilet:    { w: [70, 80], h: [80, 90] },
   // special junk
   trampoline:{ w: [100, 130], h: [30, 36], bouncy: true },
-  mattress:  { w: [140, 170], h: [36, 44], bouncy: true },
+  mattress:  { w: [140, 170], h: [36, 44], slow: true },        // so comfy it slows you down
   icebox:    { w: [120, 150], h: [60, 70], slippery: true },
   boxes:     { w: [90, 110], h: [50, 60], crumbly: true },
   cart:      { w: [100, 120], h: [50, 56], moving: true },
@@ -161,7 +163,7 @@ function levelHeight(L) { return 1500 + L * 800; }        // each level is talle
 // little seeded random, so a level is the same every time you try it
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 
-let level = 1, objs = [], summit = null, decor = [];
+let level = 1, objs = [], summit = null, decor = [], checkpoints = [], cpIndex = -1;
 
 // Can a player standing on "a" get onto "b"? Tries jumps the way a person would (from different spots,
 // steering at different moments) using the same physics as the game. Used while building each level,
@@ -176,12 +178,14 @@ function canJump(a, b, list) {
   if (a.type === "ground") { ax = Math.max(0, b.x - 260); aw = Math.min(WORLD_W, b.x + b.w + 260) - ax; }
   for (let s = 0; s <= 8; s++) for (const delay of [0, 0.08, 0.16, 0.26]) for (const steer of [1, 0.6]) {
     let x = ax + s / 8 * (aw - C_PW), y = a.y - C_PH - 0.01, vy = -C_JUMP, t = 0;
+    let vx = a.slow ? d * C_RUN * 0.35 : 0;          // off a mattress you take off slowly, then speed up in the air
     if (x < 0 || x > WORLD_W - C_PW || near.some(o => ov(x, y, o))) continue;
     for (let i = 0; i < 220; i++) {
       t += C_DT; vy = Math.min(vy + C_G * C_DT, 1500);
-      const vx = t > delay ? d * C_RUN * steer : 0;
+      if (a.slow) { if (t > delay) vx = Math.max(-C_RUN * steer, Math.min(C_RUN * steer, vx + d * 1900 * C_DT)); }
+      else vx = t > delay ? d * C_RUN * steer : 0;
       x += vx * C_DT;
-      for (const o of near) if (ov(x, y, o)) x = vx > 0 ? o.x - C_PW : o.x + o.w;
+      for (const o of near) if (ov(x, y, o)) { x = vx > 0 ? o.x - C_PW : o.x + o.w; if (a.slow) vx = 0; }   // walls stop you, like in the game
       y += vy * C_DT;
       let landed = null;
       for (const o of near) if (ov(x, y, o)) { if (vy > 0) { y = o.y - C_PH; landed = o; } else y = o.y + o.h; vy = 0; }
@@ -228,7 +232,10 @@ function buildLevel(L) {
       // keep it only if you can jump onto it, and it doesn't get in the way of the jump before it
       const prev = objs[objs.length - 1], all = objs.concat([o]);
       if (!canJump(prev, o, all)) continue;
-      if (objs.length > 1 && !canJump(objs[objs.length - 2], prev, all)) continue;
+      // and it mustn't block any of the last few jumps below it either
+      let blocks = false;
+      for (let k = Math.max(0, objs.length - 4); k < objs.length - 1 && !blocks; k++) if (!canJump(objs[k], objs[k + 1], all)) blocks = true;
+      if (blocks) continue;
       if (def.moving) { o.x0 = o.x; o.range = between(30, 60); o.speed = between(0.6, 1.0); o.phase = R() * 6; }
       objs.push(o); cx = nx; top = ntop; prevW = w; dir = d; placed = true;
       if (R() < 0.25) dir = -dir;                                   // zig-zag now and then
@@ -247,6 +254,14 @@ function buildLevel(L) {
   }
   if (!summit) summit = { type: "summit", x: cx - sw / 2, y: top - 160, w: sw, h: 60, solid: true };   // fallback (never seen in testing)
   objs.push(summit);
+  // checkpoints: a flag on a nice, steady piece of junk about every 12 m
+  checkpoints = [];
+  let nextCp = 480;
+  objs.forEach(o => {
+    if (o.type === "ground" || o.type === "summit") return;
+    if (o.bouncy || o.slippery || o.crumbly || o.moving || o.slow || o.w < 70) return;
+    if (-o.y >= nextCp && -o.y < target - 250) { o.checkpoint = checkpoints.length; checkpoints.push(o); nextCp = -o.y + 480; }
+  });
   // background junk pile, just for looks
   const R2 = rng(L * 31 + 7);
   for (let i = 0; i < 60 + L * 12; i++) {
@@ -286,23 +301,29 @@ function step(dt) {
   if (P.ground && P.ground.moving && P.ground.dx) P.x += P.ground.dx;
 
   const left = keys.arrowleft || keys.a || keys.tleft, right = keys.arrowright || keys.d || keys.tright;
-  const dirIn = (right ? 1 : 0) - (left ? 1 : 0);
+  let dirIn = (right ? 1 : 0) - (left ? 1 : 0);
+  const runScale = 1;
   if (dirIn) P.face = dirIn;
   const slippery = P.ground && P.ground.slippery;
   if (P.lockT > 0) P.lockT -= dt;
   else if (P.ground) {
-    const target = dirIn * RUN, accel = slippery ? 500 : 3000;
+    const comfy = P.ground.slow ? 0.35 : 1;                         // mattresses: sleepy, slow running
+    const target = dirIn * RUN * runScale * comfy, accel = slippery ? 500 : 3000;
     P.vx += Math.max(-accel * dt, Math.min(accel * dt, target - P.vx));
+  } else if (P.flung) {
+    P.vx += dirIn * AIR * 0.4 * dt;                 // a little nudge with the keys, but mostly physics
   } else {
     P.vx += dirIn * AIR * dt;
     P.vx = Math.max(-RUN, Math.min(RUN, P.vx));
     if (!dirIn) P.vx *= Math.pow(0.4, dt);
   }
+  // aiming a fling: stand still and get ready
+  if (aim.active && P.ground) P.vx = 0;
   // timers that make jumping feel fair
   P.coyote = P.ground ? 0.1 : Math.max(0, P.coyote - dt);
   P.buffer = Math.max(0, P.buffer - dt);
   // gravity, and a slower slide down walls
-  P.vy += GRAV * dt * (P.vy < 0 && !jumpHeld ? 1.9 : 1);
+  P.vy += GRAV * dt * (P.vy < 0 && !jumpHeld && !P.flung ? 1.9 : 1);
   if (P.wall && P.vy > 260 && !P.ground) P.vy = 260;
   P.vy = Math.min(P.vy, 1500);
   // jump: from the ground, or off a wall
@@ -351,16 +372,35 @@ function step(dt) {
       }
       dust(P.x + PW / 2, P.y + PH);
       if (P.ground.crumbly && P.ground.crumbleT == null) P.ground.crumbleT = 0;
+      if (P.ground.checkpoint != null && P.ground.checkpoint > cpIndex) reachCheckpoint(P.ground.checkpoint);
     }
   }
-  if (P.ground) P.fallStart = P.y;
+  if (P.ground) { P.fallStart = P.y; P.flung = false; }
   else if (P.vy < 0) P.fallStart = P.y;
+  // fell well below your checkpoint? it catches you and puts you back
+  if (cpIndex >= 0 && P.y > checkpoints[cpIndex].y + 350) { bigFalls++; toCheckpoint("Caught by the checkpoint! Back you go."); return; }
   if (!P.ground && P.vy > 1200 && !P.whistled) { P.whistled = true; sfx.whistle(); }
   if (P.ground) P.whistled = false;
   P.highest = Math.max(P.highest, -P.y);
   P.anim += dt * (P.ground ? Math.abs(P.vx) / 40 : 6);
   // reached the Golden Plunger?
   if (P.ground === summit && Math.abs((P.x + PW / 2) - (summit.x + summit.w / 2)) < 60) levelComplete();
+}
+
+function reachCheckpoint(i) {
+  cpIndex = i; sfx.checkpoint();
+  const o = checkpoints[i];
+  burst(o.x + o.w / 2, o.y - 40, "#5ad17a", 24);
+  quip = { text: "✔ Checkpoint " + (i + 1) + " of " + checkpoints.length + "!  Falls below here bring you back.", t: 3 };
+  const d = load(); if (level >= d.level) { d.level = level; d.cp = { level, i }; save(d); }
+}
+function toCheckpoint(msg) {
+  if (cpIndex < 0) return;
+  const o = checkpoints[cpIndex];
+  P.x = o.x + o.w / 2 - PW / 2; P.y = o.y - PH - 1; P.vx = 0; P.vy = 0; P.ground = null; P.fallStart = P.y; P.whistled = false;
+  if (o.crumbleT != null) { o.crumbleT = null; o.solid = true; }
+  burst(P.x + PW / 2, P.y + PH / 2, "#5ad17a", 18); sfx.checkpoint();
+  if (msg) quip = { text: msg, t: 2.5 };
 }
 
 // =====================================================================
@@ -371,8 +411,9 @@ const SAVE = "junk-mountain-v1" + (PLAYER ? ":" + PLAYER : "");
 function load() { try { return JSON.parse(localStorage.getItem(SAVE)) || { level: 1, best: 0 }; } catch (e) { return { level: 1, best: 0 }; } }
 function save(d) { try { localStorage.setItem(SAVE, JSON.stringify(d)); } catch (e) {} }
 
-function startLevel(L) {
-  level = L; levelT = 0; buildLevel(L); resetPlayer(); camY = -H * 0.4; celebrateT = 0;
+function startLevel(L, fromCp) {
+  level = L; levelT = 0; buildLevel(L); resetPlayer(); camY = -H * 0.4; celebrateT = 0; cpIndex = -1;
+  if (fromCp != null && checkpoints[fromCp]) { cpIndex = fromCp; toCheckpoint(); camY = P.y; }
   state = "play"; overlay.classList.add("hidden");
   if (isTouch) touchEl.classList.add("on");
   quip = { text: "Level " + L + ": " + Math.round(levelHeight(L) / UNIT_PER_M) + " m of junk. Grab the Golden Plunger!", t: 3.5 };
@@ -381,7 +422,7 @@ function levelComplete() {
   if (state !== "play") return;
   state = "celebrate"; celebrateT = 0; sfx.win();
   for (let i = 0; i < 120; i++) confetti.push({ x: Math.random() * W, y: -Math.random() * H * 0.4, vx: (Math.random() - 0.5) * 80, vy: 80 + Math.random() * 140, r: 0, vr: (Math.random() - 0.5) * 8, c: ["#ffd23f", "#4fb0ff", "#ff6b8b", "#5ad17a"][i % 4], life: 4 });
-  const d = load(); d.level = Math.max(d.level, level + 1); d.best = Math.max(d.best, level); save(d);
+  const d = load(); d.level = Math.max(d.level, level + 1); d.best = Math.max(d.best, level); d.cp = null; save(d);
   if (level >= WIN_LEVEL && window.ArcadeProgress) ArcadeProgress.complete();
   setTimeout(() => {
     touchEl.classList.remove("on");
@@ -411,19 +452,21 @@ function showMenu() {
     <h1>Junk Mountain</h1>
     <p>Somebody dumped a whole mountain of junk, and there's a <b style="color:var(--gold)">Golden Plunger</b> at the top. Parkour your way up!</p>
     <ul>
-      <li><b>Run</b>: ← → or A D &nbsp;·&nbsp; <b>Jump</b>: Space, W or ↑ (hold for higher)</li>
+      <li><b>Mouse (or finger)</b>: press, <b>pull back</b> like a slingshot, and let go to <b>fling</b> him. The dotted line shows exactly where he'll fly. Pull farther for more power.</li>
+      <li><b>Keys</b>: ← → or A D to run &nbsp;·&nbsp; Space, W or ↑ to jump</li>
       <li><b>Wall-jump</b>: jump into the side of tall junk, then jump again to kick off it</li>
-      <li>🛏 Trampolines and mattresses bounce you · 🧊 ice boxes are slippery</li>
+      <li>🤸 Trampolines bounce you · 🛏 mattresses are so comfy they slow you down · 🧊 ice boxes are slippery</li>
       <li>📦 cardboard boxes crumble · 🛒 carts and skateboards move</li>
-      <li>Fall, and you might fall a <b>long</b> way. Don't give up!</li>
+      <li>⚑ Touch a <b>checkpoint flag</b> to save your spot. Fall too far below it and it catches you. Press <b>R</b> to go back to it any time.</li>
+      <li>Fall above your checkpoint, and you might still fall a <b>long</b> way. Don't give up!</li>
     </ul>
     <p>Every level is taller. <b>Beat Level ${WIN_LEVEL}</b> to win.${PLAYER ? " Your progress is saved for <b>" + PLAYER + "</b>." : ""}</p>
     <div class="row">
-      ${d.level > 1 ? `<button id="cont">Continue: Level ${d.level}</button><button id="fresh" class="secondary">Start at Level 1</button>` : `<button id="fresh">Start climbing</button>`}
+      ${d.level > 1 || d.cp ? `<button id="cont">Continue: Level ${d.level}${d.cp && d.cp.level === d.level ? " (checkpoint " + (d.cp.i + 1) + ")" : ""}</button><button id="fresh" class="secondary">Start at Level 1</button>` : `<button id="fresh">Start climbing</button>`}
     </div>
     ${d.level > 1 ? `<p class="small">Or pick any level you've reached: ${Array.from({ length: d.level }, (_, i) => `<button class="secondary lvl" data-l="${i + 1}" style="padding:4px 10px;margin:2px">${i + 1}</button>`).join("")}</p>` : ""}`;
   const c = document.getElementById("cont"), f = document.getElementById("fresh");
-  if (c) c.onclick = () => { audio(); startLevel(d.level); };
+  if (c) c.onclick = () => { audio(); startLevel(d.level, d.cp && d.cp.level === d.level ? d.cp.i : null); };
   f.onclick = () => { audio(); startLevel(1); };
   card.querySelectorAll(".lvl").forEach(b => b.onclick = () => { audio(); startLevel(+b.dataset.l); });
   (c || f).focus();
@@ -483,7 +526,7 @@ function drawJunk(o) {
     case "boombox": rr(x, y + 10, w, h - 10, 8, "#3a3a4a"); ctx.strokeStyle = "#3a3a4a"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x + w / 2, y + 12, w * 0.3, Math.PI, 0); ctx.stroke(); ctx.fillStyle = "#888"; ctx.beginPath(); ctx.arc(x + w * 0.25, y + h * 0.6, h * 0.25, 0, 7); ctx.arc(x + w * 0.75, y + h * 0.6, h * 0.25, 0, 7); ctx.fill(); break;
     case "toilet": rr(x + w * 0.1, y, w * 0.8, h * 0.4, 6, "#f4f4f8"); rr(x, y + h * 0.38, w, h * 0.22, 10, "#f4f4f8"); rr(x + w * 0.2, y + h * 0.58, w * 0.6, h * 0.42, 6, "#e8e8f0"); break;
     case "trampoline": rr(x, y, w, 10, 5, "#3a8ad0"); ctx.fillStyle = "#555"; ctx.fillRect(x + 8, y + 10, 6, h - 10); ctx.fillRect(x + w - 14, y + 10, 6, h - 10); ctx.fillStyle = "#ffd23f"; ctx.font = "900 11px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("BOING", x + w / 2, y + 24); break;
-    case "mattress": rr(x, y, w, h, 12, "#f0e0f0"); ctx.strokeStyle = "#c0a0c0"; ctx.lineWidth = 2; for (let i = 1; i < 5; i++) { ctx.beginPath(); ctx.moveTo(x + i * w / 5, y + 4); ctx.lineTo(x + i * w / 5, y + h - 4); ctx.stroke(); } break;
+    case "mattress": rr(x, y, w, h, 12, "#f0e0f0"); if (P.ground === o) { ctx.fillStyle = "rgba(150,110,160,0.35)"; ctx.beginPath(); ctx.ellipse(P.x + PW / 2, y + 4, 26, 6, 0, 0, 7); ctx.fill(); } ctx.strokeStyle = "#c0a0c0"; ctx.lineWidth = 2; for (let i = 1; i < 5; i++) { ctx.beginPath(); ctx.moveTo(x + i * w / 5, y + 4); ctx.lineTo(x + i * w / 5, y + h - 4); ctx.stroke(); } break;
     case "icebox": rr(x, y, w, h, 8, "#bfe8ff"); ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fillRect(x + 10, y + 6, w * 0.5, 5); ctx.fillStyle = "#3a7ab0"; ctx.font = "900 13px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("ICE", x + w / 2, y + h / 2 + 6); break;
     case "boxes": rr(x, y, w, h, 2, "#c8a070"); ctx.strokeStyle = "#8a6a40"; ctx.lineWidth = 2; ctx.strokeRect(x + 2, y + 2, w - 4, h - 4); ctx.fillStyle = "#e8d0a0"; ctx.fillRect(x + w / 2 - 8, y, 16, h); ctx.fillStyle = "#8a6a40"; ctx.font = "900 10px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("FRAGILE", x + w / 2, y + h / 2 + 4); break;
     case "cart": ctx.strokeStyle = "#c0c8d0"; ctx.lineWidth = 3; ctx.strokeRect(x + 4, y + 2, w - 8, h - 16); for (let i = 1; i < 5; i++) { ctx.beginPath(); ctx.moveTo(x + 4 + i * (w - 8) / 5, y + 2); ctx.lineTo(x + 4 + i * (w - 8) / 5, y + h - 14); ctx.stroke(); } ctx.fillStyle = "#c0c8d0"; ctx.fillRect(x, y, w, 4); ctx.fillStyle = "#222"; ctx.beginPath(); ctx.arc(x + 14, y + h - 6, 6, 0, 7); ctx.arc(x + w - 14, y + h - 6, 6, 0, 7); ctx.fill(); break;
@@ -492,10 +535,37 @@ function drawJunk(o) {
   }
   ctx.restore();
 }
+function drawAim() {
+  const cx = P.x + PW / 2, cy = P.y + PH / 2;
+  const power = Math.hypot(aim.vx, aim.vy) / FLING_MAX, ok = Math.hypot(aim.vx, aim.vy) >= FLING_MIN;
+  // the rubber band, stretched back the way you pulled
+  const bx = cx - aim.vx / FLING_K, by = cy - aim.vy / FLING_K;
+  ctx.strokeStyle = "rgba(200,80,40,0.85)"; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(cx - 10, cy); ctx.lineTo(bx, by); ctx.lineTo(cx + 10, cy); ctx.stroke();
+  ctx.fillStyle = "#7a3a20"; ctx.beginPath(); ctx.arc(bx, by, 6, 0, 7); ctx.fill();
+  if (!ok) return;
+  // where he'll fly (same physics as the game), stopping at the first thing he'd hit
+  let x = P.x, y = P.y, vx = aim.vx, vy = aim.vy;
+  const sdt = 1 / 60;
+  for (let i = 1; i < 110; i++) {
+    vy = Math.min(vy + GRAV * sdt, 1500); x += vx * sdt; y += vy * sdt;
+    if (x < 0 || x > WORLD_W - PW) break;
+    const hit = objs.find(o => o.solid && x < o.x + o.w && x + PW > o.x && y < o.y + o.h && y + PH > o.y);
+    if (hit) { ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(x + PW / 2, y + PH / 2, 9, 0, 7); ctx.fill(); break; }
+    if (i % 3 === 0) {
+      ctx.fillStyle = `rgba(255,255,255,${0.95 - i / 140})`;
+      ctx.beginPath(); ctx.arc(x + PW / 2, y + PH / 2, Math.max(1.5, 4.5 - i / 40), 0, 7); ctx.fill();
+    }
+  }
+  // power meter above his head
+  ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(cx - 26, P.y - 26, 52, 8);
+  ctx.fillStyle = power > 0.85 ? "#ff6a3a" : "#5ad17a"; ctx.fillRect(cx - 26, P.y - 26, 52 * power, 8);
+}
 function drawClimber() {
   const x = P.x + PW / 2, y = P.y + PH, f = P.face;
   const run = P.ground && Math.abs(P.vx) > 20, sw = run ? Math.sin(P.anim) : 0;
   ctx.save(); ctx.translate(x, y);
+  if (aim.active && P.ground) { ctx.scale(1.08, 0.86); }   // crouched, ready to fling
   if (P.wall && !P.ground) ctx.rotate(P.wall * 0.12);
   ctx.lineCap = "round"; ctx.lineJoin = "round";
   // legs
@@ -546,18 +616,32 @@ function draw() {
   ctx.strokeStyle = "rgba(255,210,63,0.6)"; ctx.setLineDash([10, 8]); ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(0, -P.highest - PH); ctx.lineTo(WORLD_W, -P.highest - PH); ctx.stroke(); ctx.setLineDash([]);
   objs.forEach(drawJunk);
+  checkpoints.forEach((o, i) => {
+    const on = i <= cpIndex, fx = o.x + o.w - 16, fy = o.y;
+    ctx.fillStyle = "#ddd"; ctx.fillRect(fx, fy - 54, 4, 54);
+    ctx.fillStyle = on ? "#5ad17a" : "#e8473f";
+    const wave = Math.sin(levelT * 6 + i) * 4;
+    ctx.beginPath(); ctx.moveTo(fx + 4, fy - 54); ctx.lineTo(fx + 30, fy - 46 + wave); ctx.lineTo(fx + 4, fy - 36); ctx.fill();
+    if (on) { ctx.fillStyle = "#fff"; ctx.font = "900 12px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("✔", fx + 14, fy - 42 + wave / 2); }
+  });
+  if (aim.active && state === "play") drawAim();
   drawClimber();
+  if (P.ground && P.ground.slow) {
+    ctx.fillStyle = "rgba(160,120,200,0.9)"; ctx.font = "900 16px Nunito, sans-serif"; ctx.textAlign = "center";
+    for (let i = 0; i < 3; i++) { const t = (levelT * 0.8 + i / 3) % 1; ctx.globalAlpha = 1 - t; ctx.fillText("z", P.x + PW / 2 + 12 + t * 18, P.y - 14 - t * 30 - i * 2); }
+    ctx.globalAlpha = 1;
+  }
   parts.forEach(p => { ctx.globalAlpha = Math.max(0, p.life * 2); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); });
   ctx.globalAlpha = 1;
   ctx.restore();
 
   // HUD
   const h = Math.max(0, Math.round(-(P.y + PH) / UNIT_PER_M)), goal = Math.round(levelHeight(level) / UNIT_PER_M);
-  ctx.fillStyle = "rgba(13,18,38,0.75)"; ctx.beginPath(); ctx.roundRect(10, 10, 250, 74, 12); ctx.fill();
+  ctx.fillStyle = "rgba(13,18,38,0.75)"; ctx.beginPath(); ctx.roundRect(10, 10, 290, 74, 12); ctx.fill();
   ctx.fillStyle = "#ffd23f"; ctx.font = "16px Bungee, Impact, sans-serif"; ctx.textAlign = "left"; ctx.fillText("LEVEL " + level + (level > WIN_LEVEL ? " (bonus)" : " of " + WIN_LEVEL), 22, 34);
   ctx.fillStyle = "#fff8e8"; ctx.font = "900 15px Nunito, sans-serif";
   ctx.fillText(`Height ${h} m / ${goal} m   ·   Best ${Math.round(P.highest / UNIT_PER_M)} m`, 22, 56);
-  ctx.fillText(`Time ${fmt(levelT)}   ·   Big falls ${bigFalls}`, 22, 76);
+  ctx.fillText(`Time ${fmt(levelT)}   ·   Falls ${bigFalls}   ·   ⚑ ${cpIndex + 1}/${checkpoints.length}`, 22, 76);
   // progress bar up the right side
   const bx = W - 26, by = 70, bh = H - 160;
   ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(bx, by, 10, bh);
@@ -609,6 +693,7 @@ window.addEventListener("keydown", e => {
   if (e.target && e.target.tagName === "BUTTON" && (k === "enter" || k === " ")) return;
   if (state !== "play") return;
   if (k === " " || k === "w" || k === "arrowup") { e.preventDefault(); if (!e.repeat) jumpDown(); return; }
+  if (k === "r") { toCheckpoint(cpIndex >= 0 ? "Back to your checkpoint." : null); return; }
   if (k.startsWith("arrow")) e.preventDefault();
   keys[k] = true;
 });
@@ -618,9 +703,40 @@ window.addEventListener("keyup", e => {
   keys[k] = false;
 });
 window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; jumpUp(); });
+// ---------- slingshot: press, drag back, let go to fling him ----------
+const aim = { active: false, sx: 0, sy: 0, cx: 0, cy: 0, vx: 0, vy: 0 };
+const FLING_MAX = 1050, FLING_K = 7.5, FLING_MIN = 120;
+function updateAim(e) {
+  aim.cx = e.clientX; aim.cy = e.clientY;
+  // pull back = fling forward (like a slingshot)
+  let vx = -(aim.cx - aim.sx) / scale * FLING_K, vy = -(aim.cy - aim.sy) / scale * FLING_K;
+  const m = Math.hypot(vx, vy);
+  if (m > FLING_MAX) { vx *= FLING_MAX / m; vy *= FLING_MAX / m; }
+  aim.vx = vx; aim.vy = vy;
+}
+canvas.addEventListener("pointerdown", e => {
+  if (state !== "play") return;
+  if (e.pointerType === "mouse" && e.button !== 0) return;
+  e.preventDefault(); audio();
+  aim.active = true; aim.sx = e.clientX; aim.sy = e.clientY; updateAim(e);
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+});
+canvas.addEventListener("pointermove", e => { if (aim.active) updateAim(e); });
+function release() {
+  if (!aim.active) return;
+  aim.active = false;
+  if (state !== "play" || Math.hypot(aim.vx, aim.vy) < FLING_MIN) return;    // tiny drag = cancel
+  if (!(P.ground || P.coyote > 0)) { quip = { text: "Land first, then fling!", t: 1.5 }; return; }
+  P.vx = aim.vx; P.vy = aim.vy; P.ground = null; P.coyote = 0; P.flung = true; P.lockT = 0;
+  P.face = aim.vx >= 0 ? 1 : -1;
+  sfx.fling(); dust(P.x + PW / 2, P.y + PH);
+}
+canvas.addEventListener("pointerup", release);
+canvas.addEventListener("pointercancel", () => { aim.active = false; });
+
 touchEl.querySelectorAll("button").forEach(b => {
   const k = b.dataset.k;
-  const down = e => { e.preventDefault(); b.classList.add("down"); if (k === "jump") jumpDown(); else keys["t" + k] = true; try { b.setPointerCapture(e.pointerId); } catch (err) {} };
+  const down = e => { e.preventDefault(); b.classList.add("down"); if (k === "cp") { toCheckpoint(cpIndex >= 0 ? "Back to your checkpoint." : null); return; } if (k === "jump") jumpDown(); else keys["t" + k] = true; try { b.setPointerCapture(e.pointerId); } catch (err) {} };
   const up = () => { b.classList.remove("down"); if (k === "jump") jumpUp(); else keys["t" + k] = false; };
   b.addEventListener("pointerdown", down); b.addEventListener("pointerup", up);
   b.addEventListener("pointercancel", up); b.addEventListener("lostpointercapture", up);
@@ -634,6 +750,11 @@ if (/[?&]test=1/.test(location.search)) {
     start: L => startLevel(L || 1),
     objs: () => objs.map(o => ({ type: o.type, x: o.x0 != null ? o.x0 : o.x, y: o.y, w: o.w, h: o.h })),
     state: () => ({ state, level, x: P.x | 0, y: P.y | 0, ground: P.ground && P.ground.type, wall: P.wall, highest: P.highest | 0 }),
+    aim: () => ({ ...aim }),
+    can: (i) => canJump(objs[i], objs[i + 1], objs),
+    raw: (i) => { const o = objs[i]; return { type: o.type, x: o.x, x0: o.x0, y: o.y, w: o.w, h: o.h, slow: !!o.slow }; },
+    cps: () => checkpoints.map(o => ({ x: o.x, y: o.y, w: o.w })),
+    cpIndex: () => cpIndex,
     put: (x, y) => { P.x = x; P.y = y; P.vx = 0; P.vy = 0; P.fallStart = y; },
     toSummit: () => { P.x = summit.x + summit.w / 2 - PW / 2; P.y = summit.y - PH - 2; P.vy = 0; P.vx = 0; P.fallStart = P.y; }
   };

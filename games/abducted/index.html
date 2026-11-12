@@ -30,6 +30,20 @@
     background: rgba(8, 10, 20, 0.8); border: 2px solid rgba(232, 240, 255, 0.6); border-radius: 99px; padding: 7px 16px;
   }
   .exit-btn:hover { background: #8a1f2a; border-color: #fff; }
+  /* "are you sure?" box for the exit button */
+  .exit-ask {
+    position: fixed; inset: 0; z-index: 40; display: grid; place-items: center;
+    background: rgba(2, 3, 8, 0.72); padding: 20px;
+  }
+  .exit-ask[hidden] { display: none; }
+  .exit-ask .box {
+    max-width: 420px; text-align: center; background: #0d1018; color: var(--ink);
+    border: 2px solid #8a1f2a; border-radius: 16px; padding: 22px 24px;
+    box-shadow: 0 0 40px rgba(138, 31, 42, 0.5);
+  }
+  .exit-ask h2 { margin: 0 0 8px; font-size: 1.4rem; }
+  .exit-ask p { margin: 0; opacity: 0.85; }
+  .exit-ask .leave { background: #8a1f2a; border-color: #ff6b7a; color: #fff; }
 </style>
 </head>
 <body>
@@ -50,7 +64,17 @@
     <div class="row"><button id="btnStart">Start</button><button id="btnSkip" class="secondary">Skip the intro</button></div>
   </div>
 </div>
-<a class="exit-btn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
+<a class="exit-btn" id="exitBtn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
+<div class="exit-ask" id="exitAsk" role="dialog" aria-modal="true" aria-labelledby="exitAskTitle" hidden>
+  <div class="box">
+    <h2 id="exitAskTitle">Leave the ship?</h2>
+    <p>Are you sure? Your escape so far will be lost.</p>
+    <div class="row">
+      <button type="button" class="secondary" id="exitStay">Keep playing</button>
+      <button type="button" class="leave" id="exitGo">Yes, exit</button>
+    </div>
+  </div>
+</div>
 
 <script src="../../arcade-progress.js"></script>
 <script>
@@ -1275,6 +1299,31 @@ function burst() {
 // MAIN LOOP
 // =====================================================================
 let last = performance.now();
+// ---------- "Are you sure?" before exiting ----------
+let exitOpen = false;
+const exitBtn = document.getElementById("exitBtn"), exitAsk = document.getElementById("exitAsk");
+function openExit() { exitOpen = true; exitAsk.hidden = false; document.getElementById("exitStay").focus(); }
+function closeExit() { exitOpen = false; exitAsk.hidden = true; exitBtn.focus(); }
+exitBtn.addEventListener("click", (e) => {
+  if (mode === "menu" || mode === "ending") return;   // nothing to lose yet (or already won)
+  e.preventDefault(); openExit();
+});
+document.getElementById("exitStay").addEventListener("click", closeExit);
+document.getElementById("exitGo").addEventListener("click", () => { location.href = exitBtn.href; });
+exitAsk.addEventListener("click", (e) => { if (e.target === exitAsk) closeExit(); });
+// while the box is open, keys go to the box, not the game
+window.addEventListener("keydown", (e) => {
+  if (!exitOpen) return;
+  if (e.key === "Escape") { closeExit(); }
+  else if (e.key === "Tab") {
+    const a = document.getElementById("exitStay"), b = document.getElementById("exitGo");
+    e.preventDefault(); (document.activeElement === a ? b : a).focus();
+    return;
+  } else if (e.key === "Enter" || e.key === " ") { e.stopImmediatePropagation(); return; }   // the focused button still works
+  e.stopImmediatePropagation(); e.preventDefault();
+}, true);
+window.addEventListener("mousedown", (e) => { if (exitOpen && !exitAsk.contains(e.target)) e.stopImmediatePropagation(); }, true);
+
 function loop(nowMs) {
   const dt = Math.min(0.05, (nowMs - last) / 1000); last = nowMs;
   const t = nowMs / 1000;
@@ -1282,7 +1331,7 @@ function loop(nowMs) {
   else if (mode === "ending") { endT += dt; drawEnding(t); if (endSlide === 2 && endT > 3 && overlay.classList.contains("hidden")) showEndCard(); }
   else if (mode === "menu") { ctx.fillStyle = "#04050a"; ctx.fillRect(0, 0, W, H); }
   else {
-    update(dt);
+    if (!exitOpen) update(dt);          // the game freezes while the "are you sure?" box is open
     if (mode === "scare") drawScare(t);
     else if (mode === "qte") drawQte(t);
     else if (mode === "dead") drawScare(t);
