@@ -65,13 +65,31 @@
   .sign h1 span { font-family: "Bungee", Impact, sans-serif; color: var(--pink); font-size: 0.78em; margin-left: 0.3em; text-shadow: 0 0 14px rgba(255, 79, 139, 0.6); }
   @media (max-width: 520px) { .sign h1 { white-space: normal; } .sign h1 span { display: block; margin: 0.1em 0 0; } }
 
-  .info {
-    min-height: 2.6em; margin: 10px auto 0; padding: 0 20px; max-width: 900px;
-    text-align: center; font-weight: 800; font-size: clamp(0.9rem, 1.8vh, 1.05rem); color: var(--text-soft);
-    display: flex; align-items: center; justify-content: center; line-height: 1.35;
+  /* words painted on the side walls, just above the neon line */
+  .wall-text {
+    position: absolute; left: 6%; right: 6%; bottom: calc(100% - var(--stripe-top) + 0.5em);
+    display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+    text-align: center; line-height: 1.2; pointer-events: none;
   }
-  .info strong { font-family: "Bungee", Impact, sans-serif; font-weight: 400; color: var(--bulb); margin-right: 0.5em; }
-  .info .needs { color: #4fd6ff; margin-left: 0.5em; }
+  .who { font-size: var(--who-fs, 40px); }
+  /* narrow screens: the side walls are too thin to read, so the words float above the sign */
+  #topText {
+    position: absolute; left: 4%; right: 4%; z-index: 4; pointer-events: none;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    --who-fs: 26px; --info-fs: 13px;
+  }
+  #topText .wall-text { position: static; }
+  .who .lbl { font: 900 0.3em Nunito, sans-serif; letter-spacing: 0.2em; text-transform: uppercase; color: #b8a6e0; }
+  .who b {
+    font-family: "Bungee", Impact, sans-serif; font-weight: 400; color: #5aff8a; white-space: nowrap;
+    text-shadow: 0 0 6px rgba(90, 255, 138, 0.9), 0 0 22px rgba(90, 255, 138, 0.6);
+  }
+  .info { font: 800 var(--info-fs, 15px) Nunito, sans-serif; color: #e6dcff; }
+  .info strong {
+    display: block; margin-bottom: 0.2em; font-family: "Bungee", Impact, sans-serif; font-weight: 400; font-size: 1.35em;
+    color: var(--bulb); text-shadow: 0 0 12px rgba(255, 210, 63, 0.55);
+  }
+  .info .needs { display: block; color: #4fd6ff; margin-top: 0.3em; }
 
   /* ---------- The room ---------- */
   .room {
@@ -225,7 +243,52 @@
 
   canvas#crowd { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 
-  footer { text-align: center; padding: 10px 16px 14px; color: var(--text-soft); font-weight: 800; font-size: 0.9rem; }
+  /* ---------- Player buttons ---------- */
+  .players {
+    display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px;
+    padding: 8px 12px 10px; max-width: 1100px; margin: 0 auto;
+  }
+  .players .label { font-weight: 900; color: var(--text-soft); margin-right: 4px; font-size: 0.9rem; }
+  .players button {
+    font: 800 0.84rem Nunito, sans-serif; color: #f4ecff; cursor: pointer;
+    background: #2a1650; border: 2px solid #4a2d80; border-radius: 999px; padding: 3px 11px;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+  .players button:hover { border-color: #8a6ad0; }
+  .players button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .players button[aria-pressed="true"] {
+    background: #1d5a34; border-color: #5aff8a; color: #fff;
+    box-shadow: 0 0 12px rgba(90, 255, 138, 0.55);
+  }
+  .players button .count { color: #5aff8a; margin-left: 5px; }
+  .players button[aria-pressed="true"] .count { color: #d6ffe2; }
+  .players button.free { border-style: dashed; }
+  .players button .trophy {
+    display: inline-block; margin-left: 5px; padding: 0 6px; border-radius: 999px;
+    background: var(--bulb); color: #22104a; font-weight: 900; font-size: 0.78rem;
+  }
+  .reset-box { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+  .reset-box[hidden] { display: none; }
+  .players .reset-box button { background: transparent; border-color: #7a3a5a; color: #ffb3cc; }
+  .players .reset-box button:hover { border-color: #ff4f8b; }
+  .players .reset-box button.yes { background: #6a1a3a; border-color: #ff4f8b; color: #fff; }
+  .reset-box .ask { font-weight: 800; font-size: 0.84rem; color: #ffb3cc; }
+
+  /* completed machines glow with a green halo */
+  .cab.done { filter: drop-shadow(0 0 6px #5aff8a) drop-shadow(0 0 18px rgba(90, 255, 138, 0.8)); animation: halo 2.4s ease-in-out infinite; }
+  .cab.done::after { --neon: #5aff8a; opacity: 0.45; }
+  @keyframes halo {
+    50% { filter: drop-shadow(0 0 10px #5aff8a) drop-shadow(0 0 30px rgba(90, 255, 138, 0.95)); }
+  }
+  @media (prefers-reduced-motion: reduce) { .cab.done { animation: none; } }
+
+  /* copyright on the sign, blinking along with the bulbs */
+  .sign .copy {
+    display: block; text-align: center; margin-top: 0.35em; font: 900 0.36em Nunito, sans-serif; letter-spacing: 0.15em;
+    color: var(--bulb); animation: copyblink 1.2s steps(1) infinite;
+  }
+  @keyframes copyblink { 0% { color: var(--bulb); text-shadow: 0 0 8px rgba(255, 210, 63, 0.8); } 50% { color: var(--bulb-off); text-shadow: none; } }
+  @media (prefers-reduced-motion: reduce) { .sign .copy { animation: none; } }
 
   .notice {
     position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
@@ -238,7 +301,7 @@
   /* One screen on computer monitors */
   @media (min-width: 900px) and (min-height: 620px) {
     html, body { height: 100%; }
-    body { overflow: hidden; display: grid; grid-template-rows: minmax(0, 1fr) auto auto; }
+    body { overflow: hidden; display: grid; grid-template-rows: minmax(0, 1fr) auto; }
     .room { min-height: 0; }
   }
 
@@ -254,19 +317,20 @@
     <div class="plane floor" id="floor"></div>
     <div class="plane ceiling" id="ceiling"></div>
     <div class="plane back" id="back"><span>GAME ON</span></div>
-    <div class="plane side left" id="wallL"></div>
-    <div class="plane side right" id="wallR"></div>
+    <div class="plane side left" id="wallL"><div class="wall-text who" id="who"></div></div>
+    <div class="plane side right" id="wallR"><div class="wall-text info" id="info" aria-live="polite"></div></div>
   </div>
   <header id="hanging">
     <div class="sign" id="sign">
       <div class="bulbs" id="bulbs" aria-hidden="true"></div>
       <h1>fake0hs<span>Arcade</span></h1>
+      <small class="copy">© 2026</small>
     </div>
   </header>
+  <div id="topText"></div>
   <canvas id="crowd" aria-hidden="true"></canvas>
 </main>
-<p class="info" id="info" aria-live="polite"></p>
-<footer>© 2026 fake0hs Arcade</footer>
+<nav class="players" id="players" aria-label="Who's playing?"></nav>
 <div class="notice" id="notice" role="status" aria-live="polite"></div>
 
 <script>
@@ -498,17 +562,17 @@
 
   // ---------- Info line ----------
   var info = document.getElementById("info");
-  function defaultInfo() {
+  var defaultInfo = function () {
     info.textContent = READY_COUNT + (READY_COUNT === 1 ? " game" : " games") + " ready to play, " + (TOTAL - READY_COUNT) + " more coming soon. Point at a machine!";
   }
-  function showInfo(i) {
+  var showInfo = function (i) {
     var g = GAMES[i];
     info.innerHTML = "";
     var s = document.createElement("strong");
     if (g && g.ready) {
       s.textContent = g.title; info.appendChild(s);
       info.appendChild(document.createTextNode(g.desc));
-      var n = document.createElement("span"); n.className = "needs"; n.textContent = "· " + g.needs.join(" · "); info.appendChild(n);
+      var n = document.createElement("span"); n.className = "needs"; n.textContent = g.needs.join(" · "); info.appendChild(n);
     } else if (i === BROKEN) {
       s.textContent = "Out of order"; info.appendChild(s);
       info.appendChild(document.createTextNode("This one has been broken forever. Sorry!"));
@@ -517,6 +581,147 @@
       info.appendChild(document.createTextNode("fake0h is still building game " + (i + 1) + "."));
     }
   }
+  // ---------- Players and records ----------
+  // Records live in this browser's storage (shared with the games on the same site).
+  // The chosen player lasts for this visit only, so every new visit starts in free play.
+  // Games report a win with ArcadeProgress.complete() from arcade-progress.js.
+  var PLAYERS = ["fakeOh", "Avery", "Corinne", "Hunter", "Joy", "Dante", "Omeira", "Ray", "Jessie", "Bonnie", "Pindar", "Darius"];
+  var CLEAR_KEY = "fake0hArcade.clears";   // { name: { count: times every game was beaten, counted: this round already counted } }
+  function readClears() { try { return JSON.parse(localStorage.getItem(CLEAR_KEY)) || {}; } catch (e) { return {}; } }
+  function writeClears(c) { try { localStorage.setItem(CLEAR_KEY, JSON.stringify(c)); } catch (e) {} }
+  var REC_KEY = "fake0hArcade.records", PLAYER_KEY = "fake0hArcade.player", JUST_KEY = "fake0hArcade.just";
+  GAMES.forEach(function (g) { var m = g.href.match(/games\/([^\/]+)/); g.id = m ? m[1] : g.title; });
+  function readRecords() { try { return JSON.parse(localStorage.getItem(REC_KEY)) || {}; } catch (e) { return {}; } }
+  function getPlayer() {
+    try { var p = sessionStorage.getItem(PLAYER_KEY); return PLAYERS.indexOf(p) >= 0 ? p : null; } catch (e) { return null; }
+  }
+  function setPlayer(p) {
+    try { if (p) sessionStorage.setItem(PLAYER_KEY, p); else sessionStorage.removeItem(PLAYER_KEY); } catch (e) {}
+    refreshProgress(); defaultInfo();
+  }
+  function doneList(p) { var r = readRecords(); return p && Array.isArray(r[p]) ? r[p] : []; }
+  function doneCount(p) {
+    var d = doneList(p);
+    return GAMES.filter(function (g) { return g.ready && d.indexOf(g.id) >= 0; }).length;
+  }
+
+  var playersEl = document.getElementById("players"), playerBtns = [], whoEl = document.getElementById("who");
+  var lbl = document.createElement("span"); lbl.className = "label"; lbl.textContent = "Who's playing?";
+  playersEl.appendChild(lbl);
+  [null].concat(PLAYERS).forEach(function (name) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = name ? "" : "free";
+    b.addEventListener("click", function () { setPlayer(name); });
+    playersEl.appendChild(b);
+    playerBtns.push({ el: b, name: name });
+  });
+
+  // Start over: clears the current player's completed games (their trophies stay)
+  var resetBox = document.createElement("span"); resetBox.className = "reset-box"; resetBox.hidden = true;
+  var resetBtn = document.createElement("button"); resetBtn.type = "button"; resetBtn.textContent = "↺ Start over";
+  var askTxt = document.createElement("span"); askTxt.className = "ask";
+  var yesBtn = document.createElement("button"); yesBtn.type = "button"; yesBtn.className = "yes"; yesBtn.textContent = "Yes, start over";
+  var noBtn = document.createElement("button"); noBtn.type = "button"; noBtn.textContent = "No";
+  resetBox.append(resetBtn, askTxt, yesBtn, noBtn);
+  playersEl.appendChild(resetBox);
+  function showAsk(on) {
+    resetBtn.hidden = on; askTxt.hidden = yesBtn.hidden = noBtn.hidden = !on;
+    if (on) {
+      var p = getPlayer(), c = doneCount(p);
+      askTxt.textContent = "Clear " + p + "'s " + c + (c === 1 ? " game?" : " games?");
+      noBtn.focus();
+    }
+  }
+  resetBtn.addEventListener("click", function () { showAsk(true); });
+  noBtn.addEventListener("click", function () { showAsk(false); resetBtn.focus(); });
+  yesBtn.addEventListener("click", function () {
+    var p = getPlayer(); if (!p) return;
+    var r = readRecords(); r[p] = [];
+    try { localStorage.setItem(REC_KEY, JSON.stringify(r)); } catch (e) {}
+    var cl = readClears(); if (cl[p]) { cl[p].counted = false; writeClears(cl); }
+    showAsk(false); refreshProgress();
+    info.innerHTML = "";
+    var s = document.createElement("strong"); s.textContent = p; info.appendChild(s);
+    info.appendChild(document.createTextNode("is starting over. Fresh arcade, good luck!"));
+  });
+  showAsk(false);
+
+  // every time a player has beaten every game, they earn a trophy
+  function countClears() {
+    var cl = readClears(), changed = false, fresh = null;
+    PLAYERS.forEach(function (p) {
+      var all = READY_COUNT > 0 && doneCount(p) === READY_COUNT;
+      var e = cl[p] || { count: 0, counted: false };
+      if (all && !e.counted) { e.count++; e.counted = true; cl[p] = e; changed = true; if (p === getPlayer()) fresh = p; }
+    });
+    if (changed) writeClears(cl);
+    return fresh;
+  }
+  function trophies(p) { var e = readClears()[p]; return e ? e.count : 0; }
+
+  function refreshProgress() {
+    countClears();
+    var cur = getPlayer(), done = doneList(cur);
+    playerBtns.forEach(function (pb) {
+      pb.el.setAttribute("aria-pressed", pb.name === cur ? "true" : "false");
+      pb.el.innerHTML = "";
+      pb.el.appendChild(document.createTextNode(pb.name || "Free play"));
+      if (pb.name) {
+        var t = trophies(pb.name);
+        if (t) {
+          var tr = document.createElement("span"); tr.className = "trophy"; tr.textContent = "🏆" + t;
+          tr.title = pb.name + " has beaten every game " + t + (t === 1 ? " time" : " times");
+          pb.el.appendChild(tr);
+        }
+        var c = doneCount(pb.name);
+        if (c) { var s = document.createElement("span"); s.className = "count"; s.textContent = "★" + c; pb.el.appendChild(s); }
+      }
+    });
+    resetBox.hidden = !cur;
+    whoEl.innerHTML = "";
+    if (cur) {
+      var lb = document.createElement("span"); lb.className = "lbl"; lb.textContent = "Now playing";
+      var nm = document.createElement("b"); nm.textContent = cur;
+      whoEl.append(lb, nm);
+    }
+    if (!cur) showAsk(false);
+    cabs.forEach(function (cab, i) {
+      var g = GAMES[i];
+      cab.classList.toggle("done", !!(cur && g && g.ready && done.indexOf(g.id) >= 0));
+    });
+  }
+
+  defaultInfo = function () {
+    var p = getPlayer();
+    info.innerHTML = "";
+    var s = document.createElement("strong");
+    if (p) {
+      var c = doneCount(p), t = trophies(p);
+      s.textContent = "★ " + c + " of " + READY_COUNT; info.appendChild(s);
+      info.appendChild(document.createTextNode(c === READY_COUNT ? "You beat them all! Press Start over to go again." : "games completed"));
+      if (t) {
+        var tr = document.createElement("span"); tr.className = "needs"; tr.style.color = "#ffd23f";
+        tr.textContent = "🏆 Beat every game " + t + (t === 1 ? " time" : " times"); info.appendChild(tr);
+      }
+    } else {
+      s.textContent = "Free play"; info.appendChild(s);
+      info.appendChild(document.createTextNode(READY_COUNT + " games ready, " + (TOTAL - READY_COUNT) + " coming soon. Pick your name below to save your progress!"));
+    }
+  };
+  var baseShowInfo = showInfo;
+  showInfo = function (i) {
+    baseShowInfo(i);
+    var g = GAMES[i], p = getPlayer();
+    if (p && g && g.ready && doneList(p).indexOf(g.id) >= 0) {
+      var d = document.createElement("span"); d.className = "needs"; d.style.color = "#5aff8a";
+      d.textContent = "✓ Completed by " + p; info.appendChild(d);
+    }
+  };
+  // coming back from a game, or records changed in another tab
+  window.addEventListener("pageshow", function () { refreshProgress(); if (hover < 0) defaultInfo(); });
+  window.addEventListener("storage", function (e) { if (e.key === REC_KEY) { refreshProgress(); if (hover < 0) defaultInfo(); } });
+
+  refreshProgress();
   defaultInfo();
 
   // ---------- 3D hallway layout ----------
@@ -532,7 +737,7 @@
 
   function layout() {
     var fit = fitMQ.matches;
-    if (!fit) room.style.height = Math.round(Math.min(700, Math.max(400, window.innerWidth * 1.05))) + "px";
+    if (!fit) room.style.height = Math.round(Math.min(700, Math.max(420, window.innerWidth * 1.1))) + "px";
     else room.style.height = "";
     var rw = room.clientWidth, rh = room.clientHeight;
     // machine size: tall enough to read, narrow enough that 5 fit on the back wall
@@ -564,10 +769,16 @@
 
     // one neon line runs along both side walls and across the back wall, just above the back machines
     var stripeTop = wallH - (14 + cw * grow * 2.3 + 26);
+    var narrow = rw < 640, topText = document.getElementById("topText");
+    var whoNode = document.getElementById("who"), infoNode = document.getElementById("info");
+    if (narrow) { topText.append(whoNode, infoNode); }
+    else { wallL.insertBefore(whoNode, wallL.firstChild); wallR.insertBefore(infoNode, wallR.firstChild); }
     backEl.style.setProperty("--stripe-top", stripeTop + "px");
     [wallL, wallR].forEach(function (w) {
       w.style.top = (yFloor - wallH) + "px"; w.style.width = D + "px"; w.style.height = wallH + "px";
       w.style.setProperty("--stripe-top", stripeTop + "px");
+      w.style.setProperty("--who-fs", Math.max(cw * 0.5, 24) + "px");
+      w.style.setProperty("--info-fs", Math.max(cw * 0.17, 11) + "px");
     });
     var ceil = document.getElementById("ceiling");
     ceil.style.left = "0px"; ceil.style.top = (yFloor - wallH) + "px"; ceil.style.width = rw + "px"; ceil.style.height = Dz + "px";
@@ -619,6 +830,7 @@
     }
     hang.style.left = (ox - W / 2) + "px"; hang.style.width = W + "px";
     hang.style.top = Math.max(8, topY - sign.offsetHeight) + "px";
+    topText.style.bottom = (rh - Math.max(8, topY - sign.offsetHeight) + 14) + "px";
 
     G = { rw: rw, rh: rh, ch: ch, cw: cw, P: P, ox: ox, oy: oy, yFloor: yFloor, theta: theta, cot: cot, Dz: Dz, spots: spots };
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -1127,6 +1339,23 @@
   window.addEventListener("resize", relayout);
   relayout();
   makePeople();
+
+  // just won a game? the crowd runs over to cheer at that machine
+  function celebrate() {
+    var id = null;
+    try { id = sessionStorage.getItem(JUST_KEY); sessionStorage.removeItem(JUST_KEY); } catch (e) {}
+    var p = getPlayer(), i = -1;
+    GAMES.forEach(function (g, j) { if (g.id === id) i = j; });
+    if (!p || i < 0) return;
+    setTimeout(function () {
+      setHover(i);
+      info.innerHTML = "";
+      var s = document.createElement("strong"); s.textContent = "🎉 " + p; info.appendChild(s);
+      info.appendChild(document.createTextNode("completed " + GAMES[i].title + "! That's " + doneCount(p) + " of " + READY_COUNT + "."));
+    }, 500);
+  }
+  celebrate();
+  window.addEventListener("pageshow", function (e) { if (e.persisted) celebrate(); });
   requestAnimationFrame(loop);
 })();
 </script>
