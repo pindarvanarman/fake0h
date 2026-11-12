@@ -414,14 +414,13 @@
       art: "frat"
     },
     {
-      // TEMPORARY test game for checking scores. Replace with a real game later.
       ready: true,
-      id: "space-win-3",
-      title: "Spacebar Win 3",
-      href: "games/space-win/index.html?slot=3",
-      desc: "Test game: press the space bar to win. For checking scores.",
-      needs: ["Keyboard or tap", "Test game"],
-      art: "space"
+      id: "junk-mountain",
+      title: "Junk Mountain",
+      href: "games/junk-mountain/index.html",
+      desc: "Parkour up a mountain of junk to the Golden Plunger. Every level is taller. Beat level 5!",
+      needs: ["Keyboard or touch", "Patience!"],
+      art: "junk"
     }
   ];
   // Machine spots: 3 on each side wall (nearest first) and 5 on the back wall.
@@ -592,7 +591,20 @@
     '<g transform="translate(72,100)"><rect x="-5" y="-8" width="10" height="10" rx="2" fill="#8a6a3a"/><circle cy="-12" r="4" fill="#e8b080"/><path d="M-4 -14 a4 4 0 0 1 8 0z" fill="#3a5a3a"/></g>' +
     '<text x="50" y="114" text-anchor="middle" font-family="Bungee, Impact, sans-serif" font-size="8" fill="#ffd23f">PLEDGE NIGHT</text>' +
     '</svg>';
-  var ARTS = { frat: fratArt, fight: fightArt, space: spaceArt, cactus: cactusArt, piano: pianoArt, leo: leoArt, abducted: abductedArt, sunny: sunnyArt, bloom: bloomArt };
+  var junkArt =
+    '<svg viewBox="0 0 100 120" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">' +
+    '<defs><linearGradient id="jsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2a6a"/><stop offset="1" stop-color="#ff9a5a"/></linearGradient></defs>' +
+    '<rect width="100" height="120" fill="url(#jsky)"/>' +
+    '<rect x="0" y="108" width="100" height="12" fill="#5a4a3a"/>' +
+    '<rect x="8" y="94" width="34" height="14" rx="3" fill="#d0402a"/><rect x="50" y="92" width="22" height="16" fill="#b07a3a"/>' +
+    '<rect x="62" y="78" width="26" height="12" rx="4" fill="#8a3a5a"/><rect x="30" y="68" width="16" height="22" rx="2" fill="#e8eef4"/>' +
+    '<ellipse cx="62" cy="60" rx="10" ry="7" fill="#ffd23f"/><circle cx="69" cy="54" r="5" fill="#ffd23f"/>' +
+    '<rect x="22" y="46" width="24" height="10" rx="2" fill="#1a1a1a"/><rect x="58" y="34" width="20" height="8" rx="3" fill="#3a8ad0"/>' +
+    '<rect x="34" y="24" width="30" height="7" rx="3" fill="#d8d0c0"/>' +
+    '<rect x="48" y="6" width="2.5" height="14" fill="#c08a20"/><path d="M42 24 a7 5 0 0 1 14 0z" fill="#ffd23f"/>' +
+    '<g transform="translate(70,30)"><rect x="-3" y="-8" width="6" height="7" rx="1.5" fill="#ff6a3a"/><circle cy="-11" r="3" fill="#e8b080"/><rect x="-3" y="-13" width="6" height="1.5" fill="#3a8ad0"/></g>' +
+    '</svg>';
+  var ARTS = { junk: junkArt, frat: fratArt, fight: fightArt, space: spaceArt, cactus: cactusArt, piano: pianoArt, leo: leoArt, abducted: abductedArt, sunny: sunnyArt, bloom: bloomArt };
 
   var coneIcon =
     '<svg viewBox="0 0 30 34" aria-hidden="true"><rect x="2" y="29" width="26" height="4" rx="1" fill="#ff6a00" stroke="#22104a" stroke-width="1.5"/>' +
@@ -607,6 +619,7 @@
     abducted: { body: "#1d2a22", hi: "#2f4436", accent: "#7dff6b", neon: "#7dff6b" },
     sunny: { body: "#2f9a84", hi: "#4fbaa4", accent: "#ffd23f", neon: "#ffe27a" },
     bloom: { body: "#4f9a3a", hi: "#6fba5a", accent: "#ff8fb8", neon: "#b8ff9a" },
+    junk: { body: "#3a6aa8", hi: "#5a8ac8", accent: "#ffd23f", neon: "#9ad8ff" },
     frat: { body: "#6a3a1a", hi: "#8a5a2a", accent: "#ffd23f", neon: "#ffd88a" },
     fight: { body: "#a8233a", hi: "#cc3a52", accent: "#4fd6ff", neon: "#ff8fa3" },
     space: { body: "#2b4a7a", hi: "#3f66a0", accent: "#4fd6ff", neon: "#7fe4ff" }

@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Junk Mountain · fake0hs Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+<!--
+  Junk Mountain: a parkour climbing game for fake0hs Arcade.
+  Climb a giant pile of random junk to grab the Golden Plunger at the top. Fall, and you might
+  fall a LONG way. Every level is taller than the last. Reach the top of Level 5 to beat it.
+  Controls: arrows / A D to run, Space / W / up to jump (hold for higher), jump off walls to wall-jump.
+-->
+<style>
+  :root { color-scheme: dark; --ink: #fff8e8; --gold: #ffd23f; --panel: #1b2440; --blue: #4fb0ff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1226; color: var(--ink); font-family: Nunito, system-ui, sans-serif; }
+  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .exit-btn {
+    position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); right: 12px; z-index: 30;
+    font: 900 0.9rem Nunito, sans-serif; color: var(--ink); text-decoration: none;
+    background: rgba(13, 18, 38, 0.85); border: 2px solid rgba(255, 248, 232, 0.5); border-radius: 99px; padding: 5px 14px;
+  }
+  .exit-btn:hover { border-color: #fff; background: #2a3a6a; }
+  button:focus-visible, .exit-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+  #overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 18px; background: rgba(8, 10, 24, 0.7); }
+  #overlay.hidden { display: none; }
+  .card {
+    width: min(560px, 100%); max-height: 92vh; overflow: auto; text-align: center;
+    background: var(--panel); border: 3px solid #3a4a80; border-radius: 18px; padding: 22px 24px;
+    box-shadow: 0 0 50px rgba(79, 176, 255, 0.2);
+  }
+  .card h1 { font-family: Bungee, Impact, sans-serif; font-weight: 400; margin: 0 0 6px; font-size: clamp(1.9rem, 6vw, 2.8rem); color: var(--gold); text-shadow: 3px 3px 0 #c0502a; }
+  .card p { margin: 8px 0; line-height: 1.45; }
+  .card ul { text-align: left; margin: 8px 0; padding-left: 22px; line-height: 1.5; }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+  .card button {
+    font: 900 1rem Nunito, sans-serif; cursor: pointer; padding: 11px 22px; border-radius: 12px;
+    border: 2px solid var(--gold); background: var(--gold); color: #1b2440;
+  }
+  .card button.secondary { background: transparent; color: var(--ink); border-color: #3a4a80; }
+  .small { font-size: 0.85rem; opacity: 0.75; }
+  #touch { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: none; justify-content: space-between; align-items: flex-end;
+           padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px)); pointer-events: none; }
+  #touch.on { display: flex; }
+  #touch button {
+    pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer;
+    font: 900 1.3rem Nunito, sans-serif; color: var(--ink); background: rgba(27, 36, 64, 0.85);
+    border: 2px solid #4a5a90; border-radius: 16px; width: 74px; height: 64px; margin-right: 8px;
+  }
+  #touch button.down { background: #3a4a80; }
+  #touch .jump { width: 110px; height: 90px; border-radius: 50%; background: rgba(200, 140, 20, 0.9); border-color: var(--gold); color: #1b2440; margin: 0; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<a class="exit-btn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
+<div id="touch" aria-hidden="true">
+  <div><button data-k="left">◀</button><button data-k="right">▶</button></div>
+  <button class="jump" data-k="jump">JUMP</button>
+</div>
+<div id="overlay">
+  <div class="card" id="card"></div>
+</div>
+
+<script src="../../arcade-progress.js"></script>
+<script>
+(function () {
+"use strict";
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const overlay = document.getElementById("overlay");
+const card = document.getElementById("card");
+const touchEl = document.getElementById("touch");
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const isTouch = window.matchMedia("(pointer: coarse)").matches;
+
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+// =====================================================================
+// AUDIO
+// =====================================================================
+let actx = null, noiseBuf = null;
+function audio() {
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+    noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+function tone(f, dur, type, vol, delay, slide) {
+  const a = audio(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain(), t0 = a.currentTime + (delay || 0);
+  o.type = type || "square"; o.frequency.setValueAtTime(f, t0);
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide, t0 + dur);
+  g.gain.setValueAtTime(vol || 0.05, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(a.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+}
+function noise(dur, vol, freq) {
+  const a = audio(); if (!a) return;
+  const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(), t0 = a.currentTime;
+  s.buffer = noiseBuf; f.type = "bandpass"; f.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  s.connect(f).connect(g).connect(a.destination); s.start(t0); s.stop(t0 + dur + 0.05);
+}
+const sfx = {
+  jump() { tone(330, 0.12, "square", 0.05, 0, 660); },
+  wall() { tone(440, 0.1, "square", 0.05, 0, 880); noise(0.06, 0.15, 2000); },
+  land(big) { noise(big ? 0.25 : 0.08, big ? 0.5 : 0.15, big ? 300 : 900); if (big) tone(90, 0.25, "sine", 0.3, 0, 50); },
+  bounce() { tone(220, 0.3, "sine", 0.12, 0, 880); },
+  crumble() { noise(0.4, 0.3, 500); },
+  whistle() { tone(1400, 1.2, "sine", 0.04, 0, 300); },
+  win() { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, 0.22, "square", 0.06, i * 0.1)); },
+  pop() { tone(880, 0.06, "triangle", 0.06); }
+};
+
+// =====================================================================
+// THE JUNK (every object is a solid box you can stand on and jump off)
+// =====================================================================
+const JUNK = {
+  crate:     { w: [80, 120], h: [60, 90] },
+  tires:     { w: [70, 90], h: [70, 110] },
+  couch:     { w: [150, 200], h: [60, 75] },
+  fridge:    { w: [70, 85], h: [140, 190], tall: true },
+  bookshelf: { w: [80, 100], h: [150, 200], tall: true },
+  tv:        { w: [90, 120], h: [60, 80] },
+  piano:     { w: [140, 180], h: [90, 110] },
+  tub:       { w: [150, 180], h: [55, 65] },
+  car:       { w: [210, 250], h: [80, 95] },
+  pizza:     { w: [90, 110], h: [40, 60] },
+  duck:      { w: [110, 140], h: [90, 110] },
+  washer:    { w: [80, 90], h: [85, 95] },
+  cone:      { w: [50, 60], h: [55, 65] },
+  boombox:   { w: [100, 130], h: [55, 65] },
+  toilet:    { w: [70, 80], h: [80, 90] },
+  // special junk
+  trampoline:{ w: [100, 130], h: [30, 36], bouncy: true },
+  mattress:  { w: [140, 170], h: [36, 44], bouncy: true },
+  icebox:    { w: [120, 150], h: [60, 70], slippery: true },
+  boxes:     { w: [90, 110], h: [50, 60], crumbly: true },
+  cart:      { w: [100, 120], h: [50, 56], moving: true },
+  skateboard:{ w: [110, 120], h: [24, 28], moving: true }
+};
+const NORMAL = ["crate", "tires", "couch", "fridge", "bookshelf", "tv", "piano", "tub", "car", "pizza", "duck", "washer", "cone", "boombox", "toilet"];
+const SPECIAL = ["trampoline", "mattress", "icebox", "boxes", "cart", "skateboard"];
+
+const WORLD_W = 1000, UNIT_PER_M = 50, WIN_LEVEL = 5;
+function levelHeight(L) { return 1500 + L * 800; }        // each level is taller than the last
+
+// little seeded random, so a level is the same every time you try it
+function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+
+let level = 1, objs = [], summit = null, decor = [];
+
+// Can a player standing on "a" get onto "b"? Tries jumps the way a person would (from different spots,
+// steering at different moments) using the same physics as the game. Used while building each level,
+// so every level can always be climbed.
+const C_PW = 26, C_PH = 44, C_G = 2300, C_RUN = 330, C_JUMP = 830, C_DT = 1 / 120;
+function canJump(a, b, list) {
+  const d = (b.x + b.w / 2 > a.x + a.w / 2) ? 1 : -1;
+  const lo = Math.min(a.x, b.x) - 220, hi = Math.max(a.x + a.w, b.x + b.w) + 220;
+  const near = list.filter(o => o.x < hi && o.x + o.w > lo && o.y < a.y + 300 && o.y + o.h > b.y - 260);
+  const ov = (x, y, o) => x < o.x + o.w && x + C_PW > o.x && y < o.y + o.h && y + C_PH > o.y;
+  let ax = a.x, aw = a.w;
+  if (a.type === "ground") { ax = Math.max(0, b.x - 260); aw = Math.min(WORLD_W, b.x + b.w + 260) - ax; }
+  for (let s = 0; s <= 8; s++) for (const delay of [0, 0.08, 0.16, 0.26]) for (const steer of [1, 0.6]) {
+    let x = ax + s / 8 * (aw - C_PW), y = a.y - C_PH - 0.01, vy = -C_JUMP, t = 0;
+    if (x < 0 || x > WORLD_W - C_PW || near.some(o => ov(x, y, o))) continue;
+    for (let i = 0; i < 220; i++) {
+      t += C_DT; vy = Math.min(vy + C_G * C_DT, 1500);
+      const vx = t > delay ? d * C_RUN * steer : 0;
+      x += vx * C_DT;
+      for (const o of near) if (ov(x, y, o)) x = vx > 0 ? o.x - C_PW : o.x + o.w;
+      y += vy * C_DT;
+      let landed = null;
+      for (const o of near) if (ov(x, y, o)) { if (vy > 0) { y = o.y - C_PH; landed = o; } else y = o.y + o.h; vy = 0; }
+      if (landed) { if (landed === b) return true; if (i > 6) break; }
+      if (y > a.y + 200) break;
+    }
+  }
+  return false;
+}
+function buildLevel(L) {
+  const R = rng(L * 7919 + 13), between = (a, b) => a + R() * (b - a);
+  objs = []; decor = [];
+  const target = levelHeight(L);
+  // the ground
+  objs.push({ type: "ground", x: -200, y: 0, w: WORLD_W + 400, h: 400, solid: true });
+  let cx = WORLD_W / 2, top = 0, dir = R() < 0.5 ? -1 : 1, prevW = 160, stuck = 0;
+  const specialChance = Math.min(0.45, 0.12 + L * 0.06);
+  // is there clear air between the last piece and a new one (so the jump can't bonk on other junk)?
+  const clash = o => objs.some(p => p.type !== "ground" &&
+    o.x < p.x + p.w + 8 && o.x + o.w > p.x - 8 && o.y < p.y + p.h + 110 && o.y + o.h > p.y - 110);
+  const pathBlocked = (o, fromX, fromTop) => {
+    // a box covering the air between the two pieces, from the lower top up past the higher one
+    const x1 = Math.min(fromX, o.x + o.w / 2) - 20, x2 = Math.max(fromX, o.x + o.w / 2) + 20;
+    const y1 = o.y - 120, y2 = fromTop - 10;
+    return objs.some(p => p.type !== "ground" && p !== objs[objs.length - 1] && p.x < x2 && p.x + p.w > x1 && p.y < y2 && p.y + p.h > y1);
+  };
+  while (top > -target + 160 && stuck < 400) {
+    let placed = false;
+    for (let t = 0; t < 40 && !placed; t++) {
+      const type = R() < specialChance ? SPECIAL[Math.floor(R() * SPECIAL.length)] : NORMAL[Math.floor(R() * NORMAL.length)];
+      const def = JUNK[type];
+      let w = between(def.w[0], def.w[1]) * Math.max(0.7, 1 - L * 0.04), h = between(def.h[0], def.h[1]);
+      const rise = between(65, Math.min(112, 90 + L * 5));          // never higher than a jump can reach
+      const gap = between(20, Math.min(140, 80 + L * 12));          // never farther than a jump can reach
+      let d = dir;
+      if (t > 10 && R() < 0.5) d = -d;                              // having trouble? try the other way
+      if (cx < 220) d = 1; else if (cx > WORLD_W - 220) d = -1;
+      if (t > 25) { w *= 0.75; h = Math.min(h, 60); }               // still stuck? use smaller junk
+      let nx = cx + d * (prevW / 2 + gap + w / 2);
+      if (nx < w / 2 + 20 || nx > WORLD_W - w / 2 - 20) continue;
+      const ntop = top - rise;
+      const o = { ...def, type, x: nx - w / 2, y: ntop, w, h, solid: true, seed: R() };
+      if (clash(o)) continue;
+      // keep it only if you can jump onto it, and it doesn't get in the way of the jump before it
+      const prev = objs[objs.length - 1], all = objs.concat([o]);
+      if (!canJump(prev, o, all)) continue;
+      if (objs.length > 1 && !canJump(objs[objs.length - 2], prev, all)) continue;
+      if (def.moving) { o.x0 = o.x; o.range = between(30, 60); o.speed = between(0.6, 1.0); o.phase = R() * 6; }
+      objs.push(o); cx = nx; top = ntop; prevW = w; dir = d; placed = true;
+      if (R() < 0.25) dir = -dir;                                   // zig-zag now and then
+    }
+    if (!placed) stuck++;
+  }
+  // the summit with the Golden Plunger
+  const sw = 220, lastO = objs[objs.length - 1];
+  summit = null;
+  for (const rise of [100, 85, 70]) for (const gap of [60, 30, 100]) for (const sd of [dir, -dir]) {
+    if (summit) break;
+    const sx = cx + sd * (lastO.w / 2 + gap + sw / 2);
+    if (sx < sw / 2 + 20 || sx > WORLD_W - sw / 2 - 20) continue;
+    const s = { type: "summit", x: sx - sw / 2, y: top - rise, w: sw, h: 60, solid: true };
+    if (!clash(s) && canJump(lastO, s, objs.concat([s]))) summit = s;
+  }
+  if (!summit) summit = { type: "summit", x: cx - sw / 2, y: top - 160, w: sw, h: 60, solid: true };   // fallback (never seen in testing)
+  objs.push(summit);
+  // background junk pile, just for looks
+  const R2 = rng(L * 31 + 7);
+  for (let i = 0; i < 60 + L * 12; i++) {
+    const y = -R2() * target, spread = (1 - (-y) / target * 0.6) * WORLD_W * 0.7;
+    decor.push({ x: WORLD_W / 2 + (R2() - 0.5) * spread * 2, y, w: 60 + R2() * 140, h: 40 + R2() * 90, c: Math.floor(R2() * 5), r: (R2() - 0.5) * 0.6 });
+  }
+}
+
+// =====================================================================
+// THE CLIMBER
+// =====================================================================
+const PW = 26, PH = 44;
+const P = { x: 500, y: -PH, vx: 0, vy: 0, ground: null, wall: 0, coyote: 0, buffer: 0, lockT: 0, face: 1, anim: 0, fallStart: 0, highest: 0 };
+const GRAV = 2300, RUN = 330, AIR = 1900, JUMP = 830, WALLJ = 760;
+let falls = 0, bigFalls = 0, levelT = 0, totalT = 0, quip = null, celebrateT = 0, state = "menu";
+const keys = {};
+let jumpHeld = false;
+
+function resetPlayer() { P.x = WORLD_W / 2; P.y = -PH - 1; P.vx = 0; P.vy = 0; P.ground = null; P.highest = 0; P.fallStart = P.y; }
+
+const QUIPS = ["Oof! Junk happens.", "That was a long way down…", "The mountain wins this round.", "Don't give up! Climb again!",
+               "Ouch! Who left a couch there?", "Gravity: 1, You: 0", "Every pro has fallen a LOT.", "Bounce back! Literally!"];
+
+function overlaps(a, o) { return a.x < o.x + o.w && a.x + PW > o.x && a.y < o.y + o.h && a.y + PH > o.y; }
+function step(dt) {
+  levelT += dt; totalT += dt;
+  // moving junk
+  objs.forEach(o => {
+    if (o.moving) { const nx = o.x0 + Math.sin(levelT * o.speed + o.phase) * o.range; o.dx = nx - o.x; o.x = nx; }
+    if (o.crumbly && o.crumbleT != null) {
+      o.crumbleT += dt;
+      if (o.crumbleT > 0.7 && o.solid) { o.solid = false; sfx.crumble(); burst(o.x + o.w / 2, o.y, "#c8a070", 12); }
+      if (o.crumbleT > 3.5) { o.solid = true; o.crumbleT = null; }
+    }
+  });
+  // ride moving junk
+  if (P.ground && P.ground.moving && P.ground.dx) P.x += P.ground.dx;
+
+  const left = keys.arrowleft || keys.a || keys.tleft, right = keys.arrowright || keys.d || keys.tright;
+  const dirIn = (right ? 1 : 0) - (left ? 1 : 0);
+  if (dirIn) P.face = dirIn;
+  const slippery = P.ground && P.ground.slippery;
+  if (P.lockT > 0) P.lockT -= dt;
+  else if (P.ground) {
+    const target = dirIn * RUN, accel = slippery ? 500 : 3000;
+    P.vx += Math.max(-accel * dt, Math.min(accel * dt, target - P.vx));
+  } else {
+    P.vx += dirIn * AIR * dt;
+    P.vx = Math.max(-RUN, Math.min(RUN, P.vx));
+    if (!dirIn) P.vx *= Math.pow(0.4, dt);
+  }
+  // timers that make jumping feel fair
+  P.coyote = P.ground ? 0.1 : Math.max(0, P.coyote - dt);
+  P.buffer = Math.max(0, P.buffer - dt);
+  // gravity, and a slower slide down walls
+  P.vy += GRAV * dt * (P.vy < 0 && !jumpHeld ? 1.9 : 1);
+  if (P.wall && P.vy > 260 && !P.ground) P.vy = 260;
+  P.vy = Math.min(P.vy, 1500);
+  // jump: from the ground, or off a wall
+  if (P.buffer > 0) {
+    if (P.coyote > 0) {
+      P.vy = -JUMP; P.coyote = 0; P.buffer = 0; P.ground = null; sfx.jump(); dust(P.x + PW / 2, P.y + PH);
+    } else if (P.wall) {
+      P.vy = -WALLJ; P.vx = -P.wall * 380; P.lockT = 0.16; P.face = -P.wall; P.buffer = 0; sfx.wall();
+      dust(P.x + (P.wall > 0 ? PW : 0), P.y + PH / 2);
+    }
+  }
+  // move and collide, side to side first, then up and down
+  const wasGround = !!P.ground, vyBefore = P.vy;
+  P.wall = 0;
+  P.x += P.vx * dt;
+  P.x = Math.max(0, Math.min(WORLD_W - PW, P.x));
+  if (P.x <= 0) P.wall = -1; else if (P.x >= WORLD_W - PW) P.wall = 1;
+  objs.forEach(o => {
+    if (!o.solid || !overlaps(P, o)) return;
+    if (P.vx > 0 || (o.dx || 0) < 0) { P.x = o.x - PW; P.wall = 1; } else { P.x = o.x + o.w; P.wall = -1; }
+    P.vx = 0;
+  });
+  P.y += P.vy * dt;
+  P.ground = null;
+  objs.forEach(o => {
+    if (!o.solid || !overlaps(P, o)) return;
+    if (P.vy >= 0) { P.y = o.y - PH; P.vy = 0; P.ground = o; }
+    else { P.y = o.y + o.h; P.vy = 0; }
+  });
+  // standing check (so we stay "on the ground" on moving things)
+  if (!P.ground && P.vy >= 0) {
+    const feet = { x: P.x, y: P.y + 1 };
+    const o = objs.find(o => o.solid && feet.x < o.x + o.w && feet.x + PW > o.x && Math.abs((P.y + PH) - o.y) < 2);
+    if (o) P.ground = o;
+  }
+  if (P.ground) P.wall = 0;
+  // landing
+  if (P.ground && !wasGround) {
+    const fell = P.y - P.fallStart;
+    if (P.ground.bouncy) { P.vy = -Math.max(980, Math.min(1350, vyBefore * 0.95)); P.ground = null; sfx.bounce(); }
+    else {
+      sfx.land(fell > 500);
+      if (fell > 500) {
+        falls++; bigFalls++; shake = reduceMotion ? 0 : Math.min(18, fell / 60);
+        quip = { text: QUIPS[Math.floor(Math.random() * QUIPS.length)] + "  (fell " + Math.round(fell / UNIT_PER_M) + " m)", t: 3 };
+      }
+      dust(P.x + PW / 2, P.y + PH);
+      if (P.ground.crumbly && P.ground.crumbleT == null) P.ground.crumbleT = 0;
+    }
+  }
+  if (P.ground) P.fallStart = P.y;
+  else if (P.vy < 0) P.fallStart = P.y;
+  if (!P.ground && P.vy > 1200 && !P.whistled) { P.whistled = true; sfx.whistle(); }
+  if (P.ground) P.whistled = false;
+  P.highest = Math.max(P.highest, -P.y);
+  P.anim += dt * (P.ground ? Math.abs(P.vx) / 40 : 6);
+  // reached the Golden Plunger?
+  if (P.ground === summit && Math.abs((P.x + PW / 2) - (summit.x + summit.w / 2)) < 60) levelComplete();
+}
+
+// =====================================================================
+// LEVELS, SAVING, WINNING
+// =====================================================================
+const PLAYER = window.ArcadeProgress && ArcadeProgress.player();
+const SAVE = "junk-mountain-v1" + (PLAYER ? ":" + PLAYER : "");
+function load() { try { return JSON.parse(localStorage.getItem(SAVE)) || { level: 1, best: 0 }; } catch (e) { return { level: 1, best: 0 }; } }
+function save(d) { try { localStorage.setItem(SAVE, JSON.stringify(d)); } catch (e) {} }
+
+function startLevel(L) {
+  level = L; levelT = 0; buildLevel(L); resetPlayer(); camY = -H * 0.4; celebrateT = 0;
+  state = "play"; overlay.classList.add("hidden");
+  if (isTouch) touchEl.classList.add("on");
+  quip = { text: "Level " + L + ": " + Math.round(levelHeight(L) / UNIT_PER_M) + " m of junk. Grab the Golden Plunger!", t: 3.5 };
+}
+function levelComplete() {
+  if (state !== "play") return;
+  state = "celebrate"; celebrateT = 0; sfx.win();
+  for (let i = 0; i < 120; i++) confetti.push({ x: Math.random() * W, y: -Math.random() * H * 0.4, vx: (Math.random() - 0.5) * 80, vy: 80 + Math.random() * 140, r: 0, vr: (Math.random() - 0.5) * 8, c: ["#ffd23f", "#4fb0ff", "#ff6b8b", "#5ad17a"][i % 4], life: 4 });
+  const d = load(); d.level = Math.max(d.level, level + 1); d.best = Math.max(d.best, level); save(d);
+  if (level >= WIN_LEVEL && window.ArcadeProgress) ArcadeProgress.complete();
+  setTimeout(() => {
+    touchEl.classList.remove("on");
+    overlay.classList.remove("hidden");
+    const won = level === WIN_LEVEL;
+    card.innerHTML = `
+      <h1>${won ? "You beat Junk Mountain!" : "Level " + level + " complete!"}</h1>
+      <p>You grabbed the <b style="color:var(--gold)">Golden Plunger</b> at ${Math.round(levelHeight(level) / UNIT_PER_M)} m!</p>
+      <p>Time: <b>${fmt(levelT)}</b> &nbsp;·&nbsp; Big falls: <b>${bigFalls}</b></p>
+      ${won ? `<p>🏆 That's the arcade win${PLAYER ? " for <b>" + PLAYER + "</b>" : ""}! The mountain keeps going though… how high can you get?</p>`
+            : level < WIN_LEVEL ? `<p>Next up: <b>Level ${level + 1}</b>, ${Math.round(levelHeight(level + 1) / UNIT_PER_M)} m tall. Beat Level ${WIN_LEVEL} to win!</p>`
+            : `<p>Bonus level ${level + 1} next: ${Math.round(levelHeight(level + 1) / UNIT_PER_M)} m!</p>`}
+      <div class="row"><button id="next">Climb Level ${level + 1}</button><button id="again" class="secondary">Replay Level ${level}</button></div>`;
+    bigFalls = 0;
+    document.getElementById("next").onclick = () => startLevel(level + 1);
+    document.getElementById("again").onclick = () => startLevel(level);
+    document.getElementById("next").focus();
+  }, 2200);
+}
+function fmt(t) { const m = Math.floor(t / 60), s = Math.floor(t % 60); return m + ":" + String(s).padStart(2, "0"); }
+
+function showMenu() {
+  state = "menu";
+  const d = load();
+  overlay.classList.remove("hidden"); touchEl.classList.remove("on");
+  card.innerHTML = `
+    <h1>Junk Mountain</h1>
+    <p>Somebody dumped a whole mountain of junk, and there's a <b style="color:var(--gold)">Golden Plunger</b> at the top. Parkour your way up!</p>
+    <ul>
+      <li><b>Run</b>: ← → or A D &nbsp;·&nbsp; <b>Jump</b>: Space, W or ↑ (hold for higher)</li>
+      <li><b>Wall-jump</b>: jump into the side of tall junk, then jump again to kick off it</li>
+      <li>🛏 Trampolines and mattresses bounce you · 🧊 ice boxes are slippery</li>
+      <li>📦 cardboard boxes crumble · 🛒 carts and skateboards move</li>
+      <li>Fall, and you might fall a <b>long</b> way. Don't give up!</li>
+    </ul>
+    <p>Every level is taller. <b>Beat Level ${WIN_LEVEL}</b> to win.${PLAYER ? " Your progress is saved for <b>" + PLAYER + "</b>." : ""}</p>
+    <div class="row">
+      ${d.level > 1 ? `<button id="cont">Continue: Level ${d.level}</button><button id="fresh" class="secondary">Start at Level 1</button>` : `<button id="fresh">Start climbing</button>`}
+    </div>
+    ${d.level > 1 ? `<p class="small">Or pick any level you've reached: ${Array.from({ length: d.level }, (_, i) => `<button class="secondary lvl" data-l="${i + 1}" style="padding:4px 10px;margin:2px">${i + 1}</button>`).join("")}</p>` : ""}`;
+  const c = document.getElementById("cont"), f = document.getElementById("fresh");
+  if (c) c.onclick = () => { audio(); startLevel(d.level); };
+  f.onclick = () => { audio(); startLevel(1); };
+  card.querySelectorAll(".lvl").forEach(b => b.onclick = () => { audio(); startLevel(+b.dataset.l); });
+  (c || f).focus();
+}
+
+// =====================================================================
+// EFFECTS
+// =====================================================================
+let parts = [], confetti = [], shake = 0;
+function dust(x, y) { for (let i = 0; i < 6; i++) parts.push({ x, y, vx: (Math.random() - 0.5) * 160, vy: -Math.random() * 80, life: 0.4, c: "rgba(220,210,190,0.8)", r: 3 + Math.random() * 3 }); }
+function burst(x, y, c, n) { for (let i = 0; i < n; i++) parts.push({ x, y, vx: (Math.random() - 0.5) * 300, vy: -Math.random() * 300, life: 0.8, c, r: 3 + Math.random() * 4, g: true }); }
+
+// =====================================================================
+// DRAWING
+// =====================================================================
+let camY = 0, scale = 1, offX = 0;
+const DECOR_C = ["#2a2a44", "#33304e", "#3a2e40", "#2a3848", "#3a3a3a"];
+function skyColors(h) {
+  // higher up, the sky changes: day, sunset, night, then space
+  const k = Math.min(1, h / 6000);
+  const stops = [[0, [110, 190, 255], [200, 235, 255]], [0.35, [255, 150, 90], [255, 210, 150]], [0.65, [40, 40, 110], [110, 70, 150]], [1, [5, 5, 20], [20, 20, 50]]];
+  let a = stops[0], b = stops[1];
+  for (let i = 0; i < stops.length - 1; i++) if (k >= stops[i][0] && k <= stops[i + 1][0]) { a = stops[i]; b = stops[i + 1]; }
+  const t = (k - a[0]) / Math.max(0.001, b[0] - a[0]);
+  const mix = (p, q) => `rgb(${p.map((v, i) => Math.round(v + (q[i] - v) * t)).join(",")})`;
+  return [mix(a[1], b[1]), mix(a[2], b[2]), k];
+}
+function rr(x, y, w, h, r, c) { ctx.fillStyle = c; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); }
+function drawJunk(o) {
+  const { x, y, w, h } = o;
+  ctx.save();
+  if (o.crumbleT != null && o.solid) ctx.translate(Math.sin(levelT * 60) * 2, 0);
+  if (!o.solid) ctx.globalAlpha = 0.2;
+  switch (o.type) {
+    case "ground": rr(x, y, w, h, 0, "#5a4a3a"); rr(x, y, w, 10, 0, "#7a6a4a"); break;
+    case "summit":
+      rr(x, y, w, h, 10, "#d8d0c0"); rr(x + 8, y + 8, w - 16, 14, 6, "#f0e8d8");
+      // the Golden Plunger
+      ctx.fillStyle = "#c08a20"; ctx.fillRect(x + w / 2 - 4, y - 90, 8, 70);
+      ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.ellipse(x + w / 2, y - 14, 34, 20, 0, Math.PI, 0); ctx.fill();
+      ctx.fillStyle = `rgba(255,230,120,${0.3 + Math.sin(levelT * 4) * 0.2})`; ctx.beginPath(); ctx.arc(x + w / 2, y - 50, 60, 0, 7); ctx.fill();
+      ctx.fillStyle = "#ffd23f"; ctx.font = "900 18px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("GOLDEN PLUNGER", x + w / 2, y + 44);
+      break;
+    case "crate": rr(x, y, w, h, 4, "#b07a3a"); ctx.strokeStyle = "#7a4a1a"; ctx.lineWidth = 4; ctx.strokeRect(x + 4, y + 4, w - 8, h - 8); ctx.beginPath(); ctx.moveTo(x + 4, y + 4); ctx.lineTo(x + w - 4, y + h - 4); ctx.stroke(); break;
+    case "tires": for (let i = 0; i < 3; i++) { const th = h / 3; rr(x, y + i * th, w, th - 2, th / 2, "#222"); rr(x + w * 0.3, y + i * th + th * 0.3, w * 0.4, th * 0.3, 4, "#555"); } break;
+    case "couch": rr(x, y + h * 0.35, w, h * 0.65, 10, "#8a3a5a"); rr(x, y, w * 0.15, h, 8, "#7a2a4a"); rr(x + w * 0.85, y, w * 0.15, h, 8, "#7a2a4a"); rr(x + w * 0.17, y + h * 0.1, w * 0.66, h * 0.4, 8, "#9a4a6a"); break;
+    case "fridge": rr(x, y, w, h, 8, "#e8eef4"); ctx.fillStyle = "#b8c8d8"; ctx.fillRect(x, y + h * 0.35, w, 3); ctx.fillRect(x + w - 14, y + 12, 5, h * 0.18); ctx.fillRect(x + w - 14, y + h * 0.45, 5, h * 0.25); break;
+    case "bookshelf": rr(x, y, w, h, 3, "#6a4020"); for (let i = 0; i < 4; i++) { const sy = y + 8 + i * (h - 16) / 4; for (let j = 0; j < 5; j++) { ctx.fillStyle = ["#d04a3a", "#3a7ad0", "#e8c040", "#3aa060", "#9a4ad0"][(i + j) % 5]; ctx.fillRect(x + 8 + j * (w - 16) / 5, sy + 4, (w - 16) / 5 - 3, (h - 16) / 4 - 8); } } break;
+    case "tv": rr(x, y, w, h, 8, "#2a2a2a"); rr(x + 8, y + 8, w - 16, h - 22, 4, `hsl(${(levelT * 60 + o.seed * 360) % 360},50%,45%)`); break;
+    case "piano": rr(x, y, w, h * 0.6, 6, "#1a1a1a"); ctx.fillStyle = "#fff"; ctx.fillRect(x + 6, y + h * 0.42, w - 12, h * 0.14); ctx.fillStyle = "#111"; for (let i = 0; i < 12; i++) ctx.fillRect(x + 10 + i * (w - 20) / 12, y + h * 0.42, 4, h * 0.08); ctx.fillStyle = "#1a1a1a"; ctx.fillRect(x + 8, y + h * 0.6, 10, h * 0.4); ctx.fillRect(x + w - 18, y + h * 0.6, 10, h * 0.4); break;
+    case "tub": rr(x, y, w, h, h / 2, "#f4f4f8"); rr(x + 8, y + 6, w - 16, 10, 5, "#9ad0f0"); ctx.fillStyle = "#c0a040"; ctx.fillRect(x + 14, y + h - 4, 10, 6); ctx.fillRect(x + w - 24, y + h - 4, 10, 6); break;
+    case "car": rr(x, y + h * 0.35, w, h * 0.5, 14, "#d0402a"); rr(x + w * 0.2, y, w * 0.55, h * 0.45, 14, "#d0402a"); rr(x + w * 0.26, y + 6, w * 0.2, h * 0.3, 4, "#9ad0f0"); rr(x + w * 0.5, y + 6, w * 0.2, h * 0.3, 4, "#9ad0f0"); ctx.fillStyle = "#222"; ctx.beginPath(); ctx.arc(x + w * 0.22, y + h * 0.85, h * 0.17, 0, 7); ctx.arc(x + w * 0.78, y + h * 0.85, h * 0.17, 0, 7); ctx.fill(); break;
+    case "pizza": for (let i = 0; i < 4; i++) rr(x + (i % 2) * 4, y + i * h / 4, w - 4, h / 4 - 2, 2, i % 2 ? "#e8d8b0" : "#d8c8a0"); ctx.fillStyle = "#c04020"; ctx.font = `900 ${Math.round(h / 4)}px Nunito, sans-serif`; ctx.textAlign = "center"; ctx.fillText("PIZZA", x + w / 2, y + h / 4 - 3); break;
+    case "duck": ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.ellipse(x + w * 0.45, y + h * 0.65, w * 0.45, h * 0.35, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(x + w * 0.72, y + h * 0.3, h * 0.28, 0, 7); ctx.fill(); ctx.fillStyle = "#ff8a20"; ctx.beginPath(); ctx.ellipse(x + w * 0.95, y + h * 0.35, w * 0.1, h * 0.07, 0, 0, 7); ctx.fill(); ctx.fillStyle = "#111"; ctx.beginPath(); ctx.arc(x + w * 0.78, y + h * 0.24, 4, 0, 7); ctx.fill(); break;
+    case "washer": rr(x, y, w, h, 8, "#f0f0f0"); ctx.fillStyle = "#9ad0f0"; ctx.beginPath(); ctx.arc(x + w / 2, y + h * 0.58, w * 0.3, 0, 7); ctx.fill(); ctx.strokeStyle = "#aaa"; ctx.lineWidth = 4; ctx.stroke(); ctx.fillStyle = "#aaa"; ctx.fillRect(x + 8, y + 8, w - 16, 8); break;
+    case "cone": ctx.fillStyle = "#ff6a20"; ctx.beginPath(); ctx.moveTo(x + w / 2 - 6, y); ctx.lineTo(x + w / 2 + 6, y); ctx.lineTo(x + w - 6, y + h - 8); ctx.lineTo(x + 6, y + h - 8); ctx.fill(); ctx.fillStyle = "#fff"; ctx.fillRect(x + w * 0.3, y + h * 0.45, w * 0.4, 6); rr(x, y + h - 10, w, 10, 3, "#ff6a20"); break;
+    case "boombox": rr(x, y + 10, w, h - 10, 8, "#3a3a4a"); ctx.strokeStyle = "#3a3a4a"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x + w / 2, y + 12, w * 0.3, Math.PI, 0); ctx.stroke(); ctx.fillStyle = "#888"; ctx.beginPath(); ctx.arc(x + w * 0.25, y + h * 0.6, h * 0.25, 0, 7); ctx.arc(x + w * 0.75, y + h * 0.6, h * 0.25, 0, 7); ctx.fill(); break;
+    case "toilet": rr(x + w * 0.1, y, w * 0.8, h * 0.4, 6, "#f4f4f8"); rr(x, y + h * 0.38, w, h * 0.22, 10, "#f4f4f8"); rr(x + w * 0.2, y + h * 0.58, w * 0.6, h * 0.42, 6, "#e8e8f0"); break;
+    case "trampoline": rr(x, y, w, 10, 5, "#3a8ad0"); ctx.fillStyle = "#555"; ctx.fillRect(x + 8, y + 10, 6, h - 10); ctx.fillRect(x + w - 14, y + 10, 6, h - 10); ctx.fillStyle = "#ffd23f"; ctx.font = "900 11px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("BOING", x + w / 2, y + 24); break;
+    case "mattress": rr(x, y, w, h, 12, "#f0e0f0"); ctx.strokeStyle = "#c0a0c0"; ctx.lineWidth = 2; for (let i = 1; i < 5; i++) { ctx.beginPath(); ctx.moveTo(x + i * w / 5, y + 4); ctx.lineTo(x + i * w / 5, y + h - 4); ctx.stroke(); } break;
+    case "icebox": rr(x, y, w, h, 8, "#bfe8ff"); ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fillRect(x + 10, y + 6, w * 0.5, 5); ctx.fillStyle = "#3a7ab0"; ctx.font = "900 13px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("ICE", x + w / 2, y + h / 2 + 6); break;
+    case "boxes": rr(x, y, w, h, 2, "#c8a070"); ctx.strokeStyle = "#8a6a40"; ctx.lineWidth = 2; ctx.strokeRect(x + 2, y + 2, w - 4, h - 4); ctx.fillStyle = "#e8d0a0"; ctx.fillRect(x + w / 2 - 8, y, 16, h); ctx.fillStyle = "#8a6a40"; ctx.font = "900 10px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("FRAGILE", x + w / 2, y + h / 2 + 4); break;
+    case "cart": ctx.strokeStyle = "#c0c8d0"; ctx.lineWidth = 3; ctx.strokeRect(x + 4, y + 2, w - 8, h - 16); for (let i = 1; i < 5; i++) { ctx.beginPath(); ctx.moveTo(x + 4 + i * (w - 8) / 5, y + 2); ctx.lineTo(x + 4 + i * (w - 8) / 5, y + h - 14); ctx.stroke(); } ctx.fillStyle = "#c0c8d0"; ctx.fillRect(x, y, w, 4); ctx.fillStyle = "#222"; ctx.beginPath(); ctx.arc(x + 14, y + h - 6, 6, 0, 7); ctx.arc(x + w - 14, y + h - 6, 6, 0, 7); ctx.fill(); break;
+    case "skateboard": rr(x, y, w, 8, 4, "#d04a8a"); ctx.fillStyle = "#222"; ctx.beginPath(); ctx.arc(x + 18, y + h - 6, 6, 0, 7); ctx.arc(x + w - 18, y + h - 6, 6, 0, 7); ctx.fill(); break;
+    default: rr(x, y, w, h, 6, "#888");
+  }
+  ctx.restore();
+}
+function drawClimber() {
+  const x = P.x + PW / 2, y = P.y + PH, f = P.face;
+  const run = P.ground && Math.abs(P.vx) > 20, sw = run ? Math.sin(P.anim) : 0;
+  ctx.save(); ctx.translate(x, y);
+  if (P.wall && !P.ground) ctx.rotate(P.wall * 0.12);
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  // legs
+  ctx.strokeStyle = "#2a3a6a"; ctx.lineWidth = 7;
+  ctx.beginPath();
+  if (P.ground) { ctx.moveTo(-3, -20); ctx.lineTo(-3 + sw * 9, 0); ctx.moveTo(3, -20); ctx.lineTo(3 - sw * 9, 0); }
+  else { ctx.moveTo(-3, -20); ctx.lineTo(-10 * f, -8); ctx.lineTo(-4 * f, 0); ctx.moveTo(3, -20); ctx.lineTo(9 * f, -12); ctx.lineTo(6 * f, -2); }
+  ctx.stroke();
+  // body
+  rr(-11, -40, 22, 24, 7, "#ff6a3a");
+  ctx.fillStyle = "#fff"; ctx.font = "900 9px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("JM", 0, -24);
+  // arms
+  ctx.strokeStyle = "#e8b080"; ctx.lineWidth = 6; ctx.beginPath();
+  if (!P.ground) { ctx.moveTo(-8, -36); ctx.lineTo(-16, -50); ctx.moveTo(8, -36); ctx.lineTo(16, -50); }
+  else { ctx.moveTo(-8, -36); ctx.lineTo(-10 - sw * 6, -22); ctx.moveTo(8, -36); ctx.lineTo(10 + sw * 6, -22); }
+  ctx.stroke();
+  // head with a headband
+  ctx.fillStyle = "#e8b080"; ctx.beginPath(); ctx.arc(0, -50, 10, 0, 7); ctx.fill();
+  ctx.fillStyle = "#3a8ad0"; ctx.fillRect(-10, -56, 20, 4);
+  ctx.strokeStyle = "#3a8ad0"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-9 * f, -54); ctx.lineTo(-18 * f, -52 + Math.sin(levelT * 14) * 3); ctx.stroke();
+  ctx.fillStyle = "#1a1a2a"; ctx.beginPath(); ctx.arc(4 * f, -50, 1.8, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function draw() {
+  const [top, bottom, k] = skyColors(Math.max(0, -camY));
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, top); g.addColorStop(1, bottom);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  if (k > 0.55) { ctx.fillStyle = `rgba(255,255,255,${(k - 0.55) * 1.6})`; for (let i = 0; i < 90; i++) ctx.fillRect((i * 173) % W, (i * 97 + camY * 0.02) % H, 2, 2); }
+  if (state === "menu") return;
+
+  scale = Math.min(W / WORLD_W, H / 620);
+  offX = (W - WORLD_W * scale) / 2;
+  ctx.save();
+  if (shake) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+  ctx.translate(offX, H * 0.5); ctx.scale(scale, scale); ctx.translate(0, -camY);
+  // clouds
+  ctx.fillStyle = `rgba(255,255,255,${0.5 * (1 - k)})`;
+  for (let i = 0; i < 14; i++) { const cy = -i * 450 - 200, cx = ((i * 337 + levelT * 6) % (WORLD_W + 400)) - 200; ctx.beginPath(); ctx.ellipse(cx, cy, 90, 26, 0, 0, 7); ctx.ellipse(cx + 50, cy - 14, 60, 22, 0, 0, 7); ctx.fill(); }
+  // background pile
+  // far-away junk pile in the background (drawn faint and slower, so it never looks like something to stand on)
+  ctx.save(); ctx.translate(0, camY * 0.35);
+  decor.forEach(d => { ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.r); ctx.fillStyle = DECOR_C[d.c]; ctx.globalAlpha = 0.05; ctx.fillRect(-d.w / 2, -d.h / 2, d.w * 0.8, d.h * 0.8); ctx.restore(); });
+  ctx.restore();
+  // height markers
+  ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.font = "900 16px Nunito, sans-serif"; ctx.textAlign = "left";
+  for (let m = 10; m * UNIT_PER_M < levelHeight(level) + 200; m += 10) { const y = -m * UNIT_PER_M; ctx.fillRect(0, y, 18, 2); ctx.fillText(m + " m", 22, y + 6); }
+  // best height this level
+  ctx.strokeStyle = "rgba(255,210,63,0.6)"; ctx.setLineDash([10, 8]); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, -P.highest - PH); ctx.lineTo(WORLD_W, -P.highest - PH); ctx.stroke(); ctx.setLineDash([]);
+  objs.forEach(drawJunk);
+  drawClimber();
+  parts.forEach(p => { ctx.globalAlpha = Math.max(0, p.life * 2); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); });
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // HUD
+  const h = Math.max(0, Math.round(-(P.y + PH) / UNIT_PER_M)), goal = Math.round(levelHeight(level) / UNIT_PER_M);
+  ctx.fillStyle = "rgba(13,18,38,0.75)"; ctx.beginPath(); ctx.roundRect(10, 10, 250, 74, 12); ctx.fill();
+  ctx.fillStyle = "#ffd23f"; ctx.font = "16px Bungee, Impact, sans-serif"; ctx.textAlign = "left"; ctx.fillText("LEVEL " + level + (level > WIN_LEVEL ? " (bonus)" : " of " + WIN_LEVEL), 22, 34);
+  ctx.fillStyle = "#fff8e8"; ctx.font = "900 15px Nunito, sans-serif";
+  ctx.fillText(`Height ${h} m / ${goal} m   ·   Best ${Math.round(P.highest / UNIT_PER_M)} m`, 22, 56);
+  ctx.fillText(`Time ${fmt(levelT)}   ·   Big falls ${bigFalls}`, 22, 76);
+  // progress bar up the right side
+  const bx = W - 26, by = 70, bh = H - 160;
+  ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(bx, by, 10, bh);
+  ctx.fillStyle = "#ffd23f"; const pf = Math.min(1, h / goal); ctx.fillRect(bx, by + bh * (1 - pf), 10, bh * pf);
+  ctx.fillStyle = "#ff6a3a"; ctx.fillRect(bx - 3, by + bh * (1 - Math.min(1, P.highest / UNIT_PER_M / goal)) - 2, 16, 4);
+  if (quip) {
+    ctx.font = "900 18px Nunito, sans-serif"; ctx.textAlign = "center";
+    const tw = Math.min(W - 40, ctx.measureText(quip.text).width + 40), y = H - (isTouch ? 140 : 46);
+    ctx.globalAlpha = Math.min(1, quip.t); ctx.fillStyle = "rgba(255,248,232,0.95)"; ctx.beginPath(); ctx.roundRect(W / 2 - tw / 2, y - 22, tw, 38, 12); ctx.fill();
+    ctx.fillStyle = "#1b2440"; ctx.fillText(quip.text, W / 2, y + 4, W - 60); ctx.globalAlpha = 1;
+  }
+  if (state === "celebrate") {
+    ctx.fillStyle = "#ffd23f"; ctx.font = `${Math.round(Math.min(W, H) * 0.08)}px Bungee, Impact, sans-serif`; ctx.textAlign = "center";
+    ctx.lineWidth = 8; ctx.lineJoin = "round"; ctx.strokeStyle = "#1b2440";
+    ctx.strokeText("YOU GOT THE PLUNGER!", W / 2, H * 0.3); ctx.fillText("YOU GOT THE PLUNGER!", W / 2, H * 0.3);
+  }
+  confetti.forEach(c => { ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.r); ctx.fillStyle = c.c; ctx.fillRect(-5, -3, 10, 6); ctx.restore(); });
+}
+
+// =====================================================================
+// LOOP AND CONTROLS
+// =====================================================================
+let last = performance.now(), acc = 0;
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (state === "play") {
+    acc += dt;
+    while (acc >= 1 / 120) { step(1 / 120); acc -= 1 / 120; }      // small steps so fast falls never skip through junk
+  }
+  if (state === "play" || state === "celebrate") {
+    const target = P.y + PH / 2 - 30;
+    camY += (target - camY) * Math.min(1, dt * 5);
+    camY = Math.min(camY, -H * 0.5 / scale + 60);
+  }
+  if (state === "celebrate") celebrateT += dt;
+  if (quip) { quip.t -= dt; if (quip.t <= 0) quip = null; }
+  shake = Math.max(0, shake - dt * 40);
+  parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; if (p.g) p.vy += 900 * dt; p.life -= dt; }); parts = parts.filter(p => p.life > 0);
+  confetti.forEach(c => { c.x += c.vx * dt; c.y += c.vy * dt; c.r += c.vr * dt; c.life -= dt; }); confetti = confetti.filter(c => c.life > 0 && c.y < H + 20);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function jumpDown() { if (!jumpHeld) P.buffer = 0.12; jumpHeld = true; audio(); }
+function jumpUp() { jumpHeld = false; }
+window.addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+  if (e.target && e.target.tagName === "BUTTON" && (k === "enter" || k === " ")) return;
+  if (state !== "play") return;
+  if (k === " " || k === "w" || k === "arrowup") { e.preventDefault(); if (!e.repeat) jumpDown(); return; }
+  if (k.startsWith("arrow")) e.preventDefault();
+  keys[k] = true;
+});
+window.addEventListener("keyup", e => {
+  const k = e.key.toLowerCase();
+  if (k === " " || k === "w" || k === "arrowup") jumpUp();
+  keys[k] = false;
+});
+window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; jumpUp(); });
+touchEl.querySelectorAll("button").forEach(b => {
+  const k = b.dataset.k;
+  const down = e => { e.preventDefault(); b.classList.add("down"); if (k === "jump") jumpDown(); else keys["t" + k] = true; try { b.setPointerCapture(e.pointerId); } catch (err) {} };
+  const up = () => { b.classList.remove("down"); if (k === "jump") jumpUp(); else keys["t" + k] = false; };
+  b.addEventListener("pointerdown", down); b.addEventListener("pointerup", up);
+  b.addEventListener("pointercancel", up); b.addEventListener("lostpointercapture", up);
+});
+
+showMenu();
+
+// testing hook: ?test=1
+if (/[?&]test=1/.test(location.search)) {
+  window.JM_TEST = {
+    start: L => startLevel(L || 1),
+    objs: () => objs.map(o => ({ type: o.type, x: o.x0 != null ? o.x0 : o.x, y: o.y, w: o.w, h: o.h })),
+    state: () => ({ state, level, x: P.x | 0, y: P.y | 0, ground: P.ground && P.ground.type, wall: P.wall, highest: P.highest | 0 }),
+    put: (x, y) => { P.x = x; P.y = y; P.vx = 0; P.vy = 0; P.fallStart = y; },
+    toSummit: () => { P.x = summit.x + summit.w / 2 - PW / 2; P.y = summit.y - PH - 2; P.vy = 0; P.vx = 0; P.fallStart = P.y; }
+  };
+}
+})();
+</script>
+</body>
+</html>
