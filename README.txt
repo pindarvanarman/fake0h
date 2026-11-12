@@ -10,6 +10,7 @@ Folder layout
 - games/home-for-leo/     : Home for Leo (a story merge game, mouse or touch)
 - games/abducted/         : Abducted (a horror stealth game, keyboard)
 - games/sunny-spot/       : Sunny Spot (a cozy cat race, mouse or keyboard)
+- games/bloom-and-grow/   : Bloom & Grow (a peaceful farming game that saves your farm)
 
 Adding a new game
 1. Put the game in its own folder inside games/, e.g. games/my-game/index.html

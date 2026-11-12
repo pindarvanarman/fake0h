@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bloom &amp; Grow · fake0hs Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #3d4a2e; --cream: #fffbea; --leaf: #5aa83a; --leaf-dark: #3d7a26; --sun: #ffd23f; --soil: #8a5a3a; --pink: #ff8fb8; color-scheme: light; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #a8dc84; font-family: "Nunito", system-ui, sans-serif; color: var(--ink); }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  button { font: 900 0.95rem "Nunito", system-ui, sans-serif; color: var(--ink); cursor: pointer; border: 3px solid var(--ink); border-radius: 12px; background: var(--sun); padding: 7px 12px; box-shadow: 0 3px 0 var(--ink); }
+  button:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+  button[disabled] { opacity: 0.45; cursor: default; }
+  button:focus-visible, .exit-btn:focus-visible { outline: 3px solid #e0559a; outline-offset: 2px; }
+
+  /* top bar */
+  #top { position: fixed; top: 0; left: 0; right: 0; height: 58px; display: flex; align-items: center; gap: 14px; padding: 8px 120px 8px 12px; z-index: 5; pointer-events: none; }
+  #top > * { pointer-events: auto; }
+  .pill { background: var(--cream); border: 3px solid var(--ink); border-radius: 16px; padding: 5px 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 3px 0 rgba(61,74,46,0.3); white-space: nowrap; }
+  #lvlName { font: 700 1.05rem "Fredoka", "Trebuchet MS", sans-serif; }
+  #xpBar { width: clamp(90px, 18vw, 220px); height: 14px; background: #e3ead0; border-radius: 8px; overflow: hidden; border: 2px solid var(--ink); }
+  #xpFill { height: 100%; width: 0; background: linear-gradient(90deg, #7fd35a, #3d9a26); transition: width 0.4s; }
+  #xpText { font-size: 0.8rem; font-weight: 800; }
+  #coins { font: 700 1.15rem "Fredoka", sans-serif; }
+  .icon-btn { padding: 4px 9px; font-size: 1rem; }
+
+  /* bottom bar */
+  #bottom { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 10px; align-items: stretch; padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); z-index: 5; pointer-events: none; }
+  #bottom > * { pointer-events: auto; }
+  #seeds { flex: 1; min-width: 0; display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: thin; }
+  .seed { flex: none; width: 92px; background: var(--cream); border: 3px solid var(--ink); border-radius: 14px; padding: 4px 4px 6px; text-align: center; box-shadow: 0 3px 0 var(--ink); }
+  .seed .e { font-size: 1.7rem; line-height: 1.2; display: block; }
+  .seed .n { display: block; font-size: 0.78rem; font-weight: 900; }
+  .seed .d { display: block; font-size: 0.68rem; font-weight: 800; opacity: 0.8; }
+  .seed.sel { background: #fff3a0; outline: 3px solid #e07a2e; outline-offset: -6px; }
+  .seed.locked { background: #e8e4d4; opacity: 0.7; }
+  .seed.locked .e { filter: grayscale(1); opacity: 0.5; }
+  .seed.cant .d.c { color: #c2413b; }
+  #side { flex: none; display: flex; flex-direction: column; gap: 6px; width: 250px; background: var(--cream); border: 3px solid var(--ink); border-radius: 14px; padding: 7px 9px; box-shadow: 0 3px 0 var(--ink); }
+  #basket { font-size: 0.85rem; font-weight: 800; min-height: 1.3em; line-height: 1.5; }
+  #sell { width: 100%; background: #ffb84d; }
+  #tools { display: flex; gap: 5px; }
+  #tools button { flex: 1; padding: 4px 2px; font-size: 0.72rem; background: #cde9ff; }
+  #tip { position: fixed; left: 50%; transform: translateX(-50%); bottom: 150px; z-index: 4; background: rgba(255,251,234,0.95); border: 3px solid var(--ink); border-radius: 14px; padding: 7px 14px; font-weight: 800; font-size: 0.95rem; max-width: min(640px, 90vw); text-align: center; pointer-events: none; }
+  #tip:empty { display: none; }
+  @media (max-width: 760px) {
+    #bottom { flex-direction: column-reverse; }
+    #side { width: auto; }
+    #tip { bottom: 250px; }
+    #top { padding-right: 96px; gap: 8px; }
+    #xpText { display: none; }
+  }
+
+  /* modal */
+  #modal { position: fixed; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(61,74,46,0.35); z-index: 20; }
+  #modal.hidden { display: none; }
+  .card { max-width: 500px; width: 100%; background: var(--cream); border: 4px solid var(--ink); border-radius: 22px; padding: 24px 26px; text-align: center; box-shadow: 8px 8px 0 var(--leaf); }
+  .card h1 { font: 700 clamp(2rem, 7vw, 3rem)/1.05 "Fredoka", sans-serif; margin: 0 0 8px; color: var(--leaf-dark); }
+  .card h2 { font: 700 1.3rem "Fredoka", sans-serif; margin: 0 0 10px; color: #e07a2e; }
+  .card p { margin: 0 0 10px; line-height: 1.45; }
+  .card ul { text-align: left; margin: 8px auto 12px; max-width: 360px; padding-left: 1.2em; line-height: 1.6; font-weight: 800; }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+
+  .exit-btn {
+    position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: 14px; z-index: 30;
+    font: 800 0.95rem "Nunito", system-ui, sans-serif; color: var(--ink); text-decoration: none;
+    background: var(--cream); border: 3px solid var(--ink); border-radius: 99px; padding: 5px 14px;
+  }
+  .exit-btn:hover { background: var(--sun); }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="top">
+  <div class="pill"><span id="lvlName">Level 1</span><div id="xpBar"><div id="xpFill"></div></div><span id="xpText"></span></div>
+  <div class="pill"><span id="coins">🪙 10</span></div>
+  <button class="icon-btn" id="btnMusic" type="button" aria-label="Music on or off">🎵</button>
+  <button class="icon-btn" id="btnZoomIn" type="button" aria-label="Zoom in">➕</button>
+  <button class="icon-btn" id="btnZoomOut" type="button" aria-label="Zoom out">➖</button>
+  <button class="icon-btn" id="btnHelp" type="button" aria-label="How to play">❓</button>
+</div>
+
+<div id="tip"></div>
+
+<div id="bottom">
+  <div id="seeds" aria-label="Seeds"></div>
+  <div id="side">
+    <div id="basket"></div>
+    <button id="sell" type="button">Sell everything</button>
+    <div id="tools">
+      <button id="tPlant" type="button">🌱 Plant all</button>
+      <button id="tWater" type="button">💧 Water all</button>
+      <button id="tHarvest" type="button">🧺 Pick all</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal" class="hidden"><div class="card" id="card"></div></div>
+<a class="exit-btn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
+
+<script>
+(function () {
+"use strict";
+const canvas = document.getElementById("game"), ctx = canvas.getContext("2d");
+const $ = (id) => document.getElementById(id);
+let W = 0, H = 0;
+const EMOJI = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+
+// =====================================================================
+// CROPS AND LEVELS (easy to tweak)
+// =====================================================================
+const SEEDS = [
+  { id: "carrot", name: "Carrot", e: "🥕", cost: 2, sell: 5, time: 8, lvl: 1, color: "#ff8a3d" },
+  { id: "lettuce", name: "Lettuce", e: "🥬", cost: 4, sell: 10, time: 12, lvl: 2, color: "#7fd35a" },
+  { id: "straw", name: "Strawberry", e: "🍓", cost: 6, sell: 16, time: 16, lvl: 3, color: "#ff4f6b" },
+  { id: "sun", name: "Sunflower", e: "🌻", cost: 9, sell: 24, time: 20, lvl: 4, color: "#ffd23f" },
+  { id: "tomato", name: "Tomato", e: "🍅", cost: 12, sell: 32, time: 24, lvl: 5, color: "#e0402a" },
+  { id: "pumpkin", name: "Pumpkin", e: "🎃", cost: 18, sell: 48, time: 30, lvl: 6, color: "#ff8a1f" },
+  { id: "eggplant", name: "Eggplant", e: "🍆", cost: 24, sell: 62, time: 34, lvl: 7, color: "#7a3ab8" },
+  { id: "corn", name: "Corn", e: "🌽", cost: 30, sell: 80, time: 40, lvl: 8, color: "#ffd23f" },
+  { id: "tulip", name: "Tulip", e: "🌷", cost: 40, sell: 105, time: 45, lvl: 9, color: "#ff7ab8" },
+  { id: "melon", name: "Watermelon", e: "🍉", cost: 55, sell: 140, time: 55, lvl: 10, color: "#3f9a4a" },
+  { id: "grapes", name: "Grapes", e: "🍇", cost: 70, sell: 180, time: 60, lvl: 11, color: "#7a5cff" },
+  { id: "rose", name: "Rose", e: "🌹", cost: 90, sell: 230, time: 70, lvl: 12, color: "#d8343a" },
+  { id: "pine", name: "Pineapple", e: "🍍", cost: 120, sell: 300, time: 80, lvl: 13, color: "#e8b04a" },
+  { id: "hibiscus", name: "Hibiscus", e: "🌺", cost: 150, sell: 380, time: 90, lvl: 14, color: "#ff4f8b" },
+  { id: "blossom", name: "Cherry Blossom", e: "🌸", cost: 200, sell: 500, time: 100, lvl: 15, color: "#ffb0d0" },
+  { id: "bouquet", name: "Prize Bouquet", e: "💐", cost: 300, sell: 800, time: 120, lvl: 16, color: "#ff8fb8" }
+];
+const LEVELS = [
+  { name: "Tiny Patch", plots: 6, unlock: "Carrots" },
+  { name: "Garden Bed", plots: 9, unlock: "Lettuce and a watering can (click a growing plant to water it)" },
+  { name: "Backyard Garden", plots: 12, unlock: "Strawberries and a scarecrow" },
+  { name: "Flower Corner", plots: 15, unlock: "Sunflowers and a garden bench" },
+  { name: "Little Farm", plots: 18, unlock: "Tomatoes and a tool shed (Plant all button)" },
+  { name: "Pumpkin Patch", plots: 21, unlock: "Pumpkins and a well (Water all button)" },
+  { name: "Busy Bee Farm", plots: 24, unlock: "Eggplants and a beehive (+10% selling price)" },
+  { name: "Country Farm", plots: 28, unlock: "Corn and a windmill" },
+  { name: "Tulip Fields", plots: 32, unlock: "Tulips and a duck pond" },
+  { name: "Big Red Farm", plots: 36, unlock: "Watermelons and a barn (Pick all button)" },
+  { name: "Vineyard Estate", plots: 40, unlock: "Grapes and a greenhouse (plants grow 20% faster)" },
+  { name: "Rose Garden", plots: 44, unlock: "Roses, a fountain (+10% XP), and visitors!" },
+  { name: "Tropical Orchard", plots: 48, unlock: "Pineapples and fruit trees (+1 coin every second)" },
+  { name: "Flower Gardens", plots: 52, unlock: "Hibiscus and a flower arch" },
+  { name: "Grand Conservatory", plots: 56, unlock: "Cherry blossoms and a glass conservatory" },
+  { name: "Botanical Museum", plots: 60, unlock: "Prize bouquets and THE BOTANICAL MUSEUM (+5 coins every second)" }
+];
+// total XP needed to reach each level (index = level - 1)
+const XP_AT = [0];
+for (let i = 1; i < 16; i++) XP_AT.push(XP_AT[i - 1] + Math.round(40 * Math.pow(1.62, i - 1)));
+const SAVE_KEY = "fake0hs-bloom-and-grow-v1";
+const PLOT = 64; // world units per plot
+
+// =====================================================================
+// STATE + SAVING
+// =====================================================================
+let S;
+function freshState() { return { coins: 10, xp: 0, level: 1, plots: [], basket: {}, sel: "carrot", music: true, tipStep: 0, seen16: false }; }
+function load() {
+  try { const d = JSON.parse(localStorage.getItem(SAVE_KEY)); if (d && d.level) { S = Object.assign(freshState(), d); return; } } catch (e) {}
+  S = freshState();
+}
+let saveT = 0;
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
+load();
+function ensurePlots() { const n = LEVELS[S.level - 1].plots; while (S.plots.length < n) S.plots.push(null); }
+ensurePlots();
+const has = (lvl) => S.level >= lvl;
+const seedById = (id) => SEEDS.find(s => s.id === id);
+
+// =====================================================================
+// AUDIO (soft and calm)
+// =====================================================================
+let actx = null, master = null, noiseBuf = null;
+function audio() {
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+    master = actx.createGain(); master.gain.value = 0.8;
+    const delay = actx.createDelay(); delay.delayTime.value = 0.28; const fb = actx.createGain(); fb.gain.value = 0.25;
+    master.connect(actx.destination); master.connect(delay); delay.connect(fb).connect(delay); delay.connect(actx.destination);
+    noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+const now = () => actx ? actx.currentTime : 0;
+function tone(f, d, v = 0.06, type = "sine", delay = 0) {
+  if (!audio()) return;
+  const t = now() + delay, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g).connect(master); o.start(t); o.stop(t + d + 0.05);
+}
+function hush(d, v, f) {
+  if (!audio()) return;
+  const t = now(), s = actx.createBufferSource(), fl = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = noiseBuf; fl.type = "lowpass"; fl.frequency.value = f;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  s.connect(fl).connect(g).connect(master); s.start(t); s.stop(t + d + 0.05);
+}
+const sfx = {
+  plant() { tone(392, 0.15, 0.06, "triangle"); hush(0.12, 0.05, 800); },
+  water() { hush(0.5, 0.08, 2500); tone(1046, 0.2, 0.02); },
+  pick() { tone(660, 0.12, 0.07); tone(990, 0.2, 0.05, "sine", 0.06); },
+  sell() { [1318, 1568, 2093].forEach((f, i) => tone(f, 0.25, 0.04, "sine", i * 0.06)); },
+  level() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.5, 0.06, "triangle", i * 0.12)); },
+  nope() { tone(220, 0.2, 0.05, "triangle"); }
+};
+// gentle background music: random notes from a happy scale
+const SCALE = [392, 440, 523, 587, 659, 784, 880];
+let musicT = 0;
+function music(dt) {
+  if (!S.music || !actx) return;
+  musicT -= dt;
+  if (musicT <= 0) {
+    musicT = 0.55 + Math.random() * 0.9;
+    tone(SCALE[Math.floor(Math.random() * SCALE.length)], 1.4, 0.025);
+    if (Math.random() < 0.2) { tone(196, 2.2, 0.025); tone(262, 2.2, 0.018); }
+  }
+}
+
+// =====================================================================
+// FARM LAYOUT: plots in the middle, buildings around them
+// =====================================================================
+let L = null; // layout
+function layout() {
+  const n = S.plots.length;
+  const cols = Math.min(10, Math.max(3, Math.ceil(Math.sqrt(n * 1.5))));
+  const rows = Math.ceil(n / cols);
+  const gw = cols * PLOT, gh = rows * PLOT, gx = -gw / 2, gy = -gh / 2;
+  const left = gx - 150, right = gx + gw + 150, top = gy - 150;
+  const decor = [];
+  const add = (lvl, kind, x, y, w, h) => { if (has(lvl)) decor.push({ kind, x, y, w, h, lvl }); };
+  // left side
+  add(5, "shed", left - 40, gy + 30, 150, 130);
+  add(4, "bench", left + 10, gy + 200, 90, 50);
+  add(7, "hive", left - 10, gy + 290, 70, 80);
+  add(12, "fountain", left - 30, gy + 430, 140, 140);
+  // right side
+  add(3, "scarecrow", right - 10, gy + 30, 70, 110);
+  add(6, "well", right + 20, gy + 190, 90, 100);
+  add(9, "pond", right + 70, gy + 360, 230, 150);
+  add(13, "orchard", right + 70, gy + 560, 260, 200);
+  // above the plots
+  add(8, "windmill", gx - 40, top - 230, 150, 230);
+  add(10, "barn", gx + gw - 120, top - 200, 200, 190);
+  add(11, "greenhouse", gx + gw / 2 - 260, top - 170, 200, 150);
+  add(14, "arch", gx + gw / 2 - 60, gy - 120, 120, 110);
+  add(15, "conservatory", gx + gw / 2 + 80, top - 380, 260, 210);
+  add(16, "museum", gx + gw / 2 - 260, top - 720, 520, 340);
+  const market = { x: -110, y: gy + gh + 50, w: 220, h: 110 };
+  // bounding box of everything
+  let x0 = gx - 160, y0 = gy - 160, x1 = gx + gw + 160, y1 = market.y + market.h + 40;
+  for (const d of decor) { x0 = Math.min(x0, d.x - 30); y0 = Math.min(y0, d.y - 30); x1 = Math.max(x1, d.x + d.w + 30); y1 = Math.max(y1, d.y + d.h + 30); }
+  x0 -= 60; y0 -= 60; x1 += 60; y1 += 40;
+  L = { cols, rows, gx, gy, gw, gh, decor, market, x0, y0, x1, y1 };
+}
+layout();
+
+// ---------- camera ----------
+const cam = { cx: 0, cy: 0, scale: 1, zoom: 1, tx: 0, ty: 0, tscale: 1 };
+function view() {
+  const top = 62, bottom = W < 760 ? 250 : 140;
+  return { x: 0, y: top, w: W, h: Math.max(200, H - top - bottom) };
+}
+function fitCamera(snap) {
+  const v = view();
+  const fit = Math.min(v.w / (L.x1 - L.x0), v.h / (L.y1 - L.y0));
+  cam.tscale = Math.min(1.6, fit) * cam.zoom;
+  cam.tx = (L.x0 + L.x1) / 2; cam.ty = (L.y0 + L.y1) / 2;
+  if (snap) { cam.scale = cam.tscale; cam.cx = cam.tx; cam.cy = cam.ty; }
+}
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  fitCamera(true);
+}
+window.addEventListener("resize", resize); resize();
+const toScreen = (wx, wy) => { const v = view(); return [v.x + v.w / 2 + (wx - cam.cx) * cam.scale, v.y + v.h / 2 + (wy - cam.cy) * cam.scale]; };
+const toWorld = (sx, sy) => { const v = view(); return [cam.cx + (sx - v.x - v.w / 2) / cam.scale, cam.cy + (sy - v.y - v.h / 2) / cam.scale]; };
+function plotAt(wx, wy) {
+  const c = Math.floor((wx - L.gx) / PLOT), r = Math.floor((wy - L.gy) / PLOT);
+  if (c < 0 || r < 0 || c >= L.cols || r >= L.rows) return -1;
+  const i = r * L.cols + c; return i < S.plots.length ? i : -1;
+}
+const plotPos = (i) => [L.gx + (i % L.cols) * PLOT, L.gy + Math.floor(i / L.cols) * PLOT];
+
+// =====================================================================
+// GARDENING
+// =====================================================================
+const clock = () => Date.now();
+function progress(p) { return p ? Math.min(1, (clock() - p.start) / p.dur) : 0; }
+const ripe = (p) => p && progress(p) >= 1;
+let pops = []; // floating text / sparkles in world space
+
+function plant(i, quiet) {
+  if (S.plots[i]) return false;
+  const sd = seedById(S.sel);
+  if (!sd || !has(sd.lvl)) return false;
+  if (S.coins < sd.cost) { if (!quiet) { sfx.nope(); tip(`Not enough coins for ${sd.name}. Sell some plants first, or pick a cheaper seed.`); } return false; }
+  S.coins -= sd.cost;
+  S.plots[i] = { seed: sd.id, start: clock(), dur: sd.time * 1000 * (has(11) ? 0.8 : 1), watered: false };
+  const [x, y] = plotPos(i); pops.push({ x: x + PLOT / 2, y: y + PLOT / 2, text: `-${sd.cost}`, t: 0, color: "#a0683a" });
+  if (!quiet) sfx.plant();
+  return true;
+}
+function water(i, quiet) {
+  const p = S.plots[i];
+  if (!p || p.watered || ripe(p) || !has(2)) return false;
+  const nowT = clock(), elapsed = nowT - p.start, remaining = p.dur - elapsed;
+  p.start = nowT - (p.dur - remaining / 2); p.watered = true;
+  const [x, y] = plotPos(i); for (let k = 0; k < 6; k++) pops.push({ x: x + PLOT * Math.random(), y: y + PLOT * Math.random(), text: "💧", t: Math.random() * 0.3, color: "#4fa3ff", emoji: true });
+  if (!quiet) sfx.water();
+  return true;
+}
+function harvest(i, quiet) {
+  const p = S.plots[i];
+  if (!ripe(p)) return false;
+  S.basket[p.seed] = (S.basket[p.seed] || 0) + 1;
+  S.plots[i] = null;
+  const sd = seedById(p.seed), [x, y] = plotPos(i);
+  pops.push({ x: x + PLOT / 2, y: y + PLOT / 2, text: sd.e, t: 0, emoji: true, fly: true });
+  if (!quiet) sfx.pick();
+  return true;
+}
+function basketValue() {
+  let v = 0; for (const id in S.basket) v += S.basket[id] * seedById(id).sell;
+  return Math.round(v * (has(7) ? 1.1 : 1));
+}
+function sellAll() {
+  const v = basketValue();
+  if (!v) { tip("Your basket is empty. Harvest some ripe plants first!"); return; }
+  S.basket = {}; S.coins += v;
+  addXP(Math.round(v * (has(12) ? 1.1 : 1)));
+  pops.push({ x: L.market.x + L.market.w / 2, y: L.market.y, text: `+${v} 🪙`, t: 0, color: "#e07a2e", big: true });
+  sfx.sell(); save(); refreshUI();
+}
+function addXP(n) {
+  S.xp += n;
+  let leveled = false;
+  while (S.level < 16 && S.xp >= XP_AT[S.level]) { S.level++; leveled = true; }
+  if (leveled) {
+    ensurePlots(); layout(); cam.zoom = 1; fitCamera(false);
+    sfx.level(); showLevelUp();
+  }
+}
+
+// =====================================================================
+// UI (seed bar, basket, tools, tips)
+// =====================================================================
+function fmt(n) { return n >= 10000 ? (n / 1000).toFixed(1) + "k" : String(Math.floor(n)); }
+function buildSeeds() {
+  const box = $("seeds"); box.innerHTML = "";
+  for (const sd of SEEDS) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "seed"; b.dataset.id = sd.id;
+    b.innerHTML = `<span class="e">${sd.e}</span><span class="n">${sd.name}</span><span class="d c"></span><span class="d"></span>`;
+    b.onclick = () => { if (!has(sd.lvl)) { tip(`${sd.name} unlocks at level ${sd.lvl}.`); return; } S.sel = sd.id; save(); refreshUI(); };
+    box.appendChild(b);
+  }
+}
+function refreshUI() {
+  const lv = LEVELS[S.level - 1];
+  $("lvlName").textContent = `Level ${S.level} · ${lv.name}`;
+  const a = XP_AT[S.level - 1], b = S.level < 16 ? XP_AT[S.level] : XP_AT[15];
+  $("xpFill").style.width = (S.level >= 16 ? 100 : Math.max(0, Math.min(100, (S.xp - a) / (b - a) * 100))) + "%";
+  $("xpText").textContent = S.level >= 16 ? "MAX LEVEL!" : `${fmt(Math.max(0, S.xp - a))} / ${fmt(b - a)} XP`;
+  $("coins").textContent = "🪙 " + fmt(S.coins);
+  $("btnMusic").textContent = S.music ? "🎵" : "🔇";
+  for (const el of $("seeds").children) {
+    const sd = seedById(el.dataset.id), open = has(sd.lvl);
+    el.classList.toggle("locked", !open); el.classList.toggle("sel", S.sel === sd.id);
+    el.classList.toggle("cant", open && S.coins < sd.cost);
+    const ds = el.querySelectorAll(".d");
+    ds[0].textContent = open ? `🪙${sd.cost} → ${sd.sell}` : `🔒 Level ${sd.lvl}`;
+    ds[1].textContent = open ? `⏱ ${sd.time}s` : "";
+    el.setAttribute("aria-label", open ? `${sd.name}: costs ${sd.cost}, sells for ${sd.sell}, grows in ${sd.time} seconds` : `${sd.name}, locked until level ${sd.lvl}`);
+  }
+  const items = Object.keys(S.basket).filter(k => S.basket[k] > 0);
+  $("basket").textContent = items.length ? "🧺 " + items.map(k => `${seedById(k).e}×${S.basket[k]}`).join("  ") : "🧺 Basket is empty";
+  const v = basketValue();
+  $("sell").textContent = v ? `Sell everything for 🪙${fmt(v)}` : "Sell everything";
+  $("sell").disabled = !v;
+  $("tPlant").disabled = !has(5); $("tPlant").title = has(5) ? "Plant the selected seed in every empty plot" : "Unlocks at level 5";
+  $("tWater").disabled = !has(6); $("tWater").title = has(6) ? "Water every growing plant" : "Unlocks at level 6";
+  $("tHarvest").disabled = !has(10); $("tHarvest").title = has(10) ? "Pick every ripe plant" : "Unlocks at level 10";
+  if (!has(5)) $("tPlant").textContent = "🔒 Lv 5"; else $("tPlant").textContent = "🌱 Plant all";
+  if (!has(6)) $("tWater").textContent = "🔒 Lv 6"; else $("tWater").textContent = "💧 Water all";
+  if (!has(10)) $("tHarvest").textContent = "🔒 Lv 10"; else $("tHarvest").textContent = "🧺 Pick all";
+}
+let tipT = 0;
+function tip(text, secs = 4) { $("tip").textContent = text; tipT = secs; }
+function guide() {
+  // gentle first-time hints
+  if (S.tipStep === 0) { tip("Click the soil to plant a carrot seed. 🥕", 999); }
+  else if (S.tipStep === 1) tip("Your seeds are growing! Wait for them to ripen, then click to pick them.", 999);
+  else if (S.tipStep === 2) tip("Now sell your basket with the orange Sell button (or click the market stall).", 999);
+  else if (S.tipStep === 3) { tip("Selling gives coins and XP. Level up to grow your farm all the way to a museum! 🏛️", 6); S.tipStep = 4; save(); }
+}
+function updateGuide() {
+  if (S.tipStep === 0 && S.plots.some(p => p)) { S.tipStep = 1; guide(); }
+  if (S.tipStep === 1 && Object.keys(S.basket).length) { S.tipStep = 2; guide(); }
+  if (S.tipStep === 2 && S.xp > 0) { S.tipStep = 3; guide(); }
+}
+
+function showModal(html, buttons) {
+  $("card").innerHTML = html + `<div class="row">${buttons}</div>`;
+  $("modal").classList.remove("hidden");
+}
+function closeModal() { $("modal").classList.add("hidden"); }
+function showLevelUp() {
+  const lv = LEVELS[S.level - 1];
+  confetti = 220;
+  if (S.level === 16) {
+    showModal(`<h1>🏛️ Level 16!</h1><h2>Your farm is now a Botanical Museum!</h2>
+      <p>From a tiny carrot patch to a garden as big as a museum. Visitors come from all over to see your plants.</p>
+      <ul><li>💐 Prize Bouquets unlocked</li><li>🏛️ The Botanical Museum (+5 coins every second)</li></ul>
+      <p>Keep gardening as long as you like.</p>`, `<button id="mOk" type="button">Wonderful!</button>`);
+  } else {
+    showModal(`<h1>Level ${S.level}!</h1><h2>${lv.name}</h2><p>Your farm grew bigger. You unlocked:</p><ul><li>${lv.unlock}</li><li>${lv.plots} garden plots</li></ul>`,
+      `<button id="mOk" type="button">Hooray!</button>`);
+  }
+  $("mOk").onclick = closeModal; $("mOk").focus();
+  refreshUI(); save();
+}
+function showHelp() {
+  showModal(`<h1>Bloom &amp; Grow</h1>
+    <p>A peaceful garden. Nothing ever wilts, and there’s no rush.</p>
+    <ul>
+      <li>Pick a seed at the bottom, then click soil to plant (drag to plant lots)</li>
+      <li>Click a growing plant to water it, so it grows twice as fast</li>
+      <li>Click ripe plants to pick them, then sell your basket</li>
+      <li>Selling gives coins and XP. Level up to grow your farm!</li>
+      <li>Scroll to zoom, drag the grass to look around</li>
+    </ul>
+    <p>Your farm saves by itself, and plants keep growing while you’re away.</p>`,
+    `<button id="mOk" type="button">Let’s garden</button><button id="mReset" type="button" class="secondary" style="background:#fff">Start a new farm</button>`);
+  $("mOk").onclick = closeModal;
+  $("mReset").onclick = () => { if (confirm("Start over with a brand-new farm? Your current farm will be erased.")) { S = freshState(); ensurePlots(); layout(); cam.zoom = 1; fitCamera(true); save(); closeModal(); refreshUI(); guide(); } };
+}
+
+// =====================================================================
+// DRAWING THE FARM
+// =====================================================================
+let confetti = 0, confettiBits = [];
+const srand = (i) => { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
+function drawGrass() {
+  ctx.fillStyle = "#a8dc84"; ctx.fillRect(0, 0, W, H);
+  const [x0, y0] = toScreen(L.x0, L.y0), [x1, y1] = toScreen(L.x1, L.y1);
+  ctx.fillStyle = "#9bd174"; ctx.beginPath(); ctx.roundRect(x0, y0, x1 - x0, y1 - y0, 30 * cam.scale); ctx.fill();
+  ctx.strokeStyle = "#7fb85a"; ctx.lineWidth = Math.max(1, 1.5 * cam.scale);
+  for (let i = 0; i < 260; i++) {
+    const wx = L.x0 + srand(i) * (L.x1 - L.x0), wy = L.y0 + srand(i + 400) * (L.y1 - L.y0);
+    const [sx, sy] = toScreen(wx, wy), s = 6 * cam.scale;
+    ctx.beginPath(); ctx.moveTo(sx - s, sy); ctx.lineTo(sx - s * 0.6, sy - s * 1.2); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - s * 1.5); ctx.moveTo(sx + s, sy); ctx.lineTo(sx + s * 0.6, sy - s * 1.2); ctx.stroke();
+  }
+  // fence
+  ctx.strokeStyle = "#a0683a"; ctx.lineWidth = Math.max(2, 5 * cam.scale);
+  ctx.beginPath(); ctx.roundRect(x0 + 8 * cam.scale, y0 + 8 * cam.scale, x1 - x0 - 16 * cam.scale, y1 - y0 - 16 * cam.scale, 26 * cam.scale); ctx.stroke();
+  ctx.fillStyle = "#8a5a3a";
+  const posts = Math.floor((x1 - x0) / (40 * cam.scale) / 2);
+  for (let i = 0; i <= posts; i++) {
+    const px = x0 + 20 * cam.scale + i * (x1 - x0 - 40 * cam.scale) / Math.max(1, posts);
+    ctx.fillRect(px - 3 * cam.scale, y0 + 2 * cam.scale, 6 * cam.scale, 14 * cam.scale);
+    ctx.fillRect(px - 3 * cam.scale, y1 - 16 * cam.scale, 6 * cam.scale, 14 * cam.scale);
+  }
+  // path around the plots and down to the market
+  const [gx, gy] = toScreen(L.gx - 18, L.gy - 18);
+  ctx.fillStyle = "#e8d5a8"; ctx.beginPath(); ctx.roundRect(gx, gy, (L.gw + 36) * cam.scale, (L.gh + 36) * cam.scale, 18 * cam.scale); ctx.fill();
+  const [mx, my] = toScreen(-30, L.gy + L.gh); ctx.fillRect(mx, my, 60 * cam.scale, 60 * cam.scale);
+  // trees around the edge
+  for (let i = 0; i < 14; i++) {
+    const side = i % 4, f = srand(i * 3 + 1);
+    const wx = side === 0 ? L.x0 + 30 : side === 1 ? L.x1 - 30 : L.x0 + 60 + f * (L.x1 - L.x0 - 120);
+    const wy = side === 2 ? L.y0 + 30 : side === 3 ? L.y1 - 30 : L.y0 + 80 + f * (L.y1 - L.y0 - 160);
+    tree(wx, wy, 34 + srand(i) * 14, i);
+  }
+}
+function tree(wx, wy, r, i, fruit) {
+  const [x, y] = toScreen(wx, wy), s = cam.scale;
+  ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.beginPath(); ctx.ellipse(x, y + r * 0.6 * s, r * s, r * 0.35 * s, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#8a5a3a"; ctx.fillRect(x - 5 * s, y, 10 * s, r * 0.6 * s);
+  ctx.fillStyle = i % 2 ? "#4f9a3a" : "#5aa83a";
+  ctx.beginPath(); ctx.arc(x, y - r * 0.2 * s, r * s, 0, 7); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.beginPath(); ctx.arc(x - r * 0.3 * s, y - r * 0.5 * s, r * 0.45 * s, 0, 7); ctx.fill();
+  if (fruit) { ctx.fillStyle = fruit; for (let k = 0; k < 6; k++) { ctx.beginPath(); ctx.arc(x + (srand(i + k) - 0.5) * r * 1.4 * s, y - r * 0.2 * s + (srand(i + k + 9) - 0.5) * r * 1.2 * s, 5 * s, 0, 7); ctx.fill(); } }
+}
+
+function drawPlots(t) {
+  const s = cam.scale, hoverI = hover >= 0 ? hover : -1;
+  for (let i = 0; i < S.plots.length; i++) {
+    const [wx, wy] = plotPos(i), [x, y] = toScreen(wx + 3, wy + 3), w = (PLOT - 6) * s;
+    const p = S.plots[i], pr = progress(p);
+    ctx.fillStyle = p && p.watered && pr < 1 ? "#6b4128" : "#8a5a3a";
+    ctx.beginPath(); ctx.roundRect(x, y, w, w, 8 * s); ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.15)"; ctx.lineWidth = Math.max(1, 2 * s);
+    for (let k = 1; k < 4; k++) { ctx.beginPath(); ctx.moveTo(x + 6 * s, y + k * w / 4); ctx.lineTo(x + w - 6 * s, y + k * w / 4); ctx.stroke(); }
+    if (i === hoverI) { ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = Math.max(2, 3 * s); ctx.beginPath(); ctx.roundRect(x, y, w, w, 8 * s); ctx.stroke(); }
+    if (!p) continue;
+    const sd = seedById(p.seed), cx = x + w / 2, cy = y + w / 2;
+    if (pr < 1) {
+      if (pr < 0.25) { ctx.fillStyle = "#5a3a22"; for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(cx + (k - 1) * 10 * s, cy + 4 * s, 3 * s, 0, 7); ctx.fill(); } }
+      else {
+        const g = pr < 0.6 ? 0.55 : 1;
+        ctx.strokeStyle = "#3d7a26"; ctx.lineWidth = Math.max(1, 3 * s);
+        ctx.beginPath(); ctx.moveTo(cx, cy + 14 * s); ctx.lineTo(cx, cy - 6 * s * g); ctx.stroke();
+        ctx.fillStyle = "#5aa83a";
+        const sway = Math.sin(t * 2 + i) * 0.15;
+        for (const sd2 of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + sd2 * 8 * s * g, cy - 2 * s * g, 9 * s * g, 4.5 * s * g, sd2 * 0.5 + sway, 0, 7); ctx.fill(); }
+        if (pr >= 0.6) { ctx.fillStyle = sd.color; ctx.beginPath(); ctx.arc(cx, cy - 10 * s, 6 * s * (pr - 0.4), 0, 7); ctx.fill(); }
+      }
+      // little growth bar
+      ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(x + 8 * s, y + w - 8 * s, w - 16 * s, 4 * s);
+      ctx.fillStyle = p.watered ? "#4fd6ff" : "#ffd23f"; ctx.fillRect(x + 8 * s, y + w - 8 * s, (w - 16 * s) * pr, 4 * s);
+    } else {
+      const bob = Math.sin(t * 3 + i) * 2 * s;
+      ctx.font = `${Math.round(36 * s)}px ${EMOJI}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(sd.e, cx, cy + bob);
+      if (Math.sin(t * 4 + i * 1.7) > 0.7) { ctx.font = `${Math.round(14 * s)}px ${EMOJI}`; ctx.fillText("✨", cx + w * 0.32, cy - w * 0.3); }
+    }
+  }
+}
+
+// ---------- buildings ----------
+function R(wx, wy, ww, wh, color, r = 6) { const [x, y] = toScreen(wx, wy); ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x, y, ww * cam.scale, wh * cam.scale, r * cam.scale); ctx.fill(); }
+function C(wx, wy, r, color) { const [x, y] = toScreen(wx, wy); ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, r * cam.scale, 0, 7); ctx.fill(); }
+function P(points, color) { ctx.fillStyle = color; ctx.beginPath(); points.forEach(([wx, wy], i) => { const [x, y] = toScreen(wx, wy); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); ctx.fill(); }
+function label(text, wx, wy, size = 16, color = "#3d4a2e") { const [x, y] = toScreen(wx, wy); ctx.font = `800 ${Math.max(8, size * cam.scale)}px Nunito, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = color; ctx.fillText(text, x, y); }
+function shadow(wx, wy, w, h) { const [x, y] = toScreen(wx, wy); ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.beginPath(); ctx.ellipse(x, y, w * cam.scale, h * cam.scale, 0, 0, 7); ctx.fill(); }
+
+function drawDecor(d, t) {
+  const { x, y, w, h } = d;
+  switch (d.kind) {
+    case "shed":
+      shadow(x + w / 2, y + h, w * 0.55, 12);
+      R(x, y + 45, w, h - 45, "#c4794a"); P([[x - 10, y + 50], [x + w / 2, y], [x + w + 10, y + 50]], "#7a3a2a");
+      R(x + w / 2 - 20, y + 70, 40, 60, "#6b3e2a", 3); R(x + 14, y + 66, 30, 26, "#cfe8f2", 3);
+      label("Tool Shed", x + w / 2, y + h + 14, 14); break;
+    case "bench":
+      shadow(x + w / 2, y + h, w * 0.5, 8);
+      R(x, y, w, 14, "#a0683a", 4); R(x, y + 20, w, 12, "#a0683a", 4); R(x + 6, y + 30, 8, 18, "#6b4128", 2); R(x + w - 14, y + 30, 8, 18, "#6b4128", 2); break;
+    case "scarecrow": {
+      const sw = Math.sin(t * 1.5) * 3;
+      R(x + w / 2 - 4, y + 30, 8, h - 30, "#8a5a3a", 2); R(x + 4, y + 44 + sw * 0.3, w - 8, 8, "#8a5a3a", 2);
+      R(x + w / 2 - 20, y + 36, 40, 44, "#4fa3ff", 6); C(x + w / 2, y + 24, 16, "#ffe0a0");
+      P([[x + w / 2 - 26, y + 16], [x + w / 2, y - 6], [x + w / 2 + 26, y + 16]], "#e8b04a");
+      C(x + w / 2 - 6, y + 24, 2.5, "#3d4a2e"); C(x + w / 2 + 6, y + 24, 2.5, "#3d4a2e"); break;
+    }
+    case "well":
+      shadow(x + w / 2, y + h, w * 0.5, 10);
+      C(x + w / 2, y + h - 30, 40, "#9a9aa8"); C(x + w / 2, y + h - 30, 28, "#2a6ad8");
+      R(x + 6, y + 10, 8, 60, "#8a5a3a", 2); R(x + w - 14, y + 10, 8, 60, "#8a5a3a", 2);
+      P([[x - 6, y + 16], [x + w / 2, y - 14], [x + w + 6, y + 16]], "#c4482b");
+      label("Well", x + w / 2, y + h + 12, 13); break;
+    case "hive":
+      shadow(x + w / 2, y + h, w * 0.5, 8);
+      R(x + 10, y + 20, w - 20, h - 20, "#e8b04a", 14); R(x + 4, y + 36, w - 8, 8, "#c4902a", 4); R(x + 4, y + 56, w - 8, 8, "#c4902a", 4);
+      C(x + w / 2, y + h - 14, 6, "#5a3a22");
+      for (let k = 0; k < 4; k++) { const a = t * 2 + k * 1.6, bx = x + w / 2 + Math.cos(a) * 46, by = y + 30 + Math.sin(a * 1.3) * 26; const [sx, sy] = toScreen(bx, by); ctx.font = `${Math.round(14 * cam.scale)}px ${EMOJI}`; ctx.textAlign = "center"; ctx.fillText("🐝", sx, sy); }
+      break;
+    case "fountain": {
+      shadow(x + w / 2, y + h - 10, w * 0.55, 14);
+      C(x + w / 2, y + h / 2 + 10, w / 2, "#c9c3d6"); C(x + w / 2, y + h / 2 + 10, w / 2 - 12, "#7ad3ff");
+      C(x + w / 2, y + h / 2 + 10, 18, "#c9c3d6");
+      for (let k = 0; k < 8; k++) { const a = k / 8 * 6.28 + t, r = 20 + (t * 30 + k * 7) % 30; C(x + w / 2 + Math.cos(a) * r, y + h / 2 + 10 + Math.sin(a) * r * 0.8, 3, "rgba(255,255,255,0.8)"); }
+      label("Fountain", x + w / 2, y + h + 10, 13); break;
+    }
+    case "pond": {
+      const [px, py] = toScreen(x + w / 2, y + h / 2);
+      ctx.fillStyle = "#6fb8e8"; ctx.beginPath(); ctx.ellipse(px, py, w / 2 * cam.scale, h / 2 * cam.scale, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 2;
+      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.ellipse(px + (k - 1) * 40 * cam.scale, py + 10 * cam.scale, (10 + (t * 10 + k * 8) % 20) * cam.scale, 4 * cam.scale, 0, 0, 7); ctx.stroke(); }
+      ctx.font = `${Math.round(26 * cam.scale)}px ${EMOJI}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("🦆", px + Math.sin(t * 0.4) * w * 0.3 * cam.scale, py - 10 * cam.scale + Math.sin(t * 2) * 2);
+      ctx.fillText("🦆", px - Math.sin(t * 0.3 + 1) * w * 0.25 * cam.scale, py + 25 * cam.scale);
+      C(x + 40, y + 30, 12, "#5aa83a"); C(x + w - 30, y + h - 30, 10, "#5aa83a"); break;
+    }
+    case "windmill": {
+      shadow(x + w / 2, y + h, w * 0.5, 12);
+      P([[x + 35, y + h], [x + w - 35, y + h], [x + w / 2 + 20, y + 70], [x + w / 2 - 20, y + 70]], "#f4ead8");
+      R(x + w / 2 - 14, y + h - 40, 28, 40, "#a0683a", 3);
+      const [cx, cy] = toScreen(x + w / 2, y + 70), a = t * 0.8;
+      ctx.fillStyle = "#c4794a";
+      for (let k = 0; k < 4; k++) { ctx.save(); ctx.translate(cx, cy); ctx.rotate(a + k * Math.PI / 2); ctx.fillRect(-6 * cam.scale, 0, 12 * cam.scale, 70 * cam.scale); ctx.fillStyle = "#fffbea"; ctx.fillRect(-1, 14 * cam.scale, 16 * cam.scale, 50 * cam.scale); ctx.fillStyle = "#c4794a"; ctx.restore(); }
+      C(x + w / 2, y + 70, 9, "#6b4128"); break;
+    }
+    case "barn":
+      shadow(x + w / 2, y + h, w * 0.55, 14);
+      R(x, y + 60, w, h - 60, "#d8343a", 4); P([[x - 12, y + 66], [x + w / 2, y], [x + w + 12, y + 66]], "#7a3a2a");
+      R(x + w / 2 - 34, y + h - 80, 68, 80, "#fffbea", 3); R(x + w / 2 - 30, y + h - 76, 60, 76, "#a8282c", 2);
+      ctx.strokeStyle = "#fffbea"; ctx.lineWidth = 3 * cam.scale; { const [a1, b1] = toScreen(x + w / 2 - 30, y + h - 76), [a2, b2] = toScreen(x + w / 2 + 30, y + h); ctx.beginPath(); ctx.moveTo(a1, b1); ctx.lineTo(a2, b2); ctx.moveTo(a2, b1); ctx.lineTo(a1, b2); ctx.stroke(); }
+      label("Barn", x + w / 2, y + 90, 16, "#fffbea"); break;
+    case "greenhouse":
+      shadow(x + w / 2, y + h, w * 0.55, 12);
+      R(x, y + 40, w, h - 40, "rgba(190,240,230,0.85)", 6); P([[x, y + 42], [x + w / 2, y], [x + w, y + 42]], "rgba(170,230,220,0.9)");
+      ctx.strokeStyle = "#5a8a7a"; ctx.lineWidth = 2;
+      for (let k = 1; k < 5; k++) { const [a, b] = toScreen(x + k * w / 5, y + 40), [, b2] = toScreen(0, y + h); ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(a, b2); ctx.stroke(); }
+      for (let k = 0; k < 5; k++) C(x + 20 + k * 40, y + h - 26, 12, ["#ff7ab8", "#ffd23f", "#5aa83a", "#ff8a3d", "#7a5cff"][k]);
+      label("Greenhouse", x + w / 2, y + h + 12, 13); break;
+    case "orchard":
+      for (let k = 0; k < 6; k++) tree(x + 40 + (k % 3) * 90, y + 40 + Math.floor(k / 3) * 100, 34, k + 20, ["#e0402a", "#ffd23f", "#ff8a3d"][k % 3]);
+      label("Orchard", x + w / 2, y + h + 6, 14); break;
+    case "arch": {
+      const [a, b] = toScreen(x + w / 2, y + h), r = (w / 2) * cam.scale;
+      ctx.strokeStyle = "#5aa83a"; ctx.lineWidth = 12 * cam.scale; ctx.beginPath(); ctx.arc(a, b, r, Math.PI, 0); ctx.stroke();
+      for (let k = 0; k <= 8; k++) { const an = Math.PI + k * Math.PI / 8; ctx.fillStyle = ["#ff7ab8", "#ffd23f", "#fff"][k % 3]; ctx.beginPath(); ctx.arc(a + Math.cos(an) * r, b + Math.sin(an) * r, 6 * cam.scale, 0, 7); ctx.fill(); }
+      break;
+    }
+    case "conservatory": {
+      shadow(x + w / 2, y + h, w * 0.55, 14);
+      R(x, y + 90, w, h - 90, "rgba(200,240,255,0.9)", 6);
+      const [a, b] = toScreen(x + w / 2, y + 96);
+      ctx.fillStyle = "rgba(180,230,255,0.95)"; ctx.beginPath(); ctx.arc(a, b, (w / 2 - 20) * cam.scale, Math.PI, 0); ctx.fill();
+      ctx.strokeStyle = "#7a9ab8"; ctx.lineWidth = 2;
+      for (let k = 1; k < 6; k++) { ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(a + Math.cos(Math.PI + k * Math.PI / 6) * (w / 2 - 20) * cam.scale, b + Math.sin(Math.PI + k * Math.PI / 6) * (w / 2 - 20) * cam.scale); ctx.stroke(); }
+      for (let k = 0; k < 6; k++) C(x + 26 + k * 42, y + h - 30, 14, k % 2 ? "#3f9a4a" : "#5aa83a");
+      C(x + w / 2, y + 60, 26, "#3f9a4a");
+      label("Glass Conservatory", x + w / 2, y + h + 14, 14); break;
+    }
+    case "museum": {
+      shadow(x + w / 2, y + h, w * 0.55, 18);
+      R(x - 20, y + h - 40, w + 40, 40, "#d8d2c4", 4); R(x - 6, y + h - 60, w + 12, 24, "#e4dece", 4);
+      R(x + 10, y + 110, w - 20, h - 170, "#f4efe2", 4);
+      P([[x - 10, y + 116], [x + w / 2, y], [x + w + 10, y + 116]], "#e4dece");
+      P([[x + 30, y + 104], [x + w / 2, y + 26], [x + w - 30, y + 104]], "#f4efe2");
+      for (let k = 0; k < 7; k++) { R(x + 28 + k * (w - 76) / 6, y + 124, 20, h - 190, "#ffffff", 3); R(x + 24 + k * (w - 76) / 6, y + 120, 28, 10, "#d8d2c4", 2); }
+      R(x + w / 2 - 34, y + h - 140, 68, 80, "#6b4128", 30);
+      C(x + w / 2, y + 62, 18, "#ffd23f");
+      label("BOTANICAL MUSEUM", x + w / 2, y + 96, 22, "#6b4128");
+      for (const fx of [x + 10, x + w - 10]) { R(fx - 2, y - 40, 4, 60, "#8a8a8a", 1); P([[fx, y - 40], [fx + 30 * (fx < x + w / 2 ? 1 : -1) + Math.sin(t * 3) * 3, y - 30], [fx, y - 20]], fx < x + w / 2 ? "#ff7ab8" : "#5aa83a"); }
+      break;
+    }
+  }
+}
+function drawMarket(t) {
+  const m = L.market, { x, y, w, h } = m;
+  shadow(x + w / 2, y + h, w * 0.55, 12);
+  R(x + 10, y + 40, w - 20, h - 40, "#c4794a", 6);
+  for (let k = 0; k < 6; k++) P([[x + k * w / 6, y + 40], [x + k * w / 6 + w / 12, y + 10], [x + (k + 1) * w / 6, y + 40]], k % 2 ? "#fff" : "#ff7ab8");
+  R(x, y + 6, w, 10, "#fff", 4);
+  ctx.font = `${Math.round(24 * cam.scale)}px ${EMOJI}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const items = Object.keys(S.basket);
+  items.slice(0, 5).forEach((id, k) => { const [sx, sy] = toScreen(x + 30 + k * 40, y + 66); ctx.fillText(seedById(id).e, sx, sy); });
+  label(items.length ? "Click to sell!" : "Market Stall", x + w / 2, y + h - 12, 15, "#fffbea");
+}
+
+// ---------- strolling visitors and butterflies ----------
+let walkers = [], flutters = [];
+function spawnLife() {
+  const nv = has(12) ? (S.level - 11) * 3 : 0, nb = 2 + S.level;
+  while (walkers.length < nv) walkers.push({ x: rand(L.x0 + 60, L.x1 - 60), y: rand(L.y0 + 60, L.y1 - 60), tx: 0, ty: 0, wait: 0, c: ["#ff7ab8", "#4fa3ff", "#ffd23f", "#7a5cff", "#ff8a3d"][walkers.length % 5], ph: Math.random() * 6 });
+  walkers.length = Math.min(walkers.length, nv);
+  while (flutters.length < nb) flutters.push({ x: rand(L.x0, L.x1), y: rand(L.y0, L.y1), a: Math.random() * 6, c: ["#ff7ab8", "#ffd23f", "#7ad3ff", "#fff"][flutters.length % 4] });
+}
+function rand(a, b) { return a + Math.random() * (b - a); }
+function updateLife(dt) {
+  for (const w of walkers) {
+    if (w.wait > 0) { w.wait -= dt; continue; }
+    const dx = w.tx - w.x, dy = w.ty - w.y, d = Math.hypot(dx, dy);
+    if (d < 3) { w.wait = rand(1, 4); w.tx = rand(L.x0 + 60, L.x1 - 60); w.ty = rand(L.y0 + 60, L.y1 - 60); if (plotAt(w.tx, w.ty) >= 0) w.ty = L.y1 - 80; }
+    else { w.x += dx / d * 40 * dt; w.y += dy / d * 40 * dt; w.ph += dt * 8; }
+  }
+  for (const b of flutters) { b.a += dt * (Math.random() - 0.5) * 3; b.x += Math.cos(b.a) * 40 * dt; b.y += Math.sin(b.a) * 40 * dt; if (b.x < L.x0 || b.x > L.x1 || b.y < L.y0 || b.y > L.y1) b.a += Math.PI; }
+}
+function drawLife(t) {
+  for (const w of walkers) {
+    const [x, y] = toScreen(w.x, w.y), s = cam.scale * 22, st = w.wait > 0 ? 0 : Math.sin(w.ph) * s * 0.15;
+    ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.beginPath(); ctx.ellipse(x, y, s * 0.5, s * 0.15, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = "#4a4560"; ctx.fillRect(x - s * 0.2 + st, y - s * 0.5, s * 0.15, s * 0.5); ctx.fillRect(x + s * 0.05 - st, y - s * 0.5, s * 0.15, s * 0.5);
+    ctx.fillStyle = w.c; ctx.beginPath(); ctx.roundRect(x - s * 0.3, y - s * 1.1, s * 0.6, s * 0.65, s * 0.15); ctx.fill();
+    ctx.fillStyle = "#f1c7a3"; ctx.beginPath(); ctx.arc(x, y - s * 1.3, s * 0.25, 0, 7); ctx.fill();
+  }
+  for (const b of flutters) {
+    const [x, y] = toScreen(b.x, b.y), s = cam.scale * 7, f = Math.abs(Math.sin(t * 14 + b.a));
+    ctx.fillStyle = b.c; ctx.beginPath(); ctx.ellipse(x - s * 0.6, y, s * f, s * 0.7, -0.4, 0, 7); ctx.ellipse(x + s * 0.6, y, s * f, s * 0.7, 0.4, 0, 7); ctx.fill();
+  }
+}
+
+function drawPops(dt) {
+  for (const p of pops) {
+    p.t += dt;
+    let wx = p.x, wy = p.y - p.t * 40;
+    if (p.fly) { const k = Math.min(1, p.t / 0.7); wx = p.x + (L.market.x + L.market.w / 2 - p.x) * k; wy = p.y + (L.market.y + 40 - p.y) * k - Math.sin(k * Math.PI) * 80; }
+    const [x, y] = toScreen(wx, wy);
+    ctx.globalAlpha = Math.max(0, 1 - p.t / (p.fly ? 0.8 : 1.2));
+    ctx.font = p.emoji ? `${Math.round((p.fly ? 30 : 16) * cam.scale)}px ${EMOJI}` : `900 ${Math.max(12, (p.big ? 30 : 18) * cam.scale)}px Nunito, sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = p.color || "#3d4a2e";
+    ctx.fillText(p.text, x, y); ctx.globalAlpha = 1;
+  }
+  pops = pops.filter(p => p.t < (p.fly ? 0.8 : 1.2));
+}
+function drawConfetti(dt) {
+  if (confetti > 0) { for (let i = 0; i < 12 && confetti > 0; i++, confetti--) confettiBits.push({ x: Math.random() * W, y: -10, vx: (Math.random() - 0.5) * 80, vy: 80 + Math.random() * 160, a: Math.random() * 6, c: ["#ff7ab8", "#ffd23f", "#7fd35a", "#4fa3ff", "#ff8a3d"][i % 5] }); }
+  for (const c of confettiBits) { c.x += c.vx * dt; c.y += c.vy * dt; c.a += dt * 6; ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.a); ctx.fillStyle = c.c; ctx.fillRect(-5, -3, 10, 6); ctx.restore(); }
+  confettiBits = confettiBits.filter(c => c.y < H + 20);
+}
+
+// =====================================================================
+// MAIN LOOP
+// =====================================================================
+let last = performance.now(), passiveT = 0, uiT = 0;
+function loop(n) {
+  const dt = Math.min(0.05, (n - last) / 1000); last = n; const t = n / 1000;
+  // smooth camera (zooms out as the farm grows)
+  cam.scale += (cam.tscale - cam.scale) * Math.min(1, dt * 3);
+  cam.cx += (cam.tx - cam.cx) * Math.min(1, dt * 3); cam.cy += (cam.ty - cam.cy) * Math.min(1, dt * 3);
+  // passive income from the orchard and the museum
+  passiveT += dt;
+  if (passiveT >= 1) { passiveT -= 1; const inc = (has(13) ? 1 : 0) + (has(16) ? 5 : 0); if (inc) { S.coins += inc; } }
+  uiT -= dt; if (uiT <= 0) { uiT = 0.5; refreshUI(); updateGuide(); }
+  saveT += dt; if (saveT > 5) { saveT = 0; save(); }
+  if (tipT > 0 && tipT < 900) { tipT -= dt; if (tipT <= 0) $("tip").textContent = ""; }
+  // safety net: never get stuck with no coins
+  if (S.coins < 2 && !S.plots.some(p => p) && !Object.keys(S.basket).length) { S.coins += 10; tip("Grandma sent you 10 coins for seeds. 💌"); }
+  music(dt);
+  spawnLife(); updateLife(dt);
+  drawGrass();
+  const sorted = [...L.decor].sort((a, b) => (a.y + a.h) - (b.y + b.h));
+  for (const d of sorted) drawDecor(d, t);
+  drawPlots(t);
+  drawMarket(t);
+  drawLife(t);
+  drawPops(dt);
+  drawConfetti(dt);
+  requestAnimationFrame(loop);
+}
+
+// =====================================================================
+// INPUT: click / drag to plant, water and pick; drag the grass to look around
+// =====================================================================
+let hover = -1, drag = null;
+function actOn(i, mode) {
+  if (i < 0 || (drag && drag.done.has(i))) return;
+  let ok = false;
+  if (mode === "pick") ok = harvest(i, drag && drag.done.size > 0);
+  else if (mode === "plant") ok = plant(i, drag && drag.done.size > 0);
+  else if (mode === "water") ok = water(i, drag && drag.done.size > 0);
+  if (drag) drag.done.add(i);
+  if (ok) refreshUI();
+}
+canvas.addEventListener("pointerdown", (e) => {
+  audio();
+  const [wx, wy] = toWorld(e.clientX, e.clientY), i = plotAt(wx, wy);
+  const m = L.market;
+  if (i >= 0) {
+    const p = S.plots[i];
+    const mode = ripe(p) ? "pick" : !p ? "plant" : (has(2) && !p.watered) ? "water" : null;
+    if (!mode) { if (p && !has(2)) tip("This plant is still growing. You’ll get a watering can at level 2!"); return; }
+    drag = { mode, done: new Set() }; actOn(i, mode);
+  } else if (wx > m.x && wx < m.x + m.w && wy > m.y && wy < m.y + m.h) { sellAll(); }
+  else { drag = { pan: true, sx: e.clientX, sy: e.clientY, cx: cam.tx, cy: cam.ty }; }
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener("pointermove", (e) => {
+  const [wx, wy] = toWorld(e.clientX, e.clientY);
+  hover = plotAt(wx, wy);
+  if (!drag) return;
+  if (drag.pan) { cam.tx = drag.cx - (e.clientX - drag.sx) / cam.scale; cam.ty = drag.cy - (e.clientY - drag.sy) / cam.scale; cam.cx = cam.tx; cam.cy = cam.ty; return; }
+  actOn(hover, drag.mode);
+});
+canvas.addEventListener("pointerup", () => {
+  if (drag && !drag.pan && drag.done.size > 1) { if (drag.mode === "pick") sfx.pick(); else if (drag.mode === "plant") sfx.plant(); else sfx.water(); }
+  drag = null; save();
+});
+canvas.addEventListener("pointerleave", () => { hover = -1; });
+function zoomBy(f, sx, sy) {
+  const before = sx !== undefined ? toWorld(sx, sy) : null;
+  cam.zoom = Math.min(4, Math.max(0.6, cam.zoom * f));
+  const v = view(), fit = Math.min(v.w / (L.x1 - L.x0), v.h / (L.y1 - L.y0));
+  cam.tscale = Math.min(1.6, fit) * cam.zoom;
+  if (before) { // keep the spot under the mouse in place
+    const v2 = view();
+    cam.tx = before[0] - (sx - v2.x - v2.w / 2) / cam.tscale; cam.ty = before[1] - (sy - v2.y - v2.h / 2) / cam.tscale;
+  } else if (cam.zoom <= 1.001) { cam.tx = (L.x0 + L.x1) / 2; cam.ty = (L.y0 + L.y1) / 2; }
+}
+canvas.addEventListener("wheel", (e) => { e.preventDefault(); zoomBy(e.deltaY < 0 ? 1.12 : 0.89, e.clientX, e.clientY); }, { passive: false });
+$("btnZoomIn").onclick = () => { zoomBy(1.3); cam.tx = L.gx + L.gw / 2; cam.ty = L.gy + L.gh / 2; };
+$("btnZoomOut").onclick = () => zoomBy(1 / 1.3);
+
+$("sell").onclick = sellAll;
+$("tPlant").onclick = () => { let n = 0; S.plots.forEach((p, i) => { if (!p && plant(i, true)) n++; }); if (n) sfx.plant(); else tip("No empty plots, or not enough coins."); refreshUI(); save(); };
+$("tWater").onclick = () => { let n = 0; S.plots.forEach((p, i) => { if (water(i, true)) n++; }); if (n) sfx.water(); else tip("Nothing needs water right now."); save(); };
+$("tHarvest").onclick = () => { let n = 0; S.plots.forEach((p, i) => { if (harvest(i, true)) n++; }); if (n) sfx.pick(); else tip("Nothing is ripe yet."); refreshUI(); save(); };
+$("btnMusic").onclick = () => { audio(); S.music = !S.music; save(); refreshUI(); };
+$("btnHelp").onclick = showHelp;
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeModal();
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= 9) { const sd = SEEDS[n - 1]; if (sd && has(sd.lvl)) { S.sel = sd.id; refreshUI(); } }
+});
+window.addEventListener("beforeunload", save);
+document.addEventListener("visibilitychange", () => { if (document.hidden) save(); });
+
+buildSeeds(); refreshUI();
+if (S.tipStep < 4) {
+  showModal(`<h1>Bloom &amp; Grow</h1><p>Welcome to your very own tiny garden. 🌱</p>
+    <p>Plant seeds, pick what grows, and sell it at your market stall. Every level makes your farm bigger, until it’s as big as a <b>museum</b>!</p>
+    <p>Nothing ever wilts and there’s no rush. Your farm saves by itself.</p>`, `<button id="mOk" type="button">Start gardening</button>`);
+  $("mOk").onclick = () => { audio(); closeModal(); guide(); };
+} else {
+  tip(`Welcome back to ${LEVELS[S.level - 1].name}! 🌼`, 4);
+}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
