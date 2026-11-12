@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Abducted · fake0hs Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #e8f0ff; --panel: rgba(8, 10, 20, 0.92); --accent: #7dff6b; --pink: #ff7ab8; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #04050a; overflow: hidden; font-family: "Nunito", system-ui, sans-serif; color: var(--ink); }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; background: radial-gradient(ellipse at center, rgba(10,30,20,0.6), rgba(0,0,0,0.92)); }
+  #overlay.hidden { display: none; }
+  .card { max-width: 520px; width: 100%; background: var(--panel); border: 2px solid #2b3a2e; border-radius: 16px; padding: 28px; text-align: center; box-shadow: 0 0 60px rgba(125, 255, 107, 0.15); }
+  h1 { font-family: "Creepster", "Impact", cursive; font-weight: 400; font-size: clamp(3rem, 10vw, 5rem); line-height: 1; margin: 0 0 6px; color: var(--accent); letter-spacing: 0.04em; text-shadow: 0 0 24px rgba(125,255,107,0.5); }
+  p { margin: 0 0 12px; line-height: 1.5; }
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; text-align: left; margin: 16px auto; max-width: 340px; font-size: 0.95rem; }
+  .keys b { background: #1b2230; border: 1px solid #3a4560; border-radius: 6px; padding: 1px 8px; font-weight: 900; text-align: center; }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+  button { font: 900 1rem "Nunito", system-ui, sans-serif; cursor: pointer; padding: 12px 22px; border-radius: 12px; border: 2px solid var(--accent); background: var(--accent); color: #08120a; }
+  button.secondary { background: transparent; color: var(--ink); border-color: #3a4560; }
+  button:focus-visible, .exit-btn:focus-visible { outline: 3px solid var(--pink); outline-offset: 3px; }
+  .note { font-size: 0.85rem; opacity: 0.7; }
+  .exit-btn {
+    position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); right: 16px; z-index: 30;
+    font: 800 0.95rem "Nunito", system-ui, sans-serif; color: #e8f0ff; text-decoration: none;
+    background: rgba(8, 10, 20, 0.8); border: 2px solid rgba(232, 240, 255, 0.6); border-radius: 99px; padding: 7px 16px;
+  }
+  .exit-btn:hover { background: #8a1f2a; border-color: #fff; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="overlay">
+  <div class="card" id="card">
+    <h1>Abducted</h1>
+    <p>Every night the farmer’s animals vanished from a yard with no way out. So he stayed up to watch… and woke up on an alien spaceship.</p>
+    <p>Sneak through the ship, find keycards and tools, and take control of the ship to escape. If an alien spots you, you’re caught.</p>
+    <div class="keys">
+      <b>WASD / Arrows</b><span>Move</span>
+      <b>E</b><span>Use, pick up, hide in closets</span>
+      <b>Space</b><span>Break free / fire the stun gun</span>
+    </div>
+    <p class="note">Turn your sound on. Best played with headphones… if you dare.</p>
+    <div class="row"><button id="btnStart">Start</button><button id="btnSkip" class="secondary">Skip the intro</button></div>
+  </div>
+</div>
+<a class="exit-btn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
+
+<script>
+(function () {
+"use strict";
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const overlay = document.getElementById("overlay");
+const card = document.getElementById("card");
+let W = 0, H = 0, T = 48; // T = tile size in pixels
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  T = Math.round(Math.max(34, Math.min(62, H / 11.5)));
+  shade.width = W; shade.height = H;
+}
+const shade = document.createElement("canvas"), sctx = shade.getContext("2d");
+window.addEventListener("resize", resize);
+resize();
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rand = (a, b) => a + Math.random() * (b - a);
+const srand = (i) => { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
+
+// =====================================================================
+// SETTINGS (easy to tweak)
+// =====================================================================
+const PLAYER_SPEED = 3.3;     // tiles per second
+const ALIEN_PATROL = 1.5;     // alien walking speed
+const ALIEN_HUNT = 2.7;       // alien speed when hunting you
+const VIEW_RANGE = 4.6;       // how far aliens can see (tiles)
+const VIEW_ANGLE = 34;        // half of the aliens' view cone, in degrees
+const LIGHT_RADIUS = 5.2;     // how far your own light reaches (tiles)
+const STUN_TIME = 7;          // seconds an alien stays stunned
+const STUN_RANGE = 5;         // stun gun range (tiles)
+
+// =====================================================================
+// AUDIO (all synthesized)
+// =====================================================================
+let actx = null, master = null, noiseBuf = null, hum = null, siren = null;
+function audio() {
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
+    master = actx.createGain(); master.gain.value = 0.9;
+    const comp = actx.createDynamicsCompressor(); master.connect(comp).connect(actx.destination);
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+const now = () => actx ? actx.currentTime : 0;
+function env(g, t, peak, a, d) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
+function osc(type, f, t, d, peak, a = 0.005, fEnd) {
+  if (!audio()) return;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); if (fEnd) o.frequency.exponentialRampToValueAtTime(fEnd, t + d);
+  env(g, t, peak, a, d); o.connect(g).connect(master); o.start(t); o.stop(t + a + d + 0.05);
+}
+function noise(t, d, peak, type, f, q = 1, a = 0.003) {
+  if (!audio()) return;
+  const s = actx.createBufferSource(), fl = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = noiseBuf; s.loop = true; fl.type = type; fl.frequency.value = f; fl.Q.value = q;
+  env(g, t, peak, a, d); s.connect(fl).connect(g).connect(master); s.start(t); s.stop(t + a + d + 0.05);
+}
+const sfx = {
+  clang() { const t = now(); [220, 347, 513, 761, 1130].forEach((f, i) => osc("sine", f, t, 1.8 - i * 0.2, 0.25 / (i + 1) + 0.05)); noise(t, 0.4, 0.5, "bandpass", 2500, 2); },
+  snap() { const t = now(); noise(t, 0.12, 0.5, "highpass", 2500); osc("square", 900, t, 0.08, 0.08, 0.002, 300); },
+  tug() { const t = now(); noise(t, 0.08, 0.2, "bandpass", 1200, 3); },
+  pickup() { const t = now(); osc("sine", 880, t, 0.12, 0.15); osc("sine", 1320, t + 0.08, 0.2, 0.15); },
+  key() { const t = now(); [660, 880, 1100].forEach((f, i) => osc("triangle", f, t + i * 0.07, 0.2, 0.12)); },
+  door() { const t = now(); noise(t, 0.35, 0.12, "lowpass", 700, 0.5, 0.05); },
+  denied() { const t = now(); osc("square", 180, t, 0.15, 0.08); osc("square", 140, t + 0.17, 0.2, 0.08); },
+  glass() { const t = now(); noise(t, 0.5, 0.6, "highpass", 3000); for (let i = 0; i < 8; i++) osc("sine", rand(2500, 6000), t + rand(0, 0.4), 0.15, 0.05); },
+  zap() { const t = now(); osc("sawtooth", 1400, t, 0.35, 0.18, 0.002, 200); noise(t, 0.25, 0.25, "bandpass", 4000, 1); },
+  step() { const t = now(); noise(t, 0.05, 0.05, "bandpass", 400, 1.5); },
+  closet() { const t = now(); noise(t, 0.15, 0.2, "bandpass", 300, 1); osc("square", 90, t, 0.1, 0.06); },
+  spotted() { const t = now(); osc("sawtooth", 300, t, 0.25, 0.25, 0.002, 1200); },
+  scream() {
+    const t = now();
+    osc("sawtooth", 900, t, 1.1, 0.5, 0.01, 120); osc("square", 640, t, 1.0, 0.3, 0.01, 90);
+    noise(t, 1.2, 0.8, "bandpass", 1800, 0.6, 0.01); noise(t, 0.6, 0.6, "lowpass", 200, 0.7, 0.005);
+  },
+  heartbeat(v) { const t = now(); osc("sine", 60, t, 0.14, 0.5 * v, 0.004, 40); osc("sine", 55, t + 0.18, 0.12, 0.35 * v, 0.004, 38); },
+  bang() { const t = now(); noise(t, 0.3, 0.6, "lowpass", 300, 0.8); osc("sine", 70, t, 0.3, 0.4, 0.003, 40); },
+  console() { const t = now(); [523, 659, 784].forEach((f, i) => osc("square", f, t + i * 0.06, 0.08, 0.05)); },
+  win() { const t = now(); [392, 523, 659, 784, 1047].forEach((f, i) => osc("triangle", f, t + i * 0.14, 0.4, 0.12)); }
+};
+function startHum() {
+  if (!audio() || hum) return;
+  const g = actx.createGain(); g.gain.value = 0.05; g.connect(master);
+  const a = actx.createOscillator(), b = actx.createOscillator();
+  a.type = "sine"; a.frequency.value = 55; b.type = "triangle"; b.frequency.value = 55.7;
+  a.connect(g); b.connect(g); a.start(); b.start();
+  hum = { g, a, b };
+}
+function sirenOn(on) {
+  if (!audio()) return;
+  if (on && !siren) {
+    const o = actx.createOscillator(), lfo = actx.createOscillator(), lg = actx.createGain(), g = actx.createGain();
+    o.type = "square"; o.frequency.value = 720; lfo.frequency.value = 1.4; lg.gain.value = 180;
+    lfo.connect(lg).connect(o.frequency); g.gain.value = 0.035; o.connect(g).connect(master);
+    o.start(); lfo.start(); siren = { o, lfo, g };
+  } else if (!on && siren) {
+    siren.g.gain.setTargetAtTime(0.0001, now(), 0.2);
+    const s = siren; setTimeout(() => { s.o.stop(); s.lfo.stop(); }, 800); siren = null;
+  }
+}
+
+// =====================================================================
+// THE SHIP: three decks
+// Legend: # wall  . floor  D door  R/B/G red/blue/gold keycard doors  L lift
+//         C closet (hide)  A alarm  K console  P specimen pod  X glass case
+//         M main ship console  O window  @/S spawn  h hammer  z stun gun  e battery  g gold keycard
+// =====================================================================
+const DECKS = [
+  {
+    name: "Deck 1 · Holding Cells", intro: true,
+    map: [
+      "##################################",
+      "#.....#........#........#........#",
+      "#.....#........#...h....#........#",
+      "#..@..#........#........#....X...#",
+      "#.....#....C...#........#.K......#",
+      "###D#####D#A#####D#########D######",
+      "#................................#",
+      "#................................#",
+      "#C..............................C#",
+      "###D########D#########D######R####",
+      "#.......#........#.........#.....#",
+      "#.......#........#....K....#..L..#",
+      "#...C...#...C....#.........#.....#",
+      "#.......#........#.........#.....#",
+      "#.......#........#..K...C..#.....#",
+      "#.......#........#.........#.....#",
+      "##################################"],
+    cases: { "29,3": "red" },
+    aliens: [
+      { id: "alarm", start: [20, 7], route: [[3, 7], [5, 12], [12, 13], [12, 7]], speed: ALIEN_PATROL, color: "#ff8fc4" },
+      { start: [31, 7], route: [[31, 7], [15, 7]], speed: 1.35, color: "#ff7ab8" },
+      { start: [20, 2], route: [[20, 2], [17, 6], [27, 6], [30, 1], [27, 6], [17, 6]], speed: 1.35, color: "#f46aa8" }
+    ],
+    logs: {
+      "26,4": "SECURITY LOG: Specimen 214 (one human, male, wearing a straw hat) secured with plastic restraints. They’re perfectly strong enough. Probably.",
+      "22,11": "MENU: Today’s lunch is… chicken? No. CHICKENS ARE SPECIMENS. Do not eat the specimens.",
+      "20,14": "CREW NOTE: Whoever keeps leaving their nose prints on the windows, please stop."
+    }
+  },
+  {
+    name: "Deck 2 · Specimen Lab",
+    map: [
+      "##################################",
+      "#........#..........#............#",
+      "#..P.P.P.#...z......#...P....P...#",
+      "#........#..........#............#",
+      "#..P.P.P.#....C.....#...P....P...#",
+      "#........#..........#............#",
+      "####D#######D############D########",
+      "#................................#",
+      "#S..............................C#",
+      "#................................#",
+      "######D########D#######D#####B####",
+      "#.........#..........#......#....#",
+      "#...C.....#...K..K...#......#.L..#",
+      "#.........#..........#......#....#",
+      "#...P.P...#....e.....#..X...#....#",
+      "#.........#....C.....#......#....#",
+      "##################################"],
+    cases: { "24,14": "blue" },
+    aliens: [
+      { start: [30, 8], route: [[31, 8], [3, 8]], speed: 1.6, color: "#ff7ab8" },
+      { start: [8, 3], route: [[1, 3], [8, 3], [8, 5], [1, 5]], speed: 1.3, color: "#f46aa8" },
+      { start: [12, 11], route: [[11, 11], [20, 13], [11, 15]], speed: 1.3, color: "#ff8fc4" },
+      { start: [27, 15], route: [[22, 11], [27, 15]], speed: 1.2, color: "#ff7ab8" }
+    ],
+    logs: {
+      "14,12": "LAB LOG: Earth cows produce milk. We tried asking politely. Results: moo.",
+      "17,12": "LAB LOG: The chickens have organized. They have a leader. It is very loud."
+    }
+  },
+  {
+    name: "Deck 3 · Command Deck",
+    map: [
+      "##################################",
+      "#.........#...........#..........#",
+      "#...K.K...#....g......#....K.....#",
+      "#.........#...........#..........#",
+      "#.C.......#.......C...#..........#",
+      "####D#########D##########D########",
+      "#................................#",
+      "#S..............................C#",
+      "#................................#",
+      "######D########D#####G############",
+      "#..........#........#............#",
+      "#...C......#...K....#............#",
+      "#..........#........#......M.....#",
+      "#......e...#...C....#............#",
+      "#..........#........#............#",
+      "#..........#........#............#",
+      "#####################OOOOOOOOOOOO#"],
+    cases: {},
+    checkpoint: [21, 10],
+    aliens: [
+      { start: [12, 1], route: [[12, 1], [20, 1], [20, 3], [12, 3]], speed: 1.25, color: "#ff5a9a", captain: true },
+      { start: [30, 7], route: [[3, 7], [31, 7]], speed: 1.6, color: "#ff7ab8" },
+      { start: [18, 8], route: [[31, 8], [3, 6]], speed: 1.4, color: "#f46aa8" },
+      { start: [2, 11], route: [[2, 11], [9, 14], [2, 14]], speed: 1.2, color: "#ff8fc4" },
+      { start: [23, 11], route: [[23, 11], [31, 11], [31, 15], [23, 15]], speed: 1.15, color: "#ff7ab8" }
+    ],
+    logs: {
+      "4,2": "CAPTAIN’S ORDERS: Collect ALL Earth animals. Especially the fluffy ones.",
+      "6,2": "NAV: Course set for home planet. Estimated arrival: 3 Earth days.",
+      "27,2": "CREW ROSTER: 47 crew members. 47 very big noses.",
+      "15,11": "HELP DESK: To fly the ship, use the main console on the bridge. Instructions: push buttons. Fast."
+    }
+  }
+];
+const SOLID = "#ACPKXMO";
+
+// =====================================================================
+// GAME STATE
+// =====================================================================
+let mode = "menu";       // menu | intro | play | scare | dead | qte | fade | ending
+let deckIdx = 0, grid = [], MW = 34, MH = 17;
+let items = [], aliens = [], player = null, inv = null, snapshot = null, spawn = null;
+let graceT = 0, msg = null, banner = null, scareT = 0, scareAlien = null, fadeT = 0, deaths = 0, startTime = 0;
+let alarm = { on: false, t: 0 }, scripted = null, heartT = 0, stepT = 0, bridgeReached = false;
+let introSlide = 0, introT = 0, endSlide = 0, endT = 0, qte = null, shakeT = 0;
+const keys = {};
+
+function freshInv() { return { hammer: false, red: false, blue: false, gold: false, zapper: false, charges: 0 }; }
+const ITEM_NAMES = { h: "Hammer", z: "Stun gun", e: "Battery", g: "Gold keycard", red: "Red keycard", blue: "Blue keycard" };
+
+function loadDeck(i, fromSnapshot) {
+  deckIdx = i;
+  const d = DECKS[i];
+  grid = d.map.map(r => r.split(""));
+  MH = grid.length; MW = grid[0].length;
+  items = [];
+  let sp = null;
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+    const c = grid[y][x];
+    if (c === "@" || c === "S") { sp = [x, y]; grid[y][x] = "."; }
+    if ("hzeg".includes(c)) { items.push({ x, y, type: c }); grid[y][x] = "."; }
+  }
+  if (!fromSnapshot) { spawn = sp; snapshot = JSON.parse(JSON.stringify(inv)); }
+  inv = JSON.parse(JSON.stringify(snapshot));
+  // remove things the player already owns; open glass cases already emptied
+  items = items.filter(it => !((it.type === "h" && inv.hammer) || (it.type === "z" && inv.zapper) || (it.type === "g" && inv.gold)));
+  for (const k in d.cases) if (inv[d.cases[k]]) { const [x, y] = k.split(",").map(Number); grid[y][x] = "."; }
+  aliens = d.aliens.map(a => ({
+    ...a, x: a.start[0] + 0.5, y: a.start[1] + 0.5, dir: 0, wp: 0, path: [], state: "patrol",
+    stun: 0, spotT: 0, searchT: 0, phase: Math.random() * 6
+  }));
+  player = { x: spawn[0] + 0.5, y: spawn[1] + 0.5, dir: -Math.PI / 2, hidden: null, chained: d.intro && !fromSnapshotChains(), breakCount: 0, walkT: 0 };
+  alarm = { on: false, t: 0 }; sirenOn(false);
+  scripted = d.intro && !snapshot.introDone ? { stage: "chains" } : null;
+  if (!scripted && d.intro) player.chained = false;
+  bridgeReached = false; graceT = 2;
+  banner = { text: d.name, t: 0 };
+}
+function fromSnapshotChains() { return snapshot && snapshot.introDone; }
+
+// =====================================================================
+// MAP HELPERS
+// =====================================================================
+const tileAt = (x, y) => (x < 0 || y < 0 || x >= MW || y >= MH) ? "#" : grid[y][x];
+function blocked(tx, ty, who) {
+  const c = tileAt(tx, ty);
+  if (SOLID.includes(c)) return true;
+  if (who === "player") {
+    if (c === "R" && !inv.red) return true;
+    if (c === "B" && !inv.blue) return true;
+    if (c === "G" && !inv.gold) return true;
+  }
+  return false;
+}
+function bfs(sx, sy, tx, ty) {
+  const key = (x, y) => y * MW + x;
+  const prev = new Map(); prev.set(key(sx, sy), -1);
+  const q = [[sx, sy]];
+  while (q.length) {
+    const [x, y] = q.shift();
+    if (x === tx && y === ty) break;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, k = key(nx, ny);
+      if (prev.has(k) || blocked(nx, ny, "alien")) continue;
+      prev.set(k, key(x, y)); q.push([nx, ny]);
+    }
+  }
+  if (!prev.has(key(tx, ty))) return [];
+  const path = []; let k = key(tx, ty);
+  while (k !== -1 && k !== key(sx, sy)) { path.push([k % MW + 0.5, Math.floor(k / MW) + 0.5]); k = prev.get(k); }
+  return path.reverse();
+}
+function lineClear(x0, y0, x1, y1) {
+  const d = Math.hypot(x1 - x0, y1 - y0), n = Math.ceil(d / 0.15);
+  for (let i = 1; i < n; i++) {
+    const x = x0 + (x1 - x0) * i / n, y = y0 + (y1 - y0) * i / n;
+    const c = tileAt(Math.floor(x), Math.floor(y));
+    if (SOLID.includes(c) && c !== "P" && c !== "X") return false;
+  }
+  return true;
+}
+function rayLen(x, y, ang, max) {
+  const dx = Math.cos(ang) * 0.12, dy = Math.sin(ang) * 0.12;
+  let d = 0;
+  while (d < max) {
+    x += dx; y += dy; d += 0.12;
+    const c = tileAt(Math.floor(x), Math.floor(y));
+    if (SOLID.includes(c) && c !== "P" && c !== "X") return d;
+  }
+  return max;
+}
+const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
+
+function canSee(a) {
+  if (a.stun > 0 || player.hidden || graceT > 0) return false;
+  const dx = player.x - a.x, dy = player.y - a.y, d = Math.hypot(dx, dy);
+  if (d < 0.7) return true;  // bumped right into it
+  if (d > VIEW_RANGE) return false;
+  if (Math.abs(angDiff(Math.atan2(dy, dx), a.dir)) > VIEW_ANGLE * Math.PI / 180) return false;
+  return lineClear(a.x, a.y, player.x, player.y);
+}
+
+function say(text, time = 3.5) { msg = { text, t: 0, life: time }; }
+
+// =====================================================================
+// UPDATE
+// =====================================================================
+function moveToward(a, tx, ty, speed, dt) {
+  const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy);
+  if (d < 0.02) return true;
+  const want = Math.atan2(dy, dx);
+  a.dir += angDiff(want, a.dir) * Math.min(1, dt * 10);
+  const st = Math.min(d, speed * dt);
+  a.x += dx / d * st; a.y += dy / d * st;
+  a.phase += dt * speed * 6;
+  return st >= d;
+}
+function goTo(a, tx, ty) { a.path = bfs(Math.floor(a.x), Math.floor(a.y), tx, ty); }
+
+function updateAlien(a, dt) {
+  if (a.stun > 0) { a.stun -= dt; return; }
+  if (a.state === "spot") return;
+  if (a.state === "notice") { a.dir += angDiff(Math.atan2(player.y - a.y, player.x - a.x), a.dir) * Math.min(1, dt * 8); return; }
+  if (a.state === "search") {
+    a.searchT -= dt; a.dir += dt * 2.2;
+    if (a.searchT <= 0) { a.state = "patrol"; a.path = []; }
+  } else if (a.path.length) {
+    const sp = a.state === "patrol" ? a.speed : ALIEN_HUNT;
+    if (moveToward(a, a.path[0][0], a.path[0][1], sp, dt)) a.path.shift();
+    if (!a.path.length) {
+      if (a.state === "alarmRun") {
+        alarm.on = true; alarm.t = 22; sirenOn(true); shakeT = 0.3;
+        say("The alien pulled the alarm! HIDE in a closet! (walk up to one and press E)", 5);
+        a.state = "hunt"; a.dir = -Math.PI / 2;
+        const tx = Math.floor(player.x), ty = Math.floor(player.y);
+        setTimeout(() => { if (a.state === "hunt") { goTo(a, tx, ty); if (!a.path.length) { a.state = "search"; a.searchT = 3.5; } } }, 700);
+      } else if (a.state === "hunt") { a.state = "search"; a.searchT = 3.5; }
+    }
+  } else if (a.state === "patrol") {
+    const r = a.route[a.wp % a.route.length]; a.wp++;
+    goTo(a, r[0], r[1]);
+  }
+  if (a.state !== "alarmRun" && a.state !== "notice" && canSee(a)) {
+    a.state = "spot"; a.spotT = 0.45; a.dir = Math.atan2(player.y - a.y, player.x - a.x);
+    sfx.spotted(); scareAlien = a;
+  }
+}
+
+function tryMove(dx, dy) {
+  const r = 0.28;
+  const nx = player.x + dx;
+  if (!blocked(Math.floor(nx + Math.sign(dx) * r), Math.floor(player.y - r), "player") && !blocked(Math.floor(nx + Math.sign(dx) * r), Math.floor(player.y + r), "player")) player.x = nx;
+  const ny = player.y + dy;
+  if (!blocked(Math.floor(player.x - r), Math.floor(ny + Math.sign(dy) * r), "player") && !blocked(Math.floor(player.x + r), Math.floor(ny + Math.sign(dy) * r), "player")) player.y = ny;
+}
+
+function interact() {
+  if (player.hidden) {
+    player.x = player.hidden.out[0]; player.y = player.hidden.out[1]; player.hidden = null; sfx.closet(); return;
+  }
+  if (player.chained) return;
+  const px = Math.floor(player.x), py = Math.floor(player.y);
+  let best = null, bd = 9;
+  for (let y = py - 1; y <= py + 1; y++) for (let x = px - 2; x <= px + 2; x++) {
+    const c = tileAt(x, y);
+    if (!"CXKAM".includes(c)) continue;
+    const d = Math.hypot(x + 0.5 - player.x, y + 0.5 - player.y);
+    if (d < bd && d < (c === "M" ? 2.1 : 1.45)) { bd = d; best = { x, y, c }; }
+  }
+  if (!best) return;
+  const k = best.x + "," + best.y;
+  if (best.c === "C") {
+    player.hidden = { x: best.x, y: best.y, out: [player.x, player.y] };
+    player.x = best.x + 0.5; player.y = best.y + 0.5;
+    sfx.closet(); say("You’re hiding. Press E to come out.", 2.5);
+  } else if (best.c === "X") {
+    if (!inv.hammer) { sfx.denied(); say("The glass is too thick to open. You need something to smash it with."); return; }
+    grid[best.y][best.x] = ".";
+    const content = DECKS[deckIdx].cases[k];
+    if (content) items.push({ x: best.x, y: best.y, type: content });
+    sfx.glass(); shakeT = 0.2; say("CRASH! The glass shatters.");
+    for (const a of aliens) if (a.stun <= 0 && a.state === "patrol" && Math.hypot(a.x - player.x, a.y - player.y) < 7) { a.state = "hunt"; goTo(a, best.x, best.y + 1); if (!a.path.length) { a.state = "search"; a.searchT = 2; } }
+  } else if (best.c === "K") {
+    sfx.console(); say(DECKS[deckIdx].logs[k] || "The screen shows strange alien writing. Lots of noses.", 6);
+  } else if (best.c === "A") {
+    say("The alarm lever. Better not touch it.");
+  } else if (best.c === "M") {
+    startQte();
+  }
+}
+
+function fireZapper() {
+  if (!inv.zapper || player.hidden || player.chained) return;
+  if (inv.charges <= 0) { sfx.denied(); say("The stun gun is out of charge. Find a battery."); return; }
+  inv.charges--; sfx.zap();
+  zapFx = { t: 0, x: player.x, y: player.y, dir: player.dir, len: STUN_RANGE };
+  let hit = null, hd = 99;
+  for (const a of aliens) {
+    const dx = a.x - player.x, dy = a.y - player.y, d = Math.hypot(dx, dy);
+    if (d > STUN_RANGE || Math.abs(angDiff(Math.atan2(dy, dx), player.dir)) > 0.4) continue;
+    if (!lineClear(player.x, player.y, a.x, a.y)) continue;
+    if (d < hd) { hd = d; hit = a; }
+  }
+  if (hit) { hit.stun = STUN_TIME; hit.state = "patrol"; hit.path = []; zapFx.len = hd; say("Zapped! It’s stunned for a few seconds. Sneak past!"); }
+}
+let zapFx = null;
+
+function pickUp(it) {
+  if (it.type === "h") { inv.hammer = true; say("You found a HAMMER. That could smash some glass…"); sfx.pickup(); }
+  if (it.type === "z") { inv.zapper = true; inv.charges += 3; say("You found a STUN GUN with 3 charges! Press SPACE to zap an alien in front of you."); sfx.pickup(); }
+  if (it.type === "e") { inv.charges += 2; say("Battery! +2 stun gun charges."); sfx.pickup(); }
+  if (it.type === "red") { inv.red = true; say("RED KEYCARD! It opens red doors."); sfx.key(); }
+  if (it.type === "blue") { inv.blue = true; say("BLUE KEYCARD! It opens blue doors."); sfx.key(); }
+  if (it.type === "g") { inv.gold = true; say("The captain’s GOLD KEYCARD! It opens the bridge."); sfx.key(); }
+}
+
+function objective() {
+  if (deckIdx === 0) {
+    if (player.chained) return "Break free! Tap SPACE fast";
+    if (scripted && scripted.stage !== "done") return "Get out of the cell";
+    if (!inv.hammer) return "Find something to smash glass with";
+    if (!inv.red) return "Smash the glass case in the security office";
+    return "Take the lift behind the red door";
+  }
+  if (deckIdx === 1) {
+    if (!inv.zapper) return "Find a weapon in the lab";
+    if (!inv.blue) return "Get the blue keycard from the glass case";
+    return "Take the lift behind the blue door";
+  }
+  if (!inv.gold) return "Steal the gold keycard from the captain’s quarters";
+  if (!bridgeReached) return "Get to the bridge (gold door)";
+  return "Take control of the ship at the main console";
+}
+
+function update(dt) {
+  if (msg) { msg.t += dt; if (msg.t > msg.life) msg = null; }
+  if (banner) { banner.t += dt; if (banner.t > 3) banner = null; }
+  if (zapFx) { zapFx.t += dt; if (zapFx.t > 0.25) zapFx = null; }
+  shakeT = Math.max(0, shakeT - dt);
+
+  if (mode === "fade") { fadeT += dt; if (fadeT > 1.2) { mode = "play"; } return; }
+  if (mode === "scare") { scareT += dt; if (scareT > 1.5) { mode = "dead"; showDead(); } return; }
+  if (mode === "qte") { updateQte(dt); updateAliensOnly(dt); return; }
+  if (mode !== "play") return;
+
+  graceT = Math.max(0, graceT - dt);
+  if (alarm.on) { alarm.t -= dt; if (alarm.t <= 0) { alarm.on = false; sirenOn(false); say("The alarm went quiet… for now."); } }
+
+  // movement
+  if (!player.chained && !player.hidden) {
+    let mx = 0, my = 0;
+    if (keys.ArrowLeft || keys.a || keys.A) mx -= 1;
+    if (keys.ArrowRight || keys.d || keys.D) mx += 1;
+    if (keys.ArrowUp || keys.w || keys.W) my -= 1;
+    if (keys.ArrowDown || keys.s || keys.S) my += 1;
+    if (mx || my) {
+      const l = Math.hypot(mx, my); mx /= l; my /= l;
+      player.dir = Math.atan2(my, mx);
+      tryMove(mx * PLAYER_SPEED * dt, my * PLAYER_SPEED * dt);
+      player.walkT += dt * 10;
+      stepT -= dt; if (stepT <= 0) { sfx.step(); stepT = 0.32; }
+    }
+  }
+
+  // pick up items
+  for (const it of items.slice()) {
+    if (Math.hypot(it.x + 0.5 - player.x, it.y + 0.5 - player.y) < 0.6) { items.splice(items.indexOf(it), 1); pickUp(it); }
+  }
+
+  const ptx = Math.floor(player.x), pty = Math.floor(player.y);
+  // checkpoint
+  const cp = DECKS[deckIdx].checkpoint;
+  if (cp && !bridgeReached && ptx === cp[0] && pty === cp[1]) {
+    bridgeReached = true; spawn = [cp[0], cp[1]]; snapshot = JSON.parse(JSON.stringify(inv)); snapshot.introDone = true;
+    say("CHECKPOINT: You made it to the bridge!");
+  }
+  // lift
+  if (tileAt(ptx, pty) === "L") {
+    if (deckIdx < DECKS.length - 1) {
+      sfx.door(); inv.introDone = true; snapshot = JSON.parse(JSON.stringify(inv));
+      loadDeck(deckIdx + 1, false); mode = "fade"; fadeT = 0;
+      return;
+    }
+  }
+
+  // intro script on deck 1
+  if (scripted) {
+    if (scripted.stage === "free" && pty >= 6) {
+      scripted.stage = "noticed";
+      const a = aliens.find(x => x.id === "alarm");
+      a.state = "notice"; a.path = [];
+      say("Uh oh. A short pink alien with a HUGE nose has seen you!", 3);
+      setTimeout(() => { a.state = "alarmRun"; goTo(a, 11, 6); }, 900);
+    }
+    if (scripted.stage === "noticed" && alarm.on) { scripted.stage = "done"; inv.introDone = true; snapshot.introDone = true; }
+  }
+
+  // aliens
+  updateAliensOnly(dt);
+
+  // heartbeat when an alien is close
+  let nearest = 99;
+  for (const a of aliens) if (a.stun <= 0) nearest = Math.min(nearest, Math.hypot(a.x - player.x, a.y - player.y));
+  if (nearest < 6) {
+    heartT -= dt;
+    if (heartT <= 0) { sfx.heartbeat(clamp(1 - nearest / 6, 0.2, 1)); heartT = 0.45 + nearest * 0.12; }
+  }
+}
+function updateAliensOnly(dt) {
+  for (const a of aliens) {
+    if (a.state === "spot") {
+      a.spotT -= dt;
+      if (a.spotT <= 0 && mode !== "scare") { startScare(a); }
+      continue;
+    }
+    if (scripted && scripted.stage === "chains" && a.id === "alarm") continue; // waits for you
+    if (scripted && scripted.stage === "free" && a.id === "alarm") continue;
+    updateAlien(a, dt);
+  }
+}
+
+function startScare(a) {
+  mode = "scare"; scareT = 0; scareAlien = a; deaths++;
+  sfx.scream(); sirenOn(false);
+}
+function showDead() {
+  overlay.classList.remove("hidden");
+  const lines = ["The alien grabbed you with its tiny pink hands.", "So much nose. So close to your face.", "You got caught! The aliens drag you back…", "BOOP. Caught by a nose."];
+  card.innerHTML = `<h1>Caught!</h1><p>${lines[Math.floor(Math.random() * lines.length)]}</p>
+    <p>You’ll start again at this deck’s spawn point${bridgeReached ? " on the bridge" : ""}.</p>
+    <div class="row"><button id="btnRespawn">Try again</button></div>`;
+  document.getElementById("btnRespawn").onclick = respawn;
+  document.getElementById("btnRespawn").focus();
+}
+function respawn() {
+  overlay.classList.add("hidden");
+  msg = null; scareAlien = null;
+  loadDeck(deckIdx, true);
+  if (bridgeReachedSnapshot()) bridgeReached = true;
+  mode = "play"; startHum();
+}
+function bridgeReachedSnapshot() { const cp = DECKS[deckIdx].checkpoint; return cp && spawn[0] === cp[0] && spawn[1] === cp[1]; }
+
+// ---------- final escape: take control of the ship ----------
+const ARROWS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+const ARROW_GLYPH = { ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→" };
+function startQte() {
+  if (!inv.gold) return;
+  mode = "qte"; sfx.console();
+  qte = { seq: Array.from({ length: 7 }, () => ARROWS[Math.floor(Math.random() * 4)]), i: 0, t: 2.2, bangT: 0.6, flash: 0 };
+  say("Hit the arrow keys as they appear to fly the ship!", 3);
+}
+function updateQte(dt) {
+  qte.t -= dt; qte.bangT -= dt; qte.flash = Math.max(0, qte.flash - dt * 3);
+  if (qte.bangT <= 0) { sfx.bang(); shakeT = 0.15; qte.bangT = 0.9 - qte.i * 0.08; }
+  if (qte.t <= 0) failQte();
+}
+function qteKey(k) {
+  if (!ARROWS.includes(k)) return;
+  if (k === qte.seq[qte.i]) {
+    qte.i++; qte.flash = 1; sfx.console(); qte.t = Math.max(1.3, 2.2 - qte.i * 0.12);
+    if (qte.i >= qte.seq.length) { mode = "ending"; endSlide = 0; endT = 0; sirenOn(false); sfx.win(); }
+  } else failQte();
+}
+function failQte() {
+  const a = aliens[aliens.length - 1];
+  a.x = player.x + 0.8; a.y = player.y; startScare(a);
+}
+
+// =====================================================================
+// DRAWING: the ship
+// =====================================================================
+let camX = 0, camY = 0;
+function drawWorld(t) {
+  const px = player.x * T, py = player.y * T;
+  camX = clamp(px - W / 2, -T, MW * T - W + T); camY = clamp(py - H / 2, -T, MH * T - H + T);
+  if (MW * T < W) camX = (MW * T - W) / 2;
+  if (MH * T < H) camY = (MH * T - H) / 2;
+  const sx = shakeT > 0 ? (Math.random() - 0.5) * 14 : 0, sy = shakeT > 0 ? (Math.random() - 0.5) * 14 : 0;
+  ctx.save(); ctx.translate(-camX + sx, -camY + sy);
+  ctx.fillStyle = "#04050a"; ctx.fillRect(camX - 20, camY - 20, W + 40, H + 40);
+  const x0 = Math.max(0, Math.floor(camX / T) - 1), x1 = Math.min(MW - 1, Math.ceil((camX + W) / T) + 1);
+  const y0 = Math.max(0, Math.floor(camY / T) - 1), y1 = Math.min(MH - 1, Math.ceil((camY + H) / T) + 1);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) drawTile(x, y, grid[y][x], t);
+  for (const it of items) drawItem(it, t);
+  // aliens' flashlight beams
+  ctx.save(); ctx.globalCompositeOperation = "lighter";
+  for (const a of aliens) if (a.stun <= 0) drawBeam(a);
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawTile(x, y, c, t) {
+  const X = x * T, Y = y * T;
+  // floor everywhere first
+  if (c !== "#" && c !== "O") {
+    ctx.fillStyle = (x + y) % 2 ? "#1a1e2b" : "#1d2130"; ctx.fillRect(X, Y, T, T);
+    ctx.strokeStyle = "rgba(120,140,180,0.08)"; ctx.lineWidth = 1; ctx.strokeRect(X + 0.5, Y + 0.5, T - 1, T - 1);
+    ctx.fillStyle = "rgba(120,140,180,0.12)"; ctx.fillRect(X + 3, Y + 3, 2, 2); ctx.fillRect(X + T - 5, Y + T - 5, 2, 2);
+  }
+  switch (c) {
+    case "#": {
+      ctx.fillStyle = "#2c3246"; ctx.fillRect(X, Y, T, T);
+      ctx.fillStyle = "#3a4260"; ctx.fillRect(X, Y, T, T * 0.22);
+      ctx.fillStyle = "#232838"; ctx.fillRect(X, Y + T * 0.85, T, T * 0.15);
+      if (srand(x * 31 + y * 7) > 0.85) { ctx.fillStyle = "#7dff6b"; ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * 3 + x); ctx.fillRect(X + T * 0.45, Y + T * 0.45, 4, 4); ctx.globalAlpha = 1; }
+      break;
+    }
+    case "O": {
+      ctx.fillStyle = "#2c3246"; ctx.fillRect(X, Y, T, T);
+      ctx.fillStyle = "#020310"; ctx.fillRect(X + 3, Y + 4, T - 6, T - 8);
+      for (let i = 0; i < 3; i++) { ctx.fillStyle = "#fff"; ctx.fillRect(X + 4 + srand(x * 9 + i) * (T - 10), Y + 6 + srand(x * 5 + i * 3) * (T - 14), 2, 2); }
+      if (x === 26) { ctx.fillStyle = "#2a6ad8"; ctx.beginPath(); ctx.arc(X + T / 2, Y + T * 0.75, T * 0.35, Math.PI, 0); ctx.fill(); ctx.fillStyle = "#3fae5a"; ctx.fillRect(X + T * 0.3, Y + T * 0.55, T * 0.15, T * 0.1); }
+      break;
+    }
+    case "D": case "R": case "B": case "G": {
+      let open = 0;
+      const near = [player, ...aliens].some(e => Math.hypot(e.x - (x + 0.5), e.y - (y + 0.5)) < 1.6);
+      const locked = (c === "R" && !inv.red) || (c === "B" && !inv.blue) || (c === "G" && !inv.gold);
+      if (near && !(locked && !aliens.some(e => Math.hypot(e.x - (x + 0.5), e.y - (y + 0.5)) < 1.6))) open = 1;
+      const vertical = tileAt(x - 1, y) !== "#" && tileAt(x + 1, y) !== "#";
+      const col = { D: "#5a6280", R: "#d8343a", B: "#2f7bff", G: "#ffc21a" }[c];
+      ctx.fillStyle = col;
+      const gap = open ? T * 0.42 : 0;
+      if (!vertical) { ctx.fillRect(X, Y + T * 0.3, T / 2 - gap, T * 0.4); ctx.fillRect(X + T / 2 + gap, Y + T * 0.3, T / 2 - gap, T * 0.4); }
+      else { ctx.fillRect(X + T * 0.3, Y, T * 0.4, T / 2 - gap); ctx.fillRect(X + T * 0.3, Y + T / 2 + gap, T * 0.4, T / 2 - gap); }
+      if (c !== "D") { ctx.fillStyle = locked ? "#ff3b3b" : "#7dff6b"; ctx.beginPath(); ctx.arc(X + T * 0.85, Y + T * 0.15, 4, 0, 7); ctx.fill(); }
+      break;
+    }
+    case "C": {
+      ctx.fillStyle = "#4a5470"; ctx.fillRect(X + 3, Y + 2, T - 6, T - 4);
+      ctx.fillStyle = "#353d55"; for (let i = 0; i < 4; i++) ctx.fillRect(X + 8, Y + 8 + i * (T - 16) / 4, T - 16, 2);
+      ctx.fillStyle = "#c9d0e0"; ctx.fillRect(X + T - 12, Y + T / 2 - 4, 3, 8);
+      if (player.hidden && player.hidden.x === x && player.hidden.y === y) { ctx.fillStyle = "#ffdf9a"; ctx.globalAlpha = 0.6; ctx.fillRect(X + 10, Y + 14, T - 20, 3); ctx.globalAlpha = 1; }
+      if (alarm.on || (scripted && scripted.stage === "noticed")) { ctx.strokeStyle = `rgba(125,255,107,${0.4 + 0.4 * Math.sin(t * 8)})`; ctx.lineWidth = 3; ctx.strokeRect(X + 2, Y + 1, T - 4, T - 2); }
+      break;
+    }
+    case "A": {
+      ctx.fillStyle = "#2c3246"; ctx.fillRect(X, Y, T, T);
+      ctx.fillStyle = alarm.on && Math.sin(t * 10) > 0 ? "#ff2a2a" : "#8a1f2a"; ctx.fillRect(X + T * 0.2, Y + T * 0.2, T * 0.6, T * 0.5);
+      ctx.fillStyle = "#ffdd55"; ctx.fillRect(X + T * 0.45, Y + T * (alarm.on ? 0.55 : 0.3), T * 0.1, T * 0.3);
+      break;
+    }
+    case "K": {
+      ctx.fillStyle = "#2a3048"; ctx.fillRect(X + 4, Y + 6, T - 8, T - 12);
+      ctx.fillStyle = `rgba(125,255,107,${0.55 + 0.2 * Math.sin(t * 2 + x)})`; ctx.fillRect(X + 8, Y + 10, T - 16, T * 0.35);
+      ctx.fillStyle = "#0a1a0c"; for (let i = 0; i < 3; i++) ctx.fillRect(X + 11, Y + 13 + i * 5, (T - 22) * srand(x + i + Math.floor(t)), 2);
+      break;
+    }
+    case "M": {
+      ctx.fillStyle = "#2a3048"; ctx.fillRect(X - T * 0.4, Y + 2, T * 1.8, T - 4);
+      ctx.fillStyle = `rgba(80,200,255,${0.6 + 0.3 * Math.sin(t * 3)})`; ctx.fillRect(X - T * 0.3, Y + 6, T * 1.6, T * 0.4);
+      ["#ff3b3b", "#ffdd55", "#7dff6b", "#2f7bff"].forEach((col, i) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(X - T * 0.15 + i * T * 0.42, Y + T * 0.72, 4, 0, 7); ctx.fill(); });
+      break;
+    }
+    case "P": {
+      ctx.fillStyle = "rgba(80,220,255,0.18)"; ctx.beginPath(); ctx.arc(X + T / 2, Y + T / 2, T * 0.45, 0, 7); ctx.fill();
+      ctx.strokeStyle = "rgba(140,240,255,0.7)"; ctx.lineWidth = 2; ctx.stroke();
+      const animals = ["🐄", "🐖", "🐔", "🐑", "🐐"];
+      ctx.font = `${Math.round(T * 0.5)}px serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(animals[(x * 3 + y) % animals.length], X + T / 2, Y + T / 2 + Math.sin(t * 1.5 + x) * 2);
+      break;
+    }
+    case "X": {
+      ctx.fillStyle = "#2a3048"; ctx.fillRect(X + 4, Y + T * 0.6, T - 8, T * 0.35);
+      ctx.fillStyle = "rgba(170,220,255,0.25)"; ctx.fillRect(X + 6, Y + 6, T - 12, T * 0.58);
+      ctx.strokeStyle = "rgba(200,240,255,0.8)"; ctx.lineWidth = 2; ctx.strokeRect(X + 6, Y + 6, T - 12, T * 0.58);
+      const content = DECKS[deckIdx].cases[x + "," + y];
+      if (content) drawCard(X + T / 2, Y + T * 0.36, content === "red" ? "#d8343a" : "#2f7bff", T * 0.5);
+      break;
+    }
+    case "L": {
+      ctx.strokeStyle = `rgba(255,221,85,${0.5 + 0.4 * Math.sin(t * 4)})`; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(X + T / 2, Y + T / 2, T * 0.4, 0, 7); ctx.stroke();
+      ctx.fillStyle = "#ffdd55"; ctx.font = `900 ${Math.round(T * 0.22)}px Nunito, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("LIFT", X + T / 2, Y + T / 2);
+      break;
+    }
+  }
+}
+function drawCard(cx, cy, color, w) {
+  ctx.fillStyle = color; ctx.fillRect(cx - w / 2, cy - w * 0.32, w, w * 0.64);
+  ctx.fillStyle = "#ffdd55"; ctx.fillRect(cx - w * 0.35, cy - w * 0.12, w * 0.22, w * 0.18);
+  ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fillRect(cx - w * 0.35, cy + w * 0.12, w * 0.6, 2);
+}
+function drawItem(it, t) {
+  const X = (it.x + 0.5) * T, Y = (it.y + 0.5) * T + Math.sin(t * 3 + it.x) * 3;
+  ctx.save(); ctx.shadowColor = "#fff6c0"; ctx.shadowBlur = 16;
+  if (it.type === "red" || it.type === "blue" || it.type === "g") drawCard(X, Y, it.type === "red" ? "#d8343a" : it.type === "blue" ? "#2f7bff" : "#ffc21a", T * 0.55);
+  else {
+    ctx.font = `${Math.round(T * 0.55)}px serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(it.type === "h" ? "🔨" : it.type === "e" ? "🔋" : "🔫", X, Y);
+  }
+  ctx.restore();
+}
+function drawBeam(a) {
+  const ax = a.x * T, ay = a.y * T, half = VIEW_ANGLE * Math.PI / 180, n = 22;
+  const g = ctx.createRadialGradient(ax, ay, 0, ax, ay, VIEW_RANGE * T);
+  const hot = a.state === "spot" || a.state === "hunt" || alarm.on;
+  g.addColorStop(0, hot ? "rgba(255,80,80,0.35)" : "rgba(255,240,170,0.28)"); g.addColorStop(1, "rgba(255,240,170,0)");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(ax, ay);
+  for (let i = 0; i <= n; i++) { const an = a.dir - half + (2 * half * i) / n, l = rayLen(a.x, a.y, an, VIEW_RANGE); ctx.lineTo(ax + Math.cos(an) * l * T, ay + Math.sin(an) * l * T); }
+  ctx.closePath(); ctx.fill();
+}
+
+function drawAlien(a, t, sx, sy, scale = 1) {
+  const s = T * 0.52 * scale, bob = Math.sin(a.phase) * s * 0.06;
+  ctx.save(); ctx.translate(sx, sy + bob);
+  ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.ellipse(0, s * 0.85, s * 0.7, s * 0.25, 0, 0, 7); ctx.fill();
+  // body
+  ctx.fillStyle = a.color || "#ff7ab8";
+  ctx.beginPath(); ctx.ellipse(0, s * 0.35, s * 0.55, s * 0.55, 0, 0, 7); ctx.fill();
+  // head
+  ctx.beginPath(); ctx.arc(0, -s * 0.25, s * 0.62, 0, 7); ctx.fill();
+  // antenna
+  ctx.strokeStyle = a.color || "#ff7ab8"; ctx.lineWidth = s * 0.08;
+  ctx.beginPath(); ctx.moveTo(0, -s * 0.8); ctx.lineTo(s * 0.15, -s * 1.15); ctx.stroke();
+  ctx.fillStyle = "#7dff6b"; ctx.beginPath(); ctx.arc(s * 0.15, -s * 1.18, s * 0.1, 0, 7); ctx.fill();
+  if (a.captain) { ctx.fillStyle = "#ffc21a"; ctx.beginPath(); ctx.moveTo(-s * 0.4, -s * 0.75); ctx.lineTo(-s * 0.25, -s * 1.05); ctx.lineTo(0, -s * 0.8); ctx.lineTo(s * 0.25, -s * 1.05); ctx.lineTo(s * 0.4, -s * 0.75); ctx.fill(); }
+  // eyes look toward facing direction
+  const lx = Math.cos(a.dir) * s * 0.18, ly = Math.sin(a.dir) * s * 0.1;
+  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.ellipse(-s * 0.24 + lx, -s * 0.38 + ly, s * 0.15, s * 0.18, 0, 0, 7); ctx.ellipse(s * 0.24 + lx, -s * 0.38 + ly, s * 0.15, s * 0.18, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = a.stun > 0 ? "#888" : "#111"; ctx.beginPath(); ctx.arc(-s * 0.24 + lx * 1.4, -s * 0.36 + ly * 1.4, s * 0.07, 0, 7); ctx.arc(s * 0.24 + lx * 1.4, -s * 0.36 + ly * 1.4, s * 0.07, 0, 7); ctx.fill();
+  // the HUGE nose, pointing where it looks
+  ctx.fillStyle = "#e0559a";
+  ctx.beginPath(); ctx.ellipse(lx * 1.6, -s * 0.12 + ly * 1.2, s * 0.32, s * 0.24, a.dir * 0.2, 0, 7); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.beginPath(); ctx.arc(lx * 1.6 - s * 0.1, -s * 0.2 + ly, s * 0.07, 0, 7); ctx.fill();
+  if (a.state === "spot" || a.state === "notice") {
+    ctx.fillStyle = "#ff3b3b"; ctx.font = `900 ${Math.round(s * 1.1)}px Nunito, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillText("!", 0, -s * 1.2);
+  }
+  if (a.stun > 0) for (let i = 0; i < 3; i++) {
+    const an = t * 4 + i * 2.1; ctx.fillStyle = "#ffdd55";
+    ctx.font = `${Math.round(s * 0.5)}px serif`; ctx.textAlign = "center"; ctx.fillText("✦", Math.cos(an) * s * 0.6, -s * 0.9 + Math.sin(an) * s * 0.2);
+  }
+  ctx.restore();
+}
+function drawPlayer(t) {
+  const sx = player.x * T - camX, sy = player.y * T - camY, s = T * 0.46;
+  if (player.hidden) return;
+  ctx.save(); ctx.translate(sx, sy);
+  ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.ellipse(0, s * 0.9, s * 0.65, s * 0.22, 0, 0, 7); ctx.fill();
+  const step = Math.sin(player.walkT) * s * 0.18;
+  ctx.fillStyle = "#3a2a1a"; ctx.fillRect(-s * 0.35, s * 0.55 + step * 0.3, s * 0.25, s * 0.35); ctx.fillRect(s * 0.1, s * 0.55 - step * 0.3, s * 0.25, s * 0.35);
+  ctx.fillStyle = "#2f5aa8"; ctx.beginPath(); ctx.roundRect(-s * 0.45, -s * 0.15, s * 0.9, s * 0.8, s * 0.2); ctx.fill();
+  ctx.fillStyle = "#c4482b"; ctx.fillRect(-s * 0.45, -s * 0.15, s * 0.9, s * 0.18);
+  ctx.fillStyle = "#f1c7a3"; ctx.beginPath(); ctx.arc(0, -s * 0.42, s * 0.32, 0, 7); ctx.fill();
+  // straw hat
+  ctx.fillStyle = "#e8c45a"; ctx.beginPath(); ctx.ellipse(0, -s * 0.62, s * 0.62, s * 0.18, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(-s * 0.3, -s * 0.92, s * 0.6, s * 0.32, s * 0.12); ctx.fill();
+  ctx.fillStyle = "#c4482b"; ctx.fillRect(-s * 0.3, -s * 0.7, s * 0.6, s * 0.07);
+  const lx = Math.cos(player.dir) * s * 0.12;
+  ctx.fillStyle = "#140a28"; ctx.beginPath(); ctx.arc(-s * 0.1 + lx, -s * 0.42, s * 0.04, 0, 7); ctx.arc(s * 0.1 + lx, -s * 0.42, s * 0.04, 0, 7); ctx.fill();
+  if (player.chained) {
+    ctx.strokeStyle = "rgba(220,230,255,0.85)"; ctx.lineWidth = 3; ctx.setLineDash([6, 4]);
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(0, s * (0.0 + i * 0.25), s * 0.6, s * 0.16, 0, 0, 7); ctx.stroke(); }
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
+function drawDarkness(t) {
+  sctx.globalCompositeOperation = "source-over";
+  sctx.clearRect(0, 0, W, H);
+  sctx.fillStyle = "rgba(2,3,8,0.93)"; sctx.fillRect(0, 0, W, H);
+  sctx.globalCompositeOperation = "destination-out";
+  const hole = (x, y, r, a = 1) => {
+    const g = sctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.6, `rgba(0,0,0,${a * 0.85})`); g.addColorStop(1, "rgba(0,0,0,0)");
+    sctx.fillStyle = g; sctx.beginPath(); sctx.arc(x, y, r, 0, 7); sctx.fill();
+  };
+  const r = (player.hidden ? 2.2 : LIGHT_RADIUS) * T * (1 + Math.sin(t * 7) * 0.01);
+  hole(player.x * T - camX, player.y * T - camY, r);
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+    const c = grid[y][x];
+    if (c === "K" || c === "P" || c === "M" || c === "L") hole((x + 0.5) * T - camX, (y + 0.5) * T - camY, T * 1.4, 0.55);
+    if (c === "O") hole((x + 0.5) * T - camX, (y + 0.5) * T - camY, T * 1.2, 0.4);
+  }
+  for (const a of aliens) if (a.stun <= 0) {
+    const n = 10, half = VIEW_ANGLE * Math.PI / 180;
+    sctx.fillStyle = "rgba(0,0,0,0.5)"; sctx.beginPath(); sctx.moveTo(a.x * T - camX, a.y * T - camY);
+    for (let i = 0; i <= n; i++) { const an = a.dir - half + (2 * half * i) / n, l = rayLen(a.x, a.y, an, VIEW_RANGE); sctx.lineTo(a.x * T - camX + Math.cos(an) * l * T, a.y * T - camY + Math.sin(an) * l * T); }
+    sctx.closePath(); sctx.fill();
+  }
+  ctx.drawImage(shade, 0, 0, W, H);
+  if (alarm.on) { ctx.fillStyle = `rgba(255,0,20,${0.12 + 0.12 * Math.sin(t * 9)})`; ctx.fillRect(0, 0, W, H); }
+  if (player.hidden) { // looking out through the closet slats
+    ctx.fillStyle = "rgba(0,0,0,0.85)";
+    for (let i = 0; i < H; i += 26) ctx.fillRect(0, i, W, 16);
+  }
+}
+
+function drawPlay(t) {
+  drawWorld(t);
+  // draw aliens and player in screen space so they sort nicely
+  const ents = [...aliens.map(a => ({ y: a.y, f: () => drawAlien(a, t, a.x * T - camX, a.y * T - camY) })), { y: player.y, f: () => drawPlayer(t) }];
+  ents.sort((p, q) => p.y - q.y).forEach(e => e.f());
+  if (zapFx) {
+    ctx.save(); ctx.strokeStyle = "#7df9ff"; ctx.shadowColor = "#7df9ff"; ctx.shadowBlur = 20; ctx.lineWidth = 4;
+    const x0 = zapFx.x * T - camX, y0 = zapFx.y * T - camY;
+    ctx.beginPath(); ctx.moveTo(x0, y0);
+    for (let i = 1; i <= 8; i++) { const l = zapFx.len * T * i / 8; ctx.lineTo(x0 + Math.cos(zapFx.dir) * l + rand(-6, 6), y0 + Math.sin(zapFx.dir) * l + rand(-6, 6)); }
+    ctx.stroke(); ctx.restore();
+  }
+  drawDarkness(t);
+  // aliens' eyes glow in the dark
+  for (const a of aliens) {
+    const ex = a.x * T - camX, ey = a.y * T - camY - T * 0.18;
+    ctx.fillStyle = a.stun > 0 ? "rgba(150,150,150,0.5)" : "rgba(255,60,90,0.9)";
+    ctx.beginPath(); ctx.arc(ex - T * 0.08, ey, 2.5, 0, 7); ctx.arc(ex + T * 0.08, ey, 2.5, 0, 7); ctx.fill();
+  }
+  drawHUD(t);
+}
+
+function drawHUD(t) {
+  ctx.save();
+  // objective
+  ctx.font = `800 ${Math.max(14, H * 0.022)}px Nunito, sans-serif`; ctx.textAlign = "left"; ctx.textBaseline = "top";
+  const obj = "Objective: " + objective();
+  const w = ctx.measureText(obj).width + 28;
+  ctx.fillStyle = "rgba(8,10,20,0.8)"; ctx.beginPath(); ctx.roundRect(14, 14, w, H * 0.022 + 18, 10); ctx.fill();
+  ctx.fillStyle = "#7dff6b"; ctx.fillText(obj, 28, 23);
+  // inventory
+  const slots = [];
+  if (inv.hammer) slots.push(["🔨", ""]);
+  if (inv.zapper) slots.push(["🔫", "×" + inv.charges]);
+  if (inv.red) slots.push(["card", "#d8343a"]);
+  if (inv.blue) slots.push(["card", "#2f7bff"]);
+  if (inv.gold) slots.push(["card", "#ffc21a"]);
+  const sz = Math.max(40, H * 0.06);
+  slots.forEach((s, i) => {
+    const x = 14 + i * (sz + 8), y = H - sz - 14;
+    ctx.fillStyle = "rgba(8,10,20,0.8)"; ctx.strokeStyle = "#3a4560"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(x, y, sz, sz, 8); ctx.fill(); ctx.stroke();
+    if (s[0] === "card") drawCard(x + sz / 2, y + sz / 2, s[1], sz * 0.7);
+    else { ctx.font = `${Math.round(sz * 0.55)}px serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(s[0], x + sz / 2, y + sz / 2); }
+    if (s[1] && s[0] !== "card") { ctx.fillStyle = "#fff"; ctx.font = `900 ${Math.round(sz * 0.28)}px Nunito, sans-serif`; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText(s[1], x + sz - 4, y + sz - 2); }
+  });
+  // message
+  if (msg) {
+    const a = Math.min(1, msg.t * 4, (msg.life - msg.t) * 2);
+    ctx.globalAlpha = a;
+    ctx.font = `800 ${Math.max(15, H * 0.026)}px Nunito, sans-serif`;
+    const lines = wrap(msg.text, Math.min(W * 0.7, 720));
+    const lh = Math.max(15, H * 0.026) * 1.35, bh = lines.length * lh + 22, by = H - bh - Math.max(70, H * 0.1);
+    ctx.fillStyle = "rgba(8,10,20,0.88)"; ctx.beginPath(); ctx.roundRect(W / 2 - Math.min(W * 0.7, 720) / 2 - 16, by, Math.min(W * 0.7, 720) + 32, bh, 12); ctx.fill();
+    ctx.fillStyle = "#e8f0ff"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    lines.forEach((l, i) => ctx.fillText(l, W / 2, by + 11 + i * lh));
+    ctx.globalAlpha = 1;
+  }
+  // deck banner
+  if (banner) {
+    const a = Math.min(1, banner.t * 3, (3 - banner.t) * 2);
+    ctx.globalAlpha = a; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = `400 ${Math.max(30, H * 0.07)}px Creepster, Impact, cursive`;
+    ctx.fillStyle = "#7dff6b"; ctx.shadowColor = "#7dff6b"; ctx.shadowBlur = 20;
+    ctx.fillText(banner.text, W / 2, H * 0.2); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+  // break-the-chains prompt
+  if (player.chained) {
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = `900 ${Math.max(18, H * 0.035)}px Nunito, sans-serif`;
+    ctx.fillStyle = "#fff"; ctx.fillText("You’re tied up in… plastic chains? Tap SPACE fast to break free!", W / 2, H * 0.32);
+    const bw = Math.min(W * 0.4, 360);
+    ctx.fillStyle = "rgba(8,10,20,0.8)"; ctx.fillRect(W / 2 - bw / 2, H * 0.36, bw, 14);
+    ctx.fillStyle = "#7dff6b"; ctx.fillRect(W / 2 - bw / 2, H * 0.36, bw * player.breakCount / 6, 14);
+  }
+  // closet prompt
+  if (!player.hidden && !player.chained) {
+    const px = Math.floor(player.x), py = Math.floor(player.y);
+    let near = null;
+    for (let y = py - 1; y <= py + 1; y++) for (let x = px - 2; x <= px + 2; x++) {
+      const c = tileAt(x, y); if ("CXKM".includes(c) && Math.hypot(x + 0.5 - player.x, y + 0.5 - player.y) < (c === "M" ? 2.1 : 1.45)) near = c;
+    }
+    if (near) {
+      const label = { C: "E  Hide in closet", X: "E  Smash glass", K: "E  Read screen", M: "E  Take control of the ship" }[near];
+      ctx.font = `900 ${Math.max(14, H * 0.024)}px Nunito, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const sx = player.x * T - camX, sy = player.y * T - camY - T * 0.9;
+      const tw = ctx.measureText(label).width + 20;
+      ctx.fillStyle = "rgba(8,10,20,0.85)"; ctx.beginPath(); ctx.roundRect(sx - tw / 2, sy - 14, tw, 28, 8); ctx.fill();
+      ctx.fillStyle = "#7dff6b"; ctx.fillText(label, sx, sy);
+    }
+  }
+  ctx.restore();
+}
+function wrap(text, maxW) {
+  const words = text.split(" "), lines = []; let line = "";
+  for (const w of words) { const test = line ? line + " " + w : w; if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test; }
+  if (line) lines.push(line); return lines;
+}
+
+// ---------- jump scare ----------
+function drawScare(t) {
+  const p = scareT;
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+  if (p < 0.08) return;
+  const k = Math.min(1, (p - 0.08) / 0.22);
+  const scale = 0.3 + k * 1.25 + Math.max(0, p - 0.3) * 0.15;
+  const jx = (Math.random() - 0.5) * 30 * (1 - Math.min(1, p / 1.2)), jy = (Math.random() - 0.5) * 30 * (1 - Math.min(1, p / 1.2));
+  ctx.save(); ctx.translate(W / 2 + jx, H / 2 + jy); ctx.scale(scale, scale);
+  const s = Math.min(W, H) * 0.42;
+  const col = (scareAlien && scareAlien.color) || "#ff7ab8";
+  // head
+  const g = ctx.createRadialGradient(-s * 0.2, -s * 0.3, s * 0.1, 0, 0, s * 1.1);
+  g.addColorStop(0, "#ffc0dd"); g.addColorStop(0.5, col); g.addColorStop(1, "#5a1030");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, 0, s * 0.95, s * 1.05, 0, 0, 7); ctx.fill();
+  // eyes
+  for (const e of [-1, 1]) {
+    ctx.fillStyle = "#0a0004"; ctx.beginPath(); ctx.ellipse(e * s * 0.38, -s * 0.38, s * 0.24, s * 0.3, e * 0.3, 0, 7); ctx.fill();
+    ctx.fillStyle = "#ff1a3c"; ctx.shadowColor = "#ff1a3c"; ctx.shadowBlur = 30;
+    ctx.beginPath(); ctx.arc(e * s * 0.36, -s * 0.36, s * 0.07, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+  }
+  // mouth
+  ctx.fillStyle = "#1a0008"; ctx.beginPath(); ctx.ellipse(0, s * 0.55, s * 0.55, s * 0.32 + Math.sin(t * 40) * s * 0.03, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#fff6e0";
+  for (let i = 0; i < 9; i++) {
+    const x = -s * 0.48 + i * s * 0.12;
+    ctx.beginPath(); ctx.moveTo(x, s * 0.3); ctx.lineTo(x + s * 0.06, s * 0.46); ctx.lineTo(x + s * 0.12, s * 0.3); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x, s * 0.82); ctx.lineTo(x + s * 0.06, s * 0.66); ctx.lineTo(x + s * 0.12, s * 0.82); ctx.fill();
+  }
+  // THE NOSE
+  const ng = ctx.createRadialGradient(-s * 0.1, -s * 0.05, s * 0.05, 0, s * 0.05, s * 0.5);
+  ng.addColorStop(0, "#ffb0d0"); ng.addColorStop(1, "#c2306f");
+  ctx.fillStyle = ng; ctx.beginPath(); ctx.ellipse(0, s * 0.05, s * 0.42, s * 0.33, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#5a1030"; ctx.beginPath(); ctx.ellipse(-s * 0.14, s * 0.18, s * 0.07, s * 0.05, 0, 0, 7); ctx.ellipse(s * 0.14, s * 0.18, s * 0.07, s * 0.05, 0, 0, 7); ctx.fill();
+  ctx.restore();
+  if (p < 0.45) { ctx.fillStyle = `rgba(255,0,30,${0.5 - p})`; ctx.fillRect(0, 0, W, H); }
+}
+
+// ---------- QTE overlay ----------
+function drawQte(t) {
+  drawPlay(t);
+  ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.font = `400 ${Math.max(30, H * 0.07)}px Creepster, Impact, cursive`; ctx.fillStyle = "#7dff6b";
+  ctx.fillText("TAKE CONTROL OF THE SHIP!", W / 2, H * 0.22);
+  ctx.font = `800 ${Math.max(15, H * 0.025)}px Nunito, sans-serif`; ctx.fillStyle = "#e8f0ff";
+  ctx.fillText("The aliens are banging on the door. Press the arrow keys as they appear!", W / 2, H * 0.3);
+  const size = Math.max(70, H * 0.14);
+  ctx.save(); ctx.translate(W / 2, H * 0.5); ctx.scale(1 + qte.flash * 0.2, 1 + qte.flash * 0.2);
+  ctx.fillStyle = "#1b2230"; ctx.strokeStyle = "#7dff6b"; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.roundRect(-size / 2, -size / 2, size, size, 16); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#7dff6b"; ctx.font = `900 ${Math.round(size * 0.6)}px Nunito, sans-serif`;
+  ctx.fillText(ARROW_GLYPH[qte.seq[qte.i]] || "", 0, 4); ctx.restore();
+  const bw = Math.min(W * 0.4, 360), max = Math.max(1.3, 2.2 - qte.i * 0.12);
+  ctx.fillStyle = "#1b2230"; ctx.fillRect(W / 2 - bw / 2, H * 0.5 + size * 0.75, bw, 12);
+  ctx.fillStyle = qte.t < 0.7 ? "#ff3b3b" : "#7dff6b"; ctx.fillRect(W / 2 - bw / 2, H * 0.5 + size * 0.75, bw * clamp(qte.t / max, 0, 1), 12);
+  ctx.fillStyle = "#e8f0ff"; ctx.font = `800 ${Math.max(14, H * 0.022)}px Nunito, sans-serif`;
+  ctx.fillText(`${qte.i} / ${qte.seq.length}`, W / 2, H * 0.5 + size * 0.75 + 34);
+}
+
+// =====================================================================
+// STORY SCENES (intro and ending)
+// =====================================================================
+const INTRO = [
+  "Every night, the farmer locked his animals safely in the yard.",
+  "But every morning… they were GONE. And there wasn’t a single hole in the fence.",
+  "So one night, he decided to camp out and see for himself.",
+  "Nothing happened. After a while… he fell asleep.",
+  "CLANG!!!",
+  "He opened his eyes. He wasn’t on the farm anymore."
+];
+const ENDING = [
+  "He grabbed the controls and pointed the ship toward home.",
+  "The ship crash-landed right in the cornfield. Out came the cows, the pigs, and every last chicken.",
+  "THE END… or is it?"
+];
+function farmScene(t, opts) {
+  const night = opts.night !== false;
+  const sky = ctx.createLinearGradient(0, 0, 0, H * 0.65);
+  if (night) { sky.addColorStop(0, "#050816"); sky.addColorStop(1, "#1a2350"); }
+  else { sky.addColorStop(0, "#ffb37a"); sky.addColorStop(1, "#ffe6b0"); }
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+  if (night) {
+    for (let i = 0; i < 80; i++) { ctx.fillStyle = `rgba(255,255,255,${0.3 + 0.5 * srand(i)})`; ctx.fillRect(srand(i) * W, srand(i + 99) * H * 0.55, 2, 2); }
+    ctx.fillStyle = "#f2f0d8"; ctx.beginPath(); ctx.arc(W * 0.82, H * 0.16, H * 0.06, 0, 7); ctx.fill();
+  } else { ctx.fillStyle = "#fff2a0"; ctx.beginPath(); ctx.arc(W * 0.8, H * 0.62, H * 0.12, Math.PI, 0); ctx.fill(); }
+  ctx.fillStyle = night ? "#14281a" : "#5fae4a"; ctx.fillRect(0, H * 0.62, W, H * 0.38);
+  // barn
+  const bx = W * 0.12, by = H * 0.62, bw = W * 0.2, bh = H * 0.22;
+  ctx.fillStyle = night ? "#5a1a14" : "#b8352a"; ctx.fillRect(bx, by - bh, bw, bh);
+  ctx.beginPath(); ctx.moveTo(bx - bw * 0.08, by - bh); ctx.lineTo(bx + bw / 2, by - bh * 1.6); ctx.lineTo(bx + bw * 1.08, by - bh); ctx.fill();
+  ctx.fillStyle = night ? "#2a0a08" : "#6b1a14"; ctx.fillRect(bx + bw * 0.35, by - bh * 0.6, bw * 0.3, bh * 0.6);
+  ctx.strokeStyle = "#e8e0d0"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(bx + bw * 0.35, by - bh * 0.6); ctx.lineTo(bx + bw * 0.65, by); ctx.moveTo(bx + bw * 0.65, by - bh * 0.6); ctx.lineTo(bx + bw * 0.35, by); ctx.stroke();
+  // fence
+  ctx.strokeStyle = night ? "#6a5a40" : "#c9a46a"; ctx.lineWidth = 6;
+  const fy = H * 0.72;
+  ctx.beginPath(); ctx.moveTo(W * 0.4, fy); ctx.lineTo(W * 0.95, fy); ctx.moveTo(W * 0.4, fy + H * 0.04); ctx.lineTo(W * 0.95, fy + H * 0.04); ctx.stroke();
+  for (let i = 0; i <= 8; i++) { ctx.beginPath(); ctx.moveTo(W * 0.4 + i * W * 0.0688, fy - H * 0.03); ctx.lineTo(W * 0.4 + i * W * 0.0688, fy + H * 0.08); ctx.stroke(); }
+  if (opts.animals) {
+    ctx.font = `${Math.round(H * 0.07)}px serif`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ["🐄", "🐖", "🐔", "🐑", "🐔"].forEach((a, i) => ctx.fillText(a, W * (0.48 + i * 0.1) + Math.sin(t * 2 + i) * 3, fy - H * 0.01 + (opts.walk ? Math.abs(Math.sin(t * 6 + i)) * -8 : 0)));
+  }
+  if (opts.camp) {
+    ctx.fillStyle = "#3a6a3a"; ctx.beginPath(); ctx.moveTo(W * 0.5, H * 0.88); ctx.lineTo(W * 0.58, H * 0.74); ctx.lineTo(W * 0.66, H * 0.88); ctx.fill();
+    ctx.fillStyle = "#ff8a1f"; ctx.beginPath(); ctx.moveTo(W * 0.72, H * 0.88); ctx.quadraticCurveTo(W * 0.74, H * (0.82 + Math.sin(t * 12) * 0.01), W * 0.76, H * 0.88); ctx.fill();
+    farmer(W * 0.44, H * 0.9, H * 0.13, opts.sleep);
+    if (opts.sleep) { ctx.fillStyle = "#e8f0ff"; ctx.font = `800 ${Math.round(H * 0.04)}px Nunito`; ctx.fillText("z z Z", W * 0.47 + Math.sin(t) * 5, H * 0.7 - (t * 10 % 20)); }
+  }
+}
+function farmer(x, y, s, sleep) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = "#2f5aa8"; ctx.fillRect(-s * 0.18, -s * 0.6, s * 0.36, s * 0.45);
+  ctx.fillStyle = "#3a2a1a"; ctx.fillRect(-s * 0.16, -s * 0.15, s * 0.12, s * 0.15); ctx.fillRect(s * 0.04, -s * 0.15, s * 0.12, s * 0.15);
+  ctx.fillStyle = "#f1c7a3"; ctx.beginPath(); ctx.arc(0, -s * 0.75, s * 0.15, 0, 7); ctx.fill();
+  ctx.fillStyle = "#e8c45a"; ctx.beginPath(); ctx.ellipse(0, -s * 0.86, s * 0.28, s * 0.06, sleep ? 0.3 : 0, 0, 7); ctx.fill(); ctx.fillRect(-s * 0.12, -s * 1.0, s * 0.24, s * 0.14);
+  ctx.restore();
+}
+function drawIntro(t) {
+  const i = introSlide;
+  if (i === 0) farmScene(t, { animals: true });
+  else if (i === 1) farmScene(t, { night: false });
+  else if (i === 2) farmScene(t, { camp: true });
+  else if (i === 3) { farmScene(t, { camp: true, sleep: true }); ctx.fillStyle = `rgba(0,0,0,${Math.min(0.6, introT * 0.3)})`; ctx.fillRect(0, 0, W, H); }
+  else if (i === 4) {
+    ctx.fillStyle = introT < 0.15 ? "#fff" : "#000"; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.translate((Math.random() - 0.5) * 20 * Math.max(0, 1 - introT), 0);
+    ctx.font = `400 ${Math.round(H * 0.2)}px Creepster, Impact, cursive`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#7dff6b"; ctx.fillText("CLANG!", W / 2, H * 0.45); ctx.restore();
+  } else {
+    ctx.fillStyle = "#04050a"; ctx.fillRect(0, 0, W, H);
+    const blink = Math.min(1, introT / 1.2);
+    ctx.fillStyle = "#1d2130"; ctx.fillRect(0, H / 2 - H * 0.5 * blink, W, H * blink);
+    ctx.fillStyle = "rgba(125,255,107,0.5)"; for (let k = 0; k < 6; k++) ctx.fillRect(W * (0.1 + k * 0.16), H / 2 - H * 0.4 * blink, 4, 4);
+  }
+  if (i !== 4) caption(INTRO[i]);
+  hint("Press SPACE or click to continue");
+}
+function drawEnding(t) {
+  if (endSlide === 0) {
+    ctx.fillStyle = "#02030a"; ctx.fillRect(0, 0, W, H);
+    for (let k = 0; k < 120; k++) {
+      const z = ((srand(k) + endT * 0.4) % 1), x = W / 2 + (srand(k + 7) - 0.5) * W * 2 * z, y = H / 2 + (srand(k + 13) - 0.5) * H * 2 * z;
+      ctx.fillStyle = "#fff"; ctx.fillRect(x, y, 1 + z * 3, 1 + z * 3);
+    }
+    const er = H * (0.1 + endT * 0.05);
+    ctx.fillStyle = "#2a6ad8"; ctx.beginPath(); ctx.arc(W / 2, H / 2, er, 0, 7); ctx.fill();
+    ctx.fillStyle = "#3fae5a"; ctx.beginPath(); ctx.ellipse(W / 2 - er * 0.3, H / 2 - er * 0.2, er * 0.35, er * 0.25, 0.4, 0, 7); ctx.fill();
+  } else if (endSlide === 1) {
+    farmScene(endT, { night: false, animals: true, walk: true });
+    ctx.save(); ctx.translate(W * 0.3, H * 0.66); ctx.rotate(-0.15);
+    ctx.fillStyle = "#9aa4c0"; ctx.beginPath(); ctx.ellipse(0, 0, W * 0.12, H * 0.05, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = "rgba(125,255,107,0.7)"; ctx.beginPath(); ctx.ellipse(0, -H * 0.03, W * 0.05, H * 0.04, 0, Math.PI, 0); ctx.fill();
+    ctx.restore();
+    farmer(W * 0.42, H * 0.9, H * 0.15);
+  } else {
+    ctx.fillStyle = "#02030a"; ctx.fillRect(0, 0, W, H);
+    ctx.font = `400 ${Math.round(H * 0.12)}px Creepster, Impact, cursive`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#7dff6b"; ctx.fillText("THE END", W / 2, H * 0.38);
+    // something blinks in the dark…
+    if (Math.sin(endT * 2) > 0.6) { ctx.fillStyle = "#ff1a3c"; ctx.beginPath(); ctx.arc(W * 0.85, H * 0.8, 4, 0, 7); ctx.arc(W * 0.85 + 16, H * 0.8, 4, 0, 7); ctx.fill(); }
+  }
+  caption(ENDING[endSlide]);
+  hint(endSlide < 2 ? "Press SPACE or click to continue" : "");
+}
+function caption(text) {
+  ctx.font = `800 ${Math.max(18, H * 0.034)}px Nunito, sans-serif`;
+  const lines = wrap(text, Math.min(W * 0.8, 900));
+  const lh = Math.max(18, H * 0.034) * 1.35;
+  ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.fillRect(0, H * 0.04, W, lines.length * lh + 30);
+  ctx.fillStyle = "#e8f0ff"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+  lines.forEach((l, k) => ctx.fillText(l, W / 2, H * 0.04 + 15 + k * lh));
+}
+function hint(text) {
+  if (!text) return;
+  ctx.font = `800 ${Math.max(13, H * 0.02)}px Nunito, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+  ctx.fillStyle = `rgba(232,240,255,${0.5 + 0.3 * Math.sin(performance.now() / 300)})`; ctx.fillText(text, W / 2, H - 20);
+}
+function advanceIntro() {
+  if (introSlide === 4 && introT < 0.8) return;
+  introSlide++; introT = 0;
+  if (introSlide === 4) { sfx.clang(); }
+  if (introSlide >= INTRO.length) beginShip();
+}
+function advanceEnding() {
+  if (endSlide < 2) { endSlide++; endT = 0; return; }
+}
+function showEndCard() {
+  overlay.classList.remove("hidden");
+  const mins = Math.floor((performance.now() - startTime) / 60000);
+  card.innerHTML = `<h1>You escaped!</h1><p>You flew the alien ship home and saved every animal on the farm.</p>
+    <p>Time: ${mins} min · Times caught: ${deaths}</p>
+    <div class="row"><button id="btnAgain">Play again</button><button id="btnArcade" class="secondary">Exit to arcade</button></div>`;
+  document.getElementById("btnAgain").onclick = () => location.reload();
+  document.getElementById("btnArcade").onclick = () => { location.href = "../../index.html"; };
+}
+
+function beginShip() {
+  inv = freshInv(); snapshot = null; deaths = 0;
+  loadDeck(0, false);
+  mode = "play"; startHum();
+  say("Where am I?! …Is this a SPACESHIP?", 3);
+}
+
+// =====================================================================
+// MAIN LOOP
+// =====================================================================
+let last = performance.now();
+function loop(nowMs) {
+  const dt = Math.min(0.05, (nowMs - last) / 1000); last = nowMs;
+  const t = nowMs / 1000;
+  if (mode === "intro") { introT += dt; drawIntro(t); if (introSlide === 4 && introT > 1.6) advanceIntro(); }
+  else if (mode === "ending") { endT += dt; drawEnding(t); if (endSlide === 2 && endT > 3 && overlay.classList.contains("hidden")) showEndCard(); }
+  else if (mode === "menu") { ctx.fillStyle = "#04050a"; ctx.fillRect(0, 0, W, H); }
+  else {
+    update(dt);
+    if (mode === "scare") drawScare(t);
+    else if (mode === "qte") drawQte(t);
+    else if (mode === "dead") drawScare(t);
+    else {
+      drawPlay(t);
+      if (mode === "fade") { ctx.fillStyle = `rgba(0,0,0,${Math.max(0, 1 - fadeT)})`; ctx.fillRect(0, 0, W, H); }
+    }
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// =====================================================================
+// CONTROLS
+// =====================================================================
+document.getElementById("btnStart").onclick = () => { audio(); overlay.classList.add("hidden"); mode = "intro"; introSlide = 0; introT = 0; startTime = performance.now(); };
+document.getElementById("btnSkip").onclick = () => { audio(); overlay.classList.add("hidden"); startTime = performance.now(); beginShip(); };
+window.addEventListener("keydown", (e) => {
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
+  keys[e.key] = true;
+  if (mode === "intro" && (e.key === " " || e.key === "Enter") && !e.repeat) { advanceIntro(); return; }
+  if (mode === "ending" && (e.key === " " || e.key === "Enter") && !e.repeat) { advanceEnding(); return; }
+  if (mode === "qte" && !e.repeat) { qteKey(e.key); return; }
+  if (mode !== "play" || e.repeat) return;
+  if (e.key === " ") {
+    if (player.chained) {
+      player.breakCount++; sfx.tug(); shakeT = 0.08;
+      if (player.breakCount >= 6) {
+        player.chained = false; sfx.snap(); shakeT = 0.25;
+        say("SNAP! The plastic chains break easily. These aliens are not very good at this.", 4);
+        if (scripted) scripted.stage = "free";
+      }
+    } else fireZapper();
+  }
+  if (e.key === "e" || e.key === "E") interact();
+});
+window.addEventListener("keyup", (e) => { keys[e.key] = false; });
+// Testing shortcuts: Shift+1/2/3 jumps to a deck with the items you'd have by then; Shift+0 goes to the bridge
+window.addEventListener("keydown", (e) => {
+  if (mode !== "play" || !e.shiftKey) return;
+  const n = { "!": 0, "@": 1, "#": 2, ")": 3 }[e.key];
+  if (n === undefined) return;
+  inv = freshInv(); inv.introDone = true;
+  if (n >= 1) { inv.hammer = true; inv.red = true; }
+  if (n >= 2) { inv.zapper = true; inv.charges = 3; inv.blue = true; }
+  if (n === 3) inv.gold = true;
+  snapshot = null;
+  loadDeck(Math.min(n, 2), false);
+  if (n === 3) { player.x = 21.5; player.y = 10.5; }
+  mode = "fade"; fadeT = 0;
+});
+canvas.addEventListener("pointerdown", () => {
+  if (mode === "intro") advanceIntro();
+  else if (mode === "ending") advanceEnding();
+});
+})();
+</script>
+</body>
+</html>

@@ -8,6 +8,7 @@ Folder layout
 - games/cactus-run/       : Cactus Run (open its README.txt for how to play)
 - games/piano-party/      : Pindars Piano Party (open its README.txt for how to play)
 - games/home-for-leo/     : Home for Leo (a story merge game, mouse or touch)
+- games/abducted/         : Abducted (a horror stealth game, keyboard)
 
 Adding a new game
 1. Put the game in its own folder inside games/, e.g. games/my-game/index.html

@@ -8,142 +8,213 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Bungee+Shade&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
 <style>
+  /* The arcade is a dark room in both light and dark mode; the tokens are kept in one place. */
   :root {
-    --bg: #efe8ff;
-    --bg-dots: #ddd0fb;
-    --ink: #22104a;
-    --ink-soft: #57487d;
-    --sign: #2a1556;
+    --wall: #1d0f3d;
+    --wall-2: #2a1556;
+    --wall-line: #ff4f8b;
+    --base-line: #4fd6ff;
+    --carpet: #120a2a;
+    --text: #f3ecff;
+    --text-soft: #b9abde;
+    --sign: #0d0522;
     --sign-text: #fff6d6;
     --bulb: #ffd23f;
-    --bulb-off: #8a6d1d;
-    --cart: #cfc6e4;
-    --cart-edge: #a79bc6;
-    --cart-shadow: #8a7cb0;
-    --label: #ffffff;
+    --bulb-off: #6b5418;
     --pink: #ff4f8b;
-    --teal: #13b3a2;
-    --hazard: #ffc400;
-    --hazard-dark: #22104a;
-    --focus: #ff4f8b;
-    color-scheme: light;
+    --focus: #ffd23f;
+    color-scheme: dark;
     box-sizing: border-box;
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #170a33;
-      --bg-dots: #241246;
-      --ink: #f3ecff;
-      --ink-soft: #b9abde;
-      --sign: #0d0522;
-      --cart: #3a2a66;
-      --cart-edge: #4d3a82;
-      --cart-shadow: #0b041c;
-      --label: #fdfbff;
-      --focus: #ffd23f;
-      color-scheme: dark;
-    }
+    :root:not([data-theme="light"]) { --wall: #1a0d38; --carpet: #100825; }
   }
-  :root[data-theme="dark"] {
-    --bg: #170a33; --bg-dots: #241246; --ink: #f3ecff; --ink-soft: #b9abde; --sign: #0d0522;
-    --cart: #3a2a66; --cart-edge: #4d3a82; --cart-shadow: #0b041c; --label: #fdfbff; --focus: #ffd23f;
-    color-scheme: dark;
-  }
+  :root[data-theme="dark"] { --wall: #1a0d38; --carpet: #100825; }
   *, *::before, *::after { box-sizing: border-box; }
   html { scroll-padding-top: env(safe-area-inset-top, 0px); }
   body {
-    margin: 0; min-height: 100%;
+    margin: 0; min-height: 100%; color: var(--text);
     font-family: "Nunito", "Trebuchet MS", system-ui, sans-serif;
-    color: var(--ink);
-    background-color: var(--bg);
-    background-image: radial-gradient(var(--bg-dots) 2px, transparent 2px);
-    background-size: 22px 22px;
+    background: linear-gradient(180deg, var(--wall) 0%, var(--wall-2) 100%);
   }
-  img, svg { max-width: 100%; }
 
-  /* ---------- Marquee sign ---------- */
-  header { padding: clamp(28px, 6vw, 64px) 20px 8px; display: grid; place-items: center; }
+  /* ---------- Neon sign on the wall ---------- */
+  header { padding: clamp(18px, 3vh, 34px) 16px 0; display: grid; place-items: center; }
   .sign {
     position: relative; background: var(--sign); color: var(--sign-text);
-    border-radius: 28px; padding: clamp(34px, 6vw, 56px) clamp(28px, 6vw, 72px);
-    text-align: center; max-width: 820px; width: 100%;
-    box-shadow: 0 0 0 6px var(--pink), 0 0 0 12px var(--sign), 0 18px 0 12px var(--cart-shadow);
+    border-radius: 22px; padding: clamp(16px, 2.4vh, 26px) clamp(30px, 5vw, 64px);
+    text-align: center; max-width: 760px; width: 100%;
+    box-shadow: 0 0 0 5px var(--pink), 0 0 0 10px var(--sign), 0 0 40px 8px rgba(255, 79, 139, 0.35);
   }
-  .bulbs { position: absolute; inset: 12px; pointer-events: none; }
-  .bulb {
-    position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
-    background: var(--bulb); box-shadow: 0 0 10px 2px rgba(255, 210, 63, 0.7);
-  }
+  .bulbs { position: absolute; inset: 9px; pointer-events: none; }
+  .bulb { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--bulb); box-shadow: 0 0 10px 2px rgba(255, 210, 63, 0.7); }
   .bulb:nth-child(odd) { animation: chase 1.2s steps(1) infinite; }
   .bulb:nth-child(even) { animation: chase 1.2s steps(1) infinite 0.6s; }
   @keyframes chase { 0% { background: var(--bulb); box-shadow: 0 0 10px 2px rgba(255,210,63,.7); } 50% { background: var(--bulb-off); box-shadow: none; } }
   .sign h1 {
     margin: 0; font-family: "Bungee Shade", "Bungee", Impact, sans-serif; font-weight: 400;
-    font-size: clamp(2.6rem, 9vw, 5.6rem); line-height: 0.95; letter-spacing: 0.01em;
-    color: var(--bulb);
+    font-size: clamp(2rem, 5.4vh, 3.6rem); line-height: 1; color: var(--bulb); white-space: nowrap;
+    text-shadow: 0 0 18px rgba(255, 210, 63, 0.45);
   }
-  .sign h1 span { display: block; font-family: "Bungee", Impact, sans-serif; color: var(--pink); font-size: 0.62em; margin-top: 0.12em; }
-  .sign p { margin: 16px 0 0; font-weight: 800; font-size: clamp(1rem, 2.4vw, 1.2rem); color: var(--sign-text); opacity: 0.85; }
+  .sign h1 span { font-family: "Bungee", Impact, sans-serif; color: var(--pink); font-size: 0.78em; margin-left: 0.3em; text-shadow: 0 0 14px rgba(255, 79, 139, 0.6); }
+  @media (max-width: 520px) { .sign h1 { white-space: normal; } .sign h1 span { display: block; margin: 0.1em 0 0; } }
 
-  /* ---------- Shelf ---------- */
-  main { max-width: 1120px; margin: 0 auto; padding: 40px 20px 24px; }
-  .shelf-note { text-align: center; margin: 0 0 32px; font-weight: 800; font-size: 1.1rem; color: var(--ink-soft); }
-  .shelf { list-style: none; margin: 0; padding: 0; display: grid; gap: 34px 26px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  @media (max-width: 900px) { .shelf { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 560px) { .shelf { grid-template-columns: 1fr; } }
+  .info {
+    min-height: 2.6em; margin: clamp(10px, 1.6vh, 16px) auto 0; padding: 0 20px; max-width: 900px;
+    text-align: center; font-weight: 800; font-size: clamp(0.9rem, 1.8vh, 1.05rem); color: var(--text-soft);
+    display: flex; align-items: center; justify-content: center; line-height: 1.35;
+  }
+  .info strong { font-family: "Bungee", Impact, sans-serif; font-weight: 400; color: var(--bulb); margin-right: 0.5em; }
+  .info .needs { color: #4fd6ff; margin-left: 0.5em; }
 
-  /* Game cartridge */
-  .cart {
-    position: relative; background: var(--cart); border: 3px solid var(--cart-edge);
-    border-radius: 10px 10px 22px 22px; padding: 26px 16px 18px;
-    box-shadow: 0 8px 0 var(--cart-shadow);
-    clip-path: polygon(0 18px, 18px 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
-    display: flex; flex-direction: column; height: 100%;
+  /* ---------- The room ---------- */
+  .room {
+    position: relative; margin-top: 8px;
+    background-color: var(--carpet);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cg fill='none' stroke-width='4' stroke-linecap='round'%3E%3Cpath d='M14 30l10-10 10 10 10-10' stroke='%23ff4f8b' stroke-opacity='.45'/%3E%3Ccircle cx='110' cy='34' r='9' stroke='%234fd6ff' stroke-opacity='.4'/%3E%3Cpath d='M60 96l12-20 12 20z' stroke='%23ffd23f' stroke-opacity='.4'/%3E%3Cpath d='M120 120q10-14 20 0t20 0' stroke='%235ad17a' stroke-opacity='.4'/%3E%3Cpath d='M20 130h18' stroke='%23c77dff' stroke-opacity='.45'/%3E%3C/g%3E%3Ccircle cx='86' cy='146' r='3' fill='%23ffd23f' fill-opacity='.5'/%3E%3Ccircle cx='140' cy='70' r='3' fill='%23ff4f8b' fill-opacity='.5'/%3E%3Ccircle cx='34' cy='76' r='3' fill='%234fd6ff' fill-opacity='.5'/%3E%3C/svg%3E");
+    background-size: 140px 140px;
   }
-  .cart::before { /* grip ridges along the top */
-    content: ""; position: absolute; top: 8px; left: 30%; right: 30%; height: 8px;
-    background: repeating-linear-gradient(90deg, var(--cart-edge) 0 4px, transparent 4px 9px); border-radius: 2px;
+  /* 3D hallway: two walls of machines meeting at a vanishing point */
+  .room { overflow: hidden; background-color: #0b0520; background-image: none; }
+  .scene { position: absolute; inset: 0; transform-style: preserve-3d; pointer-events: none; }
+  .plane { position: absolute; transform-style: flat; pointer-events: none; }
+  .side .cab { pointer-events: auto; }
+  .floor {
+    transform-origin: 50% 0; backface-visibility: visible;
+    background-color: var(--carpet);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cg fill='none' stroke-width='4' stroke-linecap='round'%3E%3Cpath d='M14 30l10-10 10 10 10-10' stroke='%23ff4f8b' stroke-opacity='.5'/%3E%3Ccircle cx='110' cy='34' r='9' stroke='%234fd6ff' stroke-opacity='.45'/%3E%3Cpath d='M60 96l12-20 12 20z' stroke='%23ffd23f' stroke-opacity='.45'/%3E%3Cpath d='M120 120q10-14 20 0t20 0' stroke='%235ad17a' stroke-opacity='.45'/%3E%3Cpath d='M20 130h18' stroke='%23c77dff' stroke-opacity='.5'/%3E%3C/g%3E%3Ccircle cx='86' cy='146' r='3' fill='%23ffd23f' fill-opacity='.55'/%3E%3Ccircle cx='140' cy='70' r='3' fill='%23ff4f8b' fill-opacity='.55'/%3E%3Ccircle cx='34' cy='76' r='3' fill='%234fd6ff' fill-opacity='.55'/%3E%3C/svg%3E");
+    background-size: 120px 120px;
   }
-  .label { margin-bottom: 16px; background: var(--label); color: #22104a; border-radius: 8px; overflow: hidden; border: 3px solid #22104a; }
-  .label .art { aspect-ratio: 16 / 10; display: block; width: 100%; }
-  .label .art svg { display: block; width: 100%; height: 100%; }
-  .label .text { padding: 12px 14px 14px; }
-  .slot { font-weight: 900; font-size: 0.85rem; color: #6b5a99; margin: 0 0 2px; }
-  .label h2 { font-family: "Bungee", Impact, sans-serif; font-weight: 400; font-size: 1.45rem; line-height: 1.1; margin: 0 0 6px; }
-  .label .desc { margin: 0; font-size: 0.95rem; line-height: 1.4; color: #44366b; }
-  .needs { margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; list-style: none; }
-  .needs li { font-weight: 800; font-size: 0.78rem; background: #efe8ff; border-radius: 99px; padding: 3px 10px; color: #3a2a66; }
+  .floor::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(5,2,15,0.75) 100%); }
+  .side {
+    background:
+      linear-gradient(180deg, transparent 0 var(--stripe-top), var(--wall-line) var(--stripe-top) calc(var(--stripe-top) + 4px), transparent calc(var(--stripe-top) + 4px)),
+      linear-gradient(0deg, var(--base-line) 0 3px, #0a0614 3px 14px, transparent 14px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 3px, transparent 3px 110px),
+      linear-gradient(180deg, #2a1556, #1b0d3a);
+  }
+  .ceiling {
+    transform-origin: 50% 0;
+    background:
+      repeating-linear-gradient(180deg, transparent 0 70px, rgba(255, 246, 214, 0.85) 70px 78px, transparent 78px 150px),
+      linear-gradient(180deg, #160a30, #0b0520);
+  }
+  .side.left { transform-origin: 0 50%; }
+  .side.right { transform-origin: 100% 50%; }
+  .side .cab { position: absolute; bottom: 14px; }
+  .back {
+    display: grid; place-items: center;
+    background: radial-gradient(ellipse at 50% 60%, #3a1d66 0%, #1b0d3a 70%);
+    box-shadow: inset 0 4px 0 var(--wall-line), inset 0 -3px 0 var(--base-line);
+  }
+  .back span {
+    font: 400 clamp(14px, 4vw, 54px)/1 "Bungee", Impact, sans-serif; color: #4fd6ff;
+    text-shadow: 0 0 8px #4fd6ff, 0 0 22px #4fd6ff; letter-spacing: 0.06em;
+  }
 
-  .play {
-    margin-top: auto; display: block; text-align: center; text-decoration: none;
-    font-family: "Bungee", Impact, sans-serif; font-size: 1.15rem; letter-spacing: 0.02em;
-    background: var(--pink); color: #fff; border: 3px solid #22104a; border-radius: 14px; padding: 12px;
-    box-shadow: 0 5px 0 #22104a; transition: transform 0.08s, box-shadow 0.08s;
+  /* ---------- Arcade cabinets ---------- */
+  .cab {
+    --body: #3a3550; --body-hi: #4d4768; --accent: #5a5470; --neon: #8a84a8;
+    position: relative; flex: none; width: var(--cw); height: var(--ch);
+    display: flex; flex-direction: column; color: inherit; text-decoration: none;
+    container-type: size; cursor: pointer; outline: none;
+    transition: transform 0.15s ease;
   }
-  .play:hover { transform: translateY(-2px); box-shadow: 0 7px 0 #22104a; }
-  .play:active { transform: translateY(4px); box-shadow: 0 1px 0 #22104a; }
-  .play:focus-visible, .theme-btn:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
-  .soon {
-    margin-top: auto; text-align: center; font-family: "Bungee", Impact, sans-serif; font-size: 1rem;
-    border: 3px dashed var(--cart-edge); border-radius: 14px; padding: 11px; color: var(--ink-soft);
+  .cab::after { /* glow on the wall behind the machine */
+    content: ""; position: absolute; left: -25%; right: -25%; top: -6%; bottom: 0; z-index: -1;
+    background: radial-gradient(ellipse at 50% 35%, var(--neon) 0%, transparent 65%);
+    opacity: 0.12; transition: opacity 0.2s;
   }
+  .cab-marquee {
+    flex: 0 0 15%; margin: 0 -4%; padding: 0 7%;
+    background: linear-gradient(180deg, #24123f, #0b0620);
+    border: 3px solid #0a0614; border-radius: 7px 7px 2px 2px;
+    display: grid; place-items: center; text-align: center;
+    font: 400 min(10cqw, 22px)/1.05 "Bungee", Impact, sans-serif; color: var(--neon);
+    text-shadow: 0 0 6px var(--neon); transition: text-shadow 0.2s, background 0.2s;
+  }
+  .cab-head {
+    flex: 0 0 37%; padding: 7% 9% 5%;
+    background:
+      linear-gradient(90deg, rgba(0,0,0,0.35) 0 7%, transparent 7% 93%, rgba(0,0,0,0.35) 93%),
+      var(--body);
+    border-left: 3px solid #0a0614; border-right: 3px solid #0a0614;
+  }
+  .screen { height: 100%; background: #05030c; border-radius: 9px; padding: 6%; box-shadow: inset 0 0 0 3px #0a0614, inset 0 0 0 6px #2b2640; }
+  .screen-in { position: relative; width: 100%; height: 100%; border-radius: 6px; overflow: hidden; background: #000; }
+  .screen-in .art { position: absolute; inset: 0; filter: brightness(0.78) saturate(0.85); transition: filter 0.2s; }
+  .screen-in .art svg { display: block; width: 100%; height: 100%; }
+  .screen-in::after { /* glass + scanlines */
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 35%),
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0 1px, transparent 1px 3px);
+  }
+  .press {
+    position: absolute; left: 0; right: 0; bottom: 6%; text-align: center; z-index: 1;
+    font: 400 min(7cqw, 15px)/1 "Bungee", Impact, sans-serif; color: #fff;
+    text-shadow: 0 0 6px #fff, 0 2px 0 #000; opacity: 0;
+  }
+  .cab-panel {
+    flex: 0 0 11%; margin: 0 -6%; position: relative;
+    background: linear-gradient(180deg, var(--body-hi), var(--body));
+    border: 3px solid #0a0614; border-radius: 5px;
+    clip-path: polygon(5% 0, 95% 0, 100% 100%, 0 100%);
+    display: flex; align-items: center; justify-content: center; gap: 9%;
+  }
+  .stick { position: relative; width: 14%; aspect-ratio: 1; }
+  .stick::before { content: ""; position: absolute; left: 50%; bottom: 30%; width: 14%; height: 70%; transform: translateX(-50%); background: #c9c3d6; border-radius: 2px; }
+  .stick::after { content: ""; position: absolute; left: 50%; top: -10%; width: 60%; aspect-ratio: 1; transform: translateX(-50%); background: #e0402a; border-radius: 50%; box-shadow: inset -2px -2px 0 rgba(0,0,0,0.3); }
+  .btns { display: flex; gap: 6%; width: 42%; }
+  .btns i { flex: 1; aspect-ratio: 1; border-radius: 50%; box-shadow: inset -2px -2px 0 rgba(0,0,0,0.35), 0 0 0 2px #0a0614; }
+  .btns i:nth-child(1) { background: #ffd23f; } .btns i:nth-child(2) { background: #4fd6ff; } .btns i:nth-child(3) { background: #5ad17a; }
+  .cab-body {
+    flex: 1; position: relative; display: flex; align-items: center; justify-content: center;
+    background:
+      linear-gradient(90deg, rgba(0,0,0,0.35) 0 7%, transparent 7% 93%, rgba(0,0,0,0.35) 93%),
+      repeating-linear-gradient(-55deg, transparent 0 14px, color-mix(in srgb, var(--accent) 35%, transparent) 14px 20px),
+      var(--body);
+    border: 3px solid #0a0614; border-top: 0;
+  }
+  .coin-door { width: 42%; height: 42%; background: #1d1a26; border: 3px solid #0a0614; border-radius: 4px; display: flex; align-items: center; justify-content: center; gap: 14%; }
+  .coin-door i { width: 16%; height: 46%; background: #ff3b3b; border-radius: 2px; box-shadow: 0 0 8px 2px rgba(255, 59, 59, 0.7); }
+  .kick { position: absolute; left: -3px; right: -3px; bottom: 0; height: 9%; background: #0a0614; }
 
-  /* Under construction label */
-  .wip .art {
-    position: relative; display: grid; place-items: center;
-    background: repeating-linear-gradient(-45deg, var(--hazard) 0 22px, var(--hazard-dark) 22px 44px);
-  }
-  .wip .art .tape {
-    background: #fff; border: 3px solid #22104a; border-radius: 10px; padding: 8px 14px;
-    font-family: "Bungee", Impact, sans-serif; font-size: 1.05rem; color: #22104a; transform: rotate(-4deg);
-    display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 0 rgba(0,0,0,0.35);
-  }
-  .wip .art .tape svg { width: 30px; height: 34px; flex: none; }
-  .wip .label h2 { color: #8a7cb0; }
+  /* hover / focus: the machine lights up */
+  .cab.hot { transform: translateY(-5px); }
+  .cab.hot::after { opacity: 0.55; }
+  .cab.hot .cab-marquee { background: linear-gradient(180deg, #3a1d66, #160a33); text-shadow: 0 0 6px var(--neon), 0 0 18px var(--neon), 0 0 30px var(--neon); }
+  .cab.hot .art { filter: brightness(1.08) saturate(1.1); }
+  .cab.hot .press { animation: blink 0.8s steps(1) infinite; }
+  @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } }
+  .cab:focus-visible { outline: 3px solid var(--focus); outline-offset: 6px; border-radius: 8px; }
 
-  /* Notice for the preview */
+  /* out-of-order machines */
+  .cab.wip .screen-in {
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0 1px, transparent 1px 2px),
+      repeating-linear-gradient(90deg, #1a1826 0 3px, #2a2738 3px 5px, #15131f 5px 9px);
+    animation: static 0.25s steps(3) infinite;
+  }
+  @keyframes static { 0% { background-position: 0 0, 0 0; } 33% { background-position: 0 2px, 7px 0; } 66% { background-position: 0 1px, 3px 0; } }
+  .tape {
+    position: absolute; left: -8%; right: -8%; top: 50%; transform: translateY(-50%) rotate(-12deg); z-index: 1;
+    background: repeating-linear-gradient(-45deg, #ffc400 0 8px, #22104a 8px 16px);
+    padding: 3px 0;
+  }
+  .tape span { display: block; background: #ffc400; color: #22104a; text-align: center; font: 400 min(7.4cqw, 15px)/1.4 "Bungee", Impact, sans-serif; }
+  .cab.wip.hot .tape { animation: wobble 0.4s ease-in-out infinite alternate; }
+  @keyframes wobble { from { transform: translateY(-50%) rotate(-14deg); } to { transform: translateY(-50%) rotate(-9deg); } }
+  .cab.wip .cab-marquee { opacity: 0.75; }
+  .cab.nope { animation: nope 0.35s; }
+  @keyframes nope { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+
+  canvas#crowd { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+
+  footer { text-align: center; padding: 10px 16px 14px; color: var(--text-soft); font-weight: 800; font-size: 0.9rem; }
+
   .notice {
     position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
     max-width: min(520px, calc(100% - 32px)); background: var(--sign); color: var(--sign-text);
@@ -152,60 +223,16 @@
   }
   .notice.show { display: block; }
 
-  footer { text-align: center; padding: 28px 20px 40px; color: var(--ink-soft); font-weight: 800; }
-  .theme-btn {
-    font: 800 0.9rem "Nunito", system-ui, sans-serif; color: var(--ink); background: transparent;
-    border: 2px solid var(--cart-edge); border-radius: 99px; padding: 6px 14px; cursor: pointer; margin-top: 10px;
-  }
-
-  /* ---------- One-screen layout for computer monitors ---------- */
+  /* One screen on computer monitors */
   @media (min-width: 900px) and (min-height: 620px) {
     html, body { height: 100%; }
-    body { overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
-    header { padding: 2.2vh 20px 0; }
-    .sign {
-      padding: 1.8vh 56px 2vh; max-width: 780px; border-radius: 22px;
-      box-shadow: 0 0 0 5px var(--pink), 0 0 0 10px var(--sign), 0 10px 0 10px var(--cart-shadow);
-    }
-    .bulbs { inset: 9px; }
-    .bulb { width: 10px; height: 10px; margin: -5px 0 0 -5px; }
-    .sign h1 { font-size: clamp(2rem, 5.6vh, 3.8rem); white-space: nowrap; }
-    .sign h1 span { display: inline; font-size: 0.78em; margin: 0 0 0 0.3em; }
-    .sign p { margin-top: 0.8vh; font-size: clamp(0.9rem, 1.8vh, 1.1rem); }
-    main { width: 100%; max-width: min(1520px, 165vh); min-height: 0; padding: 3.4vh 28px 1.4vh; display: flex; flex-direction: column; }
-    .shelf-note { margin: 0 0 1.8vh; font-size: clamp(0.85rem, 1.7vh, 1rem); }
-    .shelf { flex: 1; min-height: 0; grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 2.6vh 24px; }
-    .shelf > li { min-height: 0; }
-    .cart { padding: 18px 12px 12px; box-shadow: 0 6px 0 var(--cart-shadow); clip-path: polygon(0 14px, 14px 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); }
-    .cart::before { top: 6px; height: 6px; }
-    .label { flex: 1; min-height: 0; display: flex; margin-bottom: 1.2vh; }
-    .label .art { aspect-ratio: auto; width: 42%; flex: none; border-right: 3px solid #22104a; }
-    .label .text { padding: 1vh 12px; min-width: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
-    .slot { font-size: clamp(0.7rem, 1.4vh, 0.85rem); }
-    .label h2 { font-size: clamp(1rem, 2.5vh, 1.45rem); margin-bottom: 0.5vh; }
-    .label .desc { font-size: clamp(0.78rem, 1.6vh, 0.95rem); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-    .needs { margin-top: 0.8vh; gap: 4px; }
-    .needs li { font-size: 0.7rem; padding: 2px 8px; }
-    .play { font-size: clamp(0.9rem, 2vh, 1.15rem); padding: 1vh 10px; border-radius: 12px; box-shadow: 0 4px 0 #22104a; }
-    .play:hover { box-shadow: 0 6px 0 #22104a; }
-    .soon { font-size: clamp(0.75rem, 1.6vh, 0.95rem); padding: 0.9vh 10px; border-radius: 12px; }
-    .wip .art .tape { font-size: clamp(0.7rem, 1.5vh, 0.95rem); padding: 5px 9px; gap: 6px; max-width: 88%; line-height: 1.15; }
-    .wip .art .tape svg { width: 18px; height: 22px; }
-    footer { padding: 0 20px 1.8vh; display: flex; justify-content: center; align-items: center; gap: 16px; font-size: 0.9rem; }
-    .theme-btn { margin-top: 0; padding: 4px 12px; }
-  }
-  @media (min-width: 900px) and (min-height: 620px) and (max-height: 950px) {
-    .needs { display: none; }
-  }
-  @media (min-width: 900px) and (min-height: 620px) and (max-height: 800px) {
-    .slot { display: none; }
-    .sign p { display: none; }
-    .shelf { gap: 2.2vh 22px; }
+    body { overflow: hidden; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; }
+    .room { min-height: 0; }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .bulb { animation: none !important; }
-    .play { transition: none; }
+    .bulb, .cab.hot .press, .cab.wip .screen-in, .cab.wip.hot .tape { animation: none !important; }
+    .cab.hot .press { opacity: 1; }
   }
 </style>
 </head>
@@ -214,26 +241,24 @@
   <div class="sign">
     <div class="bulbs" id="bulbs" aria-hidden="true"></div>
     <h1>fake0hs<span>Arcade</span></h1>
-    <p>Homemade games by fake0h. Pick a cartridge and press play.</p>
   </div>
 </header>
-
-<main>
-  <p class="shelf-note" id="shelfNote"></p>
-  <ul class="shelf" id="shelf"></ul>
+<p class="info" id="info" aria-live="polite"></p>
+<main class="room" id="room">
+  <div class="scene" id="scene">
+    <div class="plane floor" id="floor"></div>
+    <div class="plane ceiling" id="ceiling"></div>
+    <div class="plane back" id="back"><span>GAME ON</span></div>
+    <div class="plane side left" id="wallL"></div>
+    <div class="plane side right" id="wallR"></div>
+  </div>
+  <canvas id="crowd" aria-hidden="true"></canvas>
 </main>
-
-<footer>
-  <div>© 2026 fake0hs Arcade</div>
-  <button class="theme-btn" id="themeBtn" type="button">Switch to dark mode</button>
-</footer>
-
+<footer>© 2026 fake0hs Arcade</footer>
 <div class="notice" id="notice" role="status" aria-live="polite"></div>
 
 <script>
 (function () {
-  // ---------- Game list: edit this to add new games ----------
-  // When a new game is ready, set ready: true and fill in href, desc, needs and art.
   var GAMES = [
     {
       ready: true,
@@ -258,6 +283,14 @@
       desc: "Merge items to make a cozy home for baby Leo.",
       needs: ["Mouse or touch", "Story", "Saves progress"],
       art: "leo"
+    },
+    {
+      ready: true,
+      title: "Abducted",
+      href: "games/abducted/index.html",
+      desc: "Escape an alien spaceship without getting spotted. Scary!",
+      needs: ["Keyboard", "Sound on", "Horror"],
+      art: "abducted"
     }
   ];
   var TOTAL = 9;
@@ -334,97 +367,362 @@
     '<circle cx="181" cy="162" r="7" fill="#ffdfc4"/><path d="M176 160q5-6 10 0" stroke="#5a3a2a" stroke-width="2" fill="none"/>' +
     '<path d="M181 92c-4-6-14-2-9 6l9 8 9-8c5-8-5-12-9-6z" fill="#ff4f8b" stroke="#fff" stroke-width="2"/>' +
     '</svg>';
-  var ARTS = { cactus: cactusArt, piano: pianoArt, leo: leoArt };
+  var abductedArt =
+    '<svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" role="img" aria-label="A pink alien with a huge nose shining a flashlight down a dark spaceship hallway">' +
+    '<rect width="320" height="200" fill="#05060c"/>' +
+    '<path d="M0 0h320v40H0zM0 160h320v40H0z" fill="#1b2030"/>' +
+    '<g fill="#2c3246"><rect x="20" y="40" width="16" height="120"/><rect x="110" y="40" width="16" height="120"/><rect x="200" y="40" width="16" height="120"/><rect x="290" y="40" width="16" height="120"/></g>' +
+    '<g fill="#7dff6b"><circle cx="28" cy="60" r="2"/><circle cx="118" cy="60" r="2"/><circle cx="208" cy="60" r="2"/><circle cx="298" cy="60" r="2"/></g>' +
+    '<defs><radialGradient id="beam" cx="0" cy=".5" r="1"><stop offset="0" stop-color="#fff0aa" stop-opacity=".55"/><stop offset="1" stop-color="#fff0aa" stop-opacity="0"/></radialGradient></defs>' +
+    '<path d="M210 112 40 60v110z" fill="url(#beam)"/>' +
+    '<g transform="translate(232 110)"><ellipse cy="36" rx="20" ry="6" fill="#000" opacity=".4"/><ellipse cy="14" rx="18" ry="18" fill="#ff7ab8"/><circle cy="-12" r="21" fill="#ff7ab8"/>' +
+    '<path d="M2-32l6-12" stroke="#ff7ab8" stroke-width="3"/><circle cx="8" cy="-45" r="3.5" fill="#7dff6b"/>' +
+    '<ellipse cx="-13" cy="-18" rx="5" ry="6" fill="#fff"/><ellipse cx="3" cy="-18" rx="5" ry="6" fill="#fff"/><circle cx="-15" cy="-17" r="2.6" fill="#111"/><circle cx="1" cy="-17" r="2.6" fill="#111"/>' +
+    '<ellipse cx="-16" cy="-6" rx="14" ry="10" fill="#e0559a"/><circle cx="-21" cy="-9" r="3" fill="#fff" opacity=".4"/>' +
+    '<text x="0" y="-52" font-family="Nunito, sans-serif" font-weight="900" font-size="22" fill="#ff3b3b" text-anchor="middle">!</text></g>' +
+    '<g transform="translate(66 120)"><rect x="-14" y="-34" width="28" height="62" rx="3" fill="#4a5470"/><path d="M-8-24h16M-8-16h16M-8-8h16M-8 0h16" stroke="#353d55" stroke-width="2"/>' +
+    '<ellipse cy="-16" rx="9" ry="3" fill="#e8c45a"/><circle cx="-3" cy="-12" r="1.6" fill="#fff"/><circle cx="3" cy="-12" r="1.6" fill="#fff"/></g>' +
+    '<g fill="#ff1a3c"><circle cx="150" cy="96" r="2"/><circle cx="157" cy="96" r="2"/></g>' +
+    '</svg>';
+  var ARTS = { cactus: cactusArt, piano: pianoArt, leo: leoArt, abducted: abductedArt };
 
   var coneIcon =
     '<svg viewBox="0 0 30 34" aria-hidden="true"><rect x="2" y="29" width="26" height="4" rx="1" fill="#ff6a00" stroke="#22104a" stroke-width="1.5"/>' +
     '<path d="M9 29 13 3h4l4 26z" fill="#ff6a00" stroke="#22104a" stroke-width="1.5"/><path d="M11 18h8l1 5H10z" fill="#fff"/></svg>';
 
-  var shelf = document.getElementById("shelf");
+
+  // Cabinet colors per game (by art name); machines without a game use the grey default
+  var CAB_COLORS = {
+    cactus: { body: "#d9663f", hi: "#f08a5a", accent: "#ffc46b", neon: "#ffdd55" },
+    piano:  { body: "#5a2290", hi: "#7a3ab8", accent: "#ff4f8b", neon: "#ff7ab8" },
+    leo:    { body: "#6b3e5e", hi: "#8c5a7c", accent: "#f4b63f", neon: "#ffd86b" },
+    abducted: { body: "#1d2a22", hi: "#2f4436", accent: "#7dff6b", neon: "#7dff6b" }
+  };
+  var READY_COUNT = GAMES.filter(function (g) { return g.ready; }).length;
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---------- Build the cabinets ----------
+  var cabs = [];
   for (var i = 0; i < TOTAL; i++) {
-    var g = GAMES[i];
-    var li = document.createElement("li");
-    if (g && g.ready) {
-      li.innerHTML =
-        '<article class="cart">' +
-          '<div class="label">' +
-            '<div class="art">' + (ARTS[g.art] || "") + '</div>' +
-            '<div class="text">' +
-              '<p class="slot">Game ' + (i + 1) + '</p>' +
-              '<h2>' + g.title + '</h2>' +
-              '<p class="desc">' + g.desc + '</p>' +
-              '<ul class="needs">' + g.needs.map(function (n) { return "<li>" + n + "</li>"; }).join("") + '</ul>' +
-            '</div>' +
-          '</div>' +
-          '<a class="play" href="' + g.href + '" data-game="' + g.title + '">Play ' + g.title + '</a>' +
-        '</article>';
-    } else {
-      li.innerHTML =
-        '<article class="cart wip" aria-label="Game ' + (i + 1) + ', under construction">' +
-          '<div class="label">' +
-            '<div class="art"><div class="tape">' + coneIcon + 'Under construction</div></div>' +
-            '<div class="text">' +
-              '<p class="slot">Game ' + (i + 1) + '</p>' +
-              '<h2>Coming soon</h2>' +
-              '<p class="desc">fake0h is still building this one.</p>' +
-            '</div>' +
-          '</div>' +
-          '<div class="soon">Not playable yet</div>' +
-        '</article>';
-    }
-    shelf.appendChild(li);
+    var g = GAMES[i], ready = g && g.ready;
+    var el = document.createElement(ready ? "a" : "div");
+    el.className = "cab" + (ready ? "" : " wip");
+    if (ready) { el.href = g.href; el.setAttribute("aria-label", "Play " + g.title + ". " + g.desc); }
+    else { el.tabIndex = 0; el.setAttribute("role", "img"); el.setAttribute("aria-label", "Machine " + (i + 1) + ", out of order. Coming soon."); }
+    var c = ready && CAB_COLORS[g.art];
+    if (c) { el.style.setProperty("--body", c.body); el.style.setProperty("--body-hi", c.hi); el.style.setProperty("--accent", c.accent); el.style.setProperty("--neon", c.neon); }
+    el.innerHTML =
+      '<div class="cab-marquee">' + (ready ? g.title : "Coming soon") + '</div>' +
+      '<div class="cab-head"><div class="screen"><div class="screen-in">' +
+        (ready ? '<div class="art">' + (ARTS[g.art] || "") + '</div><div class="press">Press start</div>'
+               : '<div class="tape"><span>Out of order</span></div>') +
+      '</div></div></div>' +
+      '<div class="cab-panel"><div class="stick"></div><div class="btns"><i></i><i></i><i></i></div></div>' +
+      '<div class="cab-body"><div class="coin-door"><i></i><i></i></div><div class="kick"></div></div>';
+    cabs.push(el);
   }
 
-  var readyCount = GAMES.filter(function (g) { return g.ready; }).length;
-  document.getElementById("shelfNote").textContent =
-    readyCount + (readyCount === 1 ? " game" : " games") + " ready to play, " + (TOTAL - readyCount) + " more being built.";
+  // ---------- Info line ----------
+  var info = document.getElementById("info");
+  function defaultInfo() {
+    info.textContent = READY_COUNT + (READY_COUNT === 1 ? " game" : " games") + " ready to play, " + (TOTAL - READY_COUNT) + " machines out of order. Point at a machine!";
+  }
+  function showInfo(i) {
+    var g = GAMES[i];
+    info.innerHTML = "";
+    var s = document.createElement("strong");
+    if (g && g.ready) {
+      s.textContent = g.title; info.appendChild(s);
+      info.appendChild(document.createTextNode(g.desc));
+      var n = document.createElement("span"); n.className = "needs"; n.textContent = "· " + g.needs.join(" · "); info.appendChild(n);
+    } else {
+      s.textContent = "Out of order"; info.appendChild(s);
+      info.appendChild(document.createTextNode("fake0h is still building game " + (i + 1) + "."));
+    }
+  }
+  defaultInfo();
+
+  // ---------- 3D hallway layout ----------
+  // World coordinates: x across the screen, z into the screen (negative = farther away),
+  // floor at y = G.yFloor. The same perspective numbers drive the CSS walls and the crowd.
+  var room = document.getElementById("room");
+  var wallL = document.getElementById("wallL"), wallR = document.getElementById("wallR");
+  var floorEl = document.getElementById("floor"), backEl = document.getElementById("back");
+  var canvas = document.getElementById("crowd"), ctx = canvas.getContext("2d");
+  var fitMQ = window.matchMedia("(min-width: 900px) and (min-height: 620px)");
+  var G = null;
+  var LEFT_COUNT = Math.ceil(TOTAL / 2);
+
+  function layout() {
+    var fit = fitMQ.matches;
+    if (!fit) room.style.height = Math.round(Math.min(760, Math.max(520, window.innerWidth * 1.45))) + "px";
+    else room.style.height = "";
+    var rw = room.clientWidth, rh = room.clientHeight;
+    var ch = Math.min(rh * 0.66, rw * 0.7), cw = ch / 2.3;
+    var spacing = cw * 1.14, d0 = cw * 0.75;
+    var D = d0 + (LEFT_COUNT - 1) * spacing + cw * 0.9;      // wall length
+    var theta = 64 * Math.PI / 180;
+    var maxCos = (rw * 0.36) / D;                              // keep the far end of the hallway open
+    if (Math.cos(theta) > maxCos) theta = Math.acos(Math.max(0.12, maxCos));
+    var P = Math.max(420, rw * 0.62);
+    var yFloor = rh * 0.97, wallH = yFloor;  // walls run all the way up to the ceiling
+    var ox = rw / 2, oy = yFloor - ch * 0.6;
+    var cot = Math.cos(theta) / Math.sin(theta), Dz = D * Math.sin(theta);
+
+    room.style.perspective = P + "px";
+    room.style.perspectiveOrigin = ox + "px " + oy + "px";
+
+    [wallL, wallR].forEach(function (w) {
+      w.style.top = (yFloor - wallH) + "px"; w.style.width = D + "px"; w.style.height = wallH + "px";
+      w.style.setProperty("--stripe-top", (wallH - ch - 40) + "px");  // neon stripe just above the machines
+    });
+    var ceil = document.getElementById("ceiling");
+    ceil.style.left = "0px"; ceil.style.top = (yFloor - wallH) + "px"; ceil.style.width = rw + "px"; ceil.style.height = (D * Math.sin(theta)) + "px";
+    ceil.style.transform = "rotateX(-90deg)";
+    wallL.style.left = "0px"; wallL.style.transform = "rotateY(" + theta + "rad)";
+    wallR.style.left = (rw - D) + "px"; wallR.style.transform = "rotateY(" + (-theta) + "rad)";
+
+    floorEl.style.left = "0px"; floorEl.style.top = yFloor + "px"; floorEl.style.width = rw + "px"; floorEl.style.height = Dz + "px";
+    floorEl.style.transform = "rotateX(-90deg)";
+    var inset = Dz * cot;
+    floorEl.style.clipPath = "polygon(0 0, " + rw + "px 0, " + (rw - inset) + "px " + Dz + "px, " + inset + "px " + Dz + "px)";
+    ceil.style.clipPath = floorEl.style.clipPath;
+
+    backEl.style.left = inset + "px"; backEl.style.width = Math.max(0, rw - 2 * inset) + "px";
+    backEl.style.top = (yFloor - wallH) + "px"; backEl.style.height = wallH + "px";
+    backEl.style.transform = "translateZ(" + (-Dz) + "px)";
+
+    // machines: odd games on the left wall, even games on the right, nearest first
+    var spots = [];
+    cabs.forEach(function (cab, i) {
+      var left = i % 2 === 0, idx = Math.floor(i / 2), d = d0 + idx * spacing;
+      cab.style.setProperty("--cw", cw + "px"); cab.style.setProperty("--ch", ch + "px");
+      cab.style.left = (left ? d - cw / 2 : D - d - cw / 2) + "px";
+      (left ? wallL : wallR).appendChild(cab);
+      spots.push({ left: left, d: d });
+    });
+
+    G = { rw: rw, rh: rh, ch: ch, cw: cw, P: P, ox: ox, oy: oy, yFloor: yFloor, theta: theta, cot: cot, Dz: Dz, spots: spots };
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = rw * dpr; canvas.height = rh * dpr;
+    canvas.style.width = rw + "px"; canvas.style.height = rh + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    people.forEach(function (p) { var s = randomSpot(); p.x = s[0]; p.z = s[1]; p.path = []; });
+  }
+
+  // project a floor point to the screen
+  function project(x, z) {
+    var k = G.P / (G.P - z);
+    return { x: G.ox + (x - G.ox) * k, y: G.oy + (G.yFloor - G.oy) * k, k: k };
+  }
+  // walkable corridor between the walls at depth z
+  function corridor(z) {
+    var inset = (-z) * G.cot, m = G.cw * 0.3;
+    return [inset + m, G.rw - inset - m];
+  }
+
+  // ---------- The crowd ----------
+  var SHIRTS = ["#ff4f8b", "#4fd6ff", "#ffd23f", "#5ad17a", "#c77dff", "#ff8a3d", "#ffffff", "#e0402a"];
+  var PANTS = ["#2a3a6a", "#1d1a26", "#5a3a2a", "#3a5a8a", "#4a4560"];
+  var SKINS = ["#f1c7a3", "#d9a37a", "#a8714a", "#7a4a2a", "#ffdfc4", "#c68b5c"];
+  var HAIR = ["#2b1a12", "#5a3a2a", "#e0b03a", "#1d1a26", "#c4482b", "#8a6a3a", "#c77dff"];
+  var pick = function (a) { return a[Math.floor(Math.random() * a.length)]; };
+  var rand = function (a, b) { return a + Math.random() * (b - a); };
+  var people = [];
+  var hover = -1;
+
+  function randomSpot() {
+    var z = -rand(G.cw * 0.45, G.Dz * 0.9), c = corridor(z);
+    return [rand(c[0], Math.max(c[0], c[1])), z];
+  }
+  function wander(p) {
+    if (reduceMotion) { p.idle = 999; return; }
+    var s = randomSpot();
+    p.path = [s]; p.run = false;
+  }
+  function makePeople() {
+    var n = fitMQ.matches ? 14 : 9;
+    for (var i = 0; i < n; i++) {
+      var s = randomSpot();
+      people.push({
+        x: s[0], z: s[1], path: [], dir: Math.random() < 0.5 ? -1 : 1,
+        phase: Math.random() * 6, idle: rand(0, 2), run: false, rush: false, cheer: false, shrug: false,
+        walkSpeed: rand(70, 110), runSpeed: rand(420, 560), seed: Math.random() * 10,
+        shirt: pick(SHIRTS), pants: pick(PANTS), skin: pick(SKINS), hair: pick(HAIR), size: rand(0.88, 1.1),
+        joins: Math.random() < 0.88
+      });
+    }
+  }
+
+  function setHover(i) {
+    if (hover === i) return;
+    if (hover >= 0) cabs[hover].classList.remove("hot");
+    hover = i;
+    cabs[i].classList.add("hot");
+    showInfo(i);
+    var sp = G.spots[i], sinT = Math.sin(G.theta);
+    people.forEach(function (p) {
+      if (!p.joins) return;
+      // gather on the floor in front of the machine
+      var d = sp.d + (Math.random() - 0.5) * G.cw * 1.3;
+      var z = Math.min(-G.cw * 0.15, -d * sinT), c = corridor(z);
+      var out = rand(G.cw * 0.5, G.cw * 1.5);
+      var x = sp.left ? c[0] + out : c[1] - out;
+      p.rush = true; p.run = !reduceMotion; p.cheer = false; p.shrug = false;
+      p.path = [[x, z]];
+      p.face = sp.left ? -1 : 1;
+    });
+  }
+  function clearHover(i) {
+    if (i !== undefined && i !== hover) return;
+    if (hover >= 0) cabs[hover].classList.remove("hot");
+    hover = -1;
+    defaultInfo();
+    people.forEach(function (p) {
+      if (!p.rush) return;
+      p.rush = false; p.run = false; p.cheer = false; p.shrug = false;
+      p.path = []; p.idle = rand(0.4, 1.8);
+    });
+  }
+
+  function update(dt) {
+    people.forEach(function (p) {
+      if (p.path.length) {
+        var t = p.path[0], dx = t[0] - p.x, dz = t[1] - p.z, d = Math.hypot(dx, dz);
+        var sp = p.run ? p.runSpeed : p.walkSpeed;
+        if (d <= sp * dt + 0.5) { p.x = t[0]; p.z = t[1]; p.path.shift(); }
+        else { p.x += dx / d * sp * dt; p.z += dz / d * sp * dt; }
+        var scr = project(p.x, p.z), next = project(t[0], t[1]);
+        if (Math.abs(next.x - scr.x) > 2) p.dir = next.x > scr.x ? 1 : -1;
+        p.moving = true;
+        p.phase += dt * sp * scr.k / (G.ch * 0.55 * 0.22);
+        if (!p.path.length) {
+          p.moving = false;
+          if (p.rush && hover >= 0) {
+            var g = GAMES[hover];
+            if (g && g.ready) p.cheer = true; else p.shrug = true;
+            p.dir = p.face;
+          } else p.idle = rand(0.6, 3.2);
+        }
+      } else {
+        p.moving = false;
+        if (!p.rush) { p.idle -= dt; if (p.idle <= 0) wander(p); }
+      }
+    });
+  }
+
+  function drawPerson(p, T) {
+    var pr = project(p.x, p.z);
+    var s = G.ch * 0.55 * p.size * pr.k;   // twice the old size
+    var x = pr.x, y = pr.y;
+    var amp = p.moving ? (p.run ? 0.95 : 0.5) : 0;
+    var sw = Math.sin(p.phase) * amp;
+    var bounce = p.moving ? Math.abs(Math.cos(p.phase)) * s * (p.run ? 0.07 : 0.03) : 0;
+    if (p.cheer) bounce = Math.abs(Math.sin(T * 9 + p.seed)) * s * 0.16;
+    var by = y - bounce;
+    var lean = p.moving && p.run ? p.dir * s * 0.07 : 0;
+    var hipY = by - s * 0.4, shY = by - s * 0.74, headY = by - s * 0.9;
+
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    ctx.beginPath(); ctx.ellipse(x, y, s * 0.2, s * 0.05, 0, 0, 7); ctx.fill();
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = p.pants; ctx.lineWidth = s * 0.1;
+    ctx.beginPath();
+    ctx.moveTo(x - s * 0.04, hipY); ctx.lineTo(x - s * 0.04 + Math.sin(sw) * s * 0.34, by - (sw > 0 ? Math.sin(sw) * s * 0.05 : 0));
+    ctx.moveTo(x + s * 0.04, hipY); ctx.lineTo(x + s * 0.04 - Math.sin(sw) * s * 0.34, by - (sw < 0 ? -Math.sin(sw) * s * 0.05 : 0));
+    ctx.stroke();
+    ctx.strokeStyle = p.skin; ctx.lineWidth = s * 0.075;
+    ctx.beginPath();
+    if (p.cheer) {
+      var wv = Math.sin(T * 12 + p.seed) * s * 0.06;
+      ctx.moveTo(x - s * 0.1 + lean, shY + s * 0.03); ctx.lineTo(x - s * 0.24 + lean + wv, shY - s * 0.26);
+      ctx.moveTo(x + s * 0.1 + lean, shY + s * 0.03); ctx.lineTo(x + s * 0.24 + lean - wv, shY - s * 0.26);
+    } else if (p.shrug) {
+      ctx.moveTo(x - s * 0.1, shY + s * 0.04); ctx.lineTo(x - s * 0.24, shY + s * 0.12); ctx.lineTo(x - s * 0.3, shY - s * 0.02);
+      ctx.moveTo(x + s * 0.1, shY + s * 0.04); ctx.lineTo(x + s * 0.24, shY + s * 0.12); ctx.lineTo(x + s * 0.3, shY - s * 0.02);
+    } else if (p.moving && p.run) {
+      ctx.moveTo(x - s * 0.08 + lean, shY + s * 0.04); ctx.lineTo(x - s * 0.08 + lean - sw * s * 0.18, shY + s * 0.18); ctx.lineTo(x - s * 0.02 + lean - sw * s * 0.26, shY + s * 0.08);
+      ctx.moveTo(x + s * 0.08 + lean, shY + s * 0.04); ctx.lineTo(x + s * 0.08 + lean + sw * s * 0.18, shY + s * 0.18); ctx.lineTo(x + s * 0.02 + lean + sw * s * 0.26, shY + s * 0.08);
+    } else {
+      ctx.moveTo(x - s * 0.1, shY + s * 0.04); ctx.lineTo(x - s * 0.13 - sw * s * 0.12, shY + s * 0.32);
+      ctx.moveTo(x + s * 0.1, shY + s * 0.04); ctx.lineTo(x + s * 0.13 + sw * s * 0.12, shY + s * 0.32);
+    }
+    ctx.stroke();
+    ctx.fillStyle = p.shirt;
+    ctx.beginPath(); ctx.roundRect(x - s * 0.12 + lean * 0.6, shY - s * 0.02, s * 0.24, hipY - shY + s * 0.06, s * 0.06); ctx.fill();
+    var hx = x + lean;
+    ctx.fillStyle = p.skin; ctx.beginPath(); ctx.arc(hx, headY, s * 0.12, 0, 7); ctx.fill();
+    ctx.fillStyle = p.hair; ctx.beginPath(); ctx.arc(hx, headY - s * 0.01, s * 0.125, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+    ctx.fillStyle = "#140a28"; ctx.beginPath(); ctx.arc(hx + p.dir * s * 0.05, headY + s * 0.01, Math.max(1, s * 0.018), 0, 7); ctx.fill();
+    if (p.shrug) {
+      var qy = headY - s * 0.32 + Math.sin(T * 4 + p.seed) * 2;
+      ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(hx, qy, s * 0.12, 0, 7); ctx.fill();
+      ctx.fillStyle = "#22104a"; ctx.font = "900 " + Math.round(s * 0.18) + "px Nunito, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("?", hx, qy + 1);
+    }
+  }
+
+  var last = performance.now();
+  function loop(now) {
+    var dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (G) {
+      update(dt);
+      ctx.clearRect(0, 0, G.rw, G.rh);
+      people.slice().sort(function (a, b) { return a.z - b.z; }).forEach(function (p) { drawPerson(p, now / 1000); });
+    }
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- Hover, focus, click ----------
+  var inPreview = window.top !== window.self || /claude/i.test(location.hostname);
+  var notice = document.getElementById("notice"), hideTimer;
+  function showNotice(msg) {
+    notice.textContent = msg; notice.classList.add("show");
+    clearTimeout(hideTimer); hideTimer = setTimeout(function () { notice.classList.remove("show"); }, 6000);
+  }
+  cabs.forEach(function (cab, i) {
+    var g = GAMES[i], ready = g && g.ready;
+    cab.addEventListener("pointerenter", function (e) { if (e.pointerType === "mouse") setHover(i); });
+    cab.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse") clearHover(i); });
+    cab.addEventListener("focus", function () { setHover(i); });
+    cab.addEventListener("blur", function () { clearHover(i); });
+    cab.addEventListener("click", function (e) {
+      if (!ready) {
+        e.preventDefault(); setHover(i);
+        cab.classList.remove("nope"); void cab.offsetWidth; cab.classList.add("nope");
+        return;
+      }
+      if (inPreview) {
+        e.preventDefault(); setHover(i);
+        showNotice(g.title + " opens from the downloaded fake0hs Arcade folder or your live GitHub site.");
+        return;
+      }
+      // On touch screens there is no hover, so let the crowd run over first
+      if (cab._touched) {
+        e.preventDefault(); setHover(i);
+        setTimeout(function () { location.href = g.href; }, 800);
+      }
+    });
+    cab.addEventListener("pointerdown", function (e) { cab._touched = e.pointerType !== "mouse"; });
+  });
 
   // Marquee bulbs around the sign
   var bulbs = document.getElementById("bulbs");
   function placeBulbs() {
     bulbs.innerHTML = "";
-    var w = bulbs.clientWidth, h = bulbs.clientHeight, gap = 34;
-    var nx = Math.max(2, Math.round(w / gap)), ny = Math.max(2, Math.round(h / gap));
+    var w = bulbs.clientWidth, h = bulbs.clientHeight, gap = 32;
+    var nx = Math.max(2, Math.round(w / gap)), ny = Math.max(1, Math.round(h / gap));
     var pts = [];
     for (var x = 0; x <= nx; x++) { pts.push([x / nx * 100, 0]); pts.push([x / nx * 100, 100]); }
     for (var y = 1; y < ny; y++) { pts.push([0, y / ny * 100]); pts.push([100, y / ny * 100]); }
-    pts.forEach(function (p) {
-      var b = document.createElement("span");
-      b.className = "bulb"; b.style.left = p[0] + "%"; b.style.top = p[1] + "%";
-      bulbs.appendChild(b);
-    });
+    pts.forEach(function (p) { var b = document.createElement("span"); b.className = "bulb"; b.style.left = p[0] + "%"; b.style.top = p[1] + "%"; bulbs.appendChild(b); });
   }
-  placeBulbs();
-  window.addEventListener("resize", placeBulbs);
 
-  // In the Claude preview the game can't use the camera, so explain where to play it
-  var inPreview = window.top !== window.self || /claude/i.test(location.hostname);
-  var notice = document.getElementById("notice"), hideTimer;
-  shelf.addEventListener("click", function (e) {
-    var a = e.target.closest(".play");
-    if (!a || !inPreview) return;
-    e.preventDefault();
-    notice.textContent = a.getAttribute("data-game") + " uses your webcam, so it opens from the downloaded fake0hs Arcade folder. Open index.html in that folder and click Play.";
-    notice.classList.add("show");
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(function () { notice.classList.remove("show"); }, 6000);
-  });
-
-  // Light / dark switch
-  var btn = document.getElementById("themeBtn"), root = document.documentElement;
-  function isDark() {
-    var t = root.getAttribute("data-theme");
-    return t ? t === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
-  }
-  function label() { btn.textContent = isDark() ? "Switch to light mode" : "Switch to dark mode"; }
-  try { var saved = localStorage.getItem("arcade-theme"); if (saved) root.setAttribute("data-theme", saved); } catch (e) {}
-  label();
-  btn.addEventListener("click", function () {
-    var next = isDark() ? "light" : "dark";
-    root.setAttribute("data-theme", next);
-    try { localStorage.setItem("arcade-theme", next); } catch (e) {}
-    label();
-  });
+  function relayout() { placeBulbs(); layout(); }
+  window.addEventListener("resize", relayout);
+  relayout();
+  makePeople();
+  requestAnimationFrame(loop);
 })();
 </script>
 </body>
