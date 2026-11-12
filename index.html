@@ -662,7 +662,7 @@
   // Records live in this browser's storage (shared with the games on the same site).
   // The chosen player lasts for this visit only, so every new visit starts in free play.
   // Games report a win with ArcadeProgress.complete() from arcade-progress.js.
-  var PLAYERS = ["fakeOh", "Avery", "Corinne", "Hunter", "Joy", "Dante", "Omeira", "Ray", "Jessie", "Bonnie", "Pindar", "Darius"];
+  var PLAYERS = ["fakeOh", "Avery", "Corinne", "Hunter", "Joy", "Dante", "Omeira", "Ray", "Jessie", "Bonnie", "Pindar", "Darius", "Andy"];
   var CLEAR_KEY = "fake0hArcade.clears";   // { name: { count: times every game was beaten, counted: this round already counted } }
   function readClears() { try { return JSON.parse(localStorage.getItem(CLEAR_KEY)) || {}; } catch (e) { return {}; } }
   function writeClears(c) { try { localStorage.setItem(CLEAR_KEY, JSON.stringify(c)); } catch (e) {} }
