@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Home for Leo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#ECE8F3; --ink:#2A2340; --muted:#6A6185; --card:#FFFFFF; --cell:#DCD6E8; --line:#C9C1DA;
+  --sun:#F4B63F; --sun-ink:#3A2600; --bad:#C2413B; --good:#2F8A57;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#17141F; --ink:#ECE7F7; --muted:#A79FC0; --card:#221D2E; --cell:#2C263B; --line:#3A3350;
+    --sun:#F4B63F; --sun-ink:#2A1B00; --bad:#F07A73; --good:#6FD39A; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#17141F; --ink:#ECE7F7; --muted:#A79FC0; --card:#221D2E; --cell:#2C263B; --line:#3A3350;
+  --sun:#F4B63F; --sun-ink:#2A1B00; --bad:#F07A73; --good:#6FD39A; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 Nunito,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-tap-highlight-color:transparent}
+main{max-width:500px;margin:0 auto;padding:14px 14px 32px}
+button{font:inherit;color:inherit}
+
+/* ---------- scene ---------- */
+.scene{position:relative;aspect-ratio:16/11;border-radius:22px;overflow:hidden;container-type:inline-size;
+  background:linear-gradient(#1E2650,#3A3F78);transition:background 1.2s}
+.scene.storm{background:linear-gradient(#3B4152,#5D6474)}
+.scene.shake{animation:shake .45s}
+@keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.sky{position:absolute;inset:0;pointer-events:none}
+.cloud{position:absolute;font-size:11cqw;top:-1%;opacity:.9}
+.moon{position:absolute;right:6%;top:5%;font-size:7cqw}
+.star{position:absolute;font-size:2.6cqw;opacity:.8}
+.rain i{position:absolute;top:-12%;width:.4cqw;height:7%;background:rgba(210,222,255,.65);border-radius:2px;animation:fall .75s linear infinite}
+@keyframes fall{to{transform:translateY(1600%)}}
+
+.house{position:absolute;left:7%;right:7%;bottom:0;top:13%}
+.roof{position:absolute;left:-5%;right:-5%;top:0;height:33%;background:#6B3E5E;clip-path:polygon(50% 0,100% 100%,0 100%)}
+.hole{position:absolute;left:60%;top:15%;width:11%;height:12%;background:#4A5062;clip-path:polygon(10% 20%,45% 0,80% 15%,100% 60%,70% 100%,30% 85%,0 70%)}
+.patch{position:absolute;left:59%;top:15%;width:13%;height:12%;background:#B98552;border-radius:3px;transform:rotate(-8deg);display:none}
+.fixed .hole{display:none}.fixed .patch{display:block}
+.room{position:absolute;left:0;right:0;top:33%;bottom:0;background:#93A4C2;transition:background 1.2s;overflow:hidden}
+.warm .room{background:#EFC28C}
+.floor{position:absolute;left:0;right:0;bottom:0;height:17%;background:repeating-linear-gradient(90deg,#7D5236 0 14%,#6E4730 14% 15%)}
+.window{position:absolute;right:7%;top:13%;width:17%;height:31%;background:#24305E;border:1cqw solid #F4EDE1;border-radius:4px}
+.window::before,.window::after{content:"";position:absolute;background:#F4EDE1}
+.window::before{left:50%;top:0;bottom:0;width:.8cqw;transform:translateX(-50%)}
+.window::after{top:50%;left:0;right:0;height:.8cqw;transform:translateY(-50%)}
+.fireplace{position:absolute;left:5%;bottom:17%;width:20%;height:42%;background:#8E4B3A;border-radius:6px 6px 0 0}
+.fireplace .opening{position:absolute;left:18%;right:18%;bottom:0;height:58%;background:#2A1A16;border-radius:40% 40% 0 0;display:grid;place-items:end center;font-size:7cqw;line-height:1}
+.prop{position:absolute;line-height:1;transition:opacity .6s, transform .6s}
+.mom{left:30%;bottom:14%;font-size:13cqw}
+.crib{left:55%;bottom:14%;font-size:12cqw}
+.baby{left:59.5%;bottom:33%;font-size:6.5cqw}
+.bubble{position:absolute;left:66%;bottom:47%;background:#fff;border-radius:999px;padding:.6cqw 1.2cqw;font-size:4.6cqw;line-height:1;box-shadow:0 1px 0 rgba(0,0,0,.15)}
+.teddy{left:72%;bottom:14%;font-size:6cqw}
+.bottle{left:47%;bottom:15%;font-size:4.5cqw}
+.cake{left:41%;bottom:15%;font-size:7cqw}
+.balloon{font-size:7cqw}
+.puddle{left:58%;bottom:13%;font-size:5cqw}
+.drip{position:absolute;left:64%;top:0;width:.6cqw;height:4%;background:#CFE0FF;border-radius:3px;animation:drip 1s linear infinite}
+@keyframes drip{to{transform:translateY(1100%)}}
+.hide{opacity:0;transform:scale(.6);pointer-events:none}
+.chapter{position:absolute;left:3%;top:3%;background:rgba(0,0,0,.35);color:#fff;font-weight:800;font-size:3.2cqw;padding:.6cqw 1.8cqw;border-radius:999px}
+
+/* ---------- story card ---------- */
+.story{margin-top:-18px;position:relative;z-index:2;background:var(--card);border-radius:20px;padding:14px 16px 16px;border:2px solid var(--line)}
+.who{font-family:"Baloo 2",Nunito,sans-serif;font-weight:800;font-size:18px;margin:0}
+.say{margin:2px 0 10px;font-size:17px}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opts button,.go{border:2px solid var(--line);background:var(--bg);border-radius:14px;padding:12px 10px;cursor:pointer;font-weight:800;line-height:1.25}
+.opts button:hover{border-color:var(--ink)}
+.go{width:100%;background:var(--sun);border-color:var(--sun);color:var(--sun-ink)}
+.go:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.needs{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.need{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 8px;border-radius:12px;background:var(--bg);border:2px dashed var(--line);font-weight:700;font-size:14px}
+.need b{font-size:26px;line-height:1}
+.need.have{border-style:solid;border-color:var(--good)}
+.need.have::after{content:"✓";color:var(--good);font-weight:800}
+.fail{color:var(--bad);font-weight:800}
+.yay{color:var(--good);font-weight:800}
+
+/* ---------- energy + generators ---------- */
+.bar{display:flex;align-items:center;gap:10px;margin:14px 0 8px;font-weight:800}
+.meter{flex:1;height:12px;border-radius:999px;background:var(--cell);overflow:hidden}
+.meter i{display:block;height:100%;background:var(--sun);transition:width .3s}
+.gens{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+.gen{display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;border-radius:14px;border:2px solid var(--ink);background:var(--card);cursor:pointer;font-weight:800;font-size:13px}
+.gen span{font-size:26px;line-height:1}
+.gen:active{transform:scale(.96)}
+.gen:disabled{opacity:.4;cursor:not-allowed}
+
+/* ---------- board ---------- */
+.board{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;padding:8px;border-radius:18px;background:var(--card);border:2px solid var(--line);touch-action:none;user-select:none}
+.cell{aspect-ratio:1;border-radius:11px;background:var(--cell);border:none;padding:0;display:grid;place-items:center;position:relative;cursor:pointer;font-size:clamp(22px,7.4vw,34px);line-height:1}
+.cell.full{background:color-mix(in srgb,hsl(var(--h) 75% 60%) 28%,var(--cell))}
+.cell .lv{position:absolute;right:3px;bottom:1px;font-size:10px;font-weight:800;color:var(--muted)}
+.cell.want{box-shadow:0 0 0 2.5px var(--good) inset}
+.cell.sel{outline:3px solid var(--sun);outline-offset:1px}
+.cell.match{box-shadow:0 0 0 3px var(--sun) inset}
+.cell.lifting>span{opacity:.25}
+.pop{animation:pop .3s ease-out}
+@keyframes pop{0%{transform:scale(.5)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+.ghost{position:fixed;pointer-events:none;z-index:50;font-size:44px;transform:translate(-50%,-60%);filter:drop-shadow(0 6px 8px rgba(0,0,0,.3))}
+.trash{margin-top:8px;width:100%;padding:10px;border-radius:14px;border:2px dashed var(--line);background:transparent;color:var(--muted);font-weight:700;cursor:pointer}
+.trash.hover,.trash.ready{border-color:var(--bad);color:var(--bad)}
+.foot{display:flex;justify-content:space-between;margin-top:12px;font-size:13px;color:var(--muted)}
+.foot button{background:none;border:none;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0}
+@media (prefers-reduced-motion:reduce){.rain i,.drip,.pop,.scene.shake{animation:none}.prop{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <div class="scene storm" id="scene" aria-hidden="true">
+    <div class="sky">
+      <span class="cloud" style="left:4%">☁️</span><span class="cloud" style="left:38%">☁️</span><span class="cloud" style="left:72%">☁️</span>
+      <span class="moon">🌙</span>
+      <span class="star" style="left:12%;top:6%">✦</span><span class="star" style="left:30%;top:14%">✦</span><span class="star" style="left:55%;top:4%">✦</span><span class="star" style="left:78%;top:20%">✦</span>
+      <div class="rain" id="rain"></div>
+    </div>
+    <div class="house" id="house">
+      <div class="roof"></div><div class="hole"></div><div class="patch"></div>
+      <div class="room">
+        <div class="drip" id="drip"></div>
+        <div class="window"></div>
+        <div class="fireplace"><div class="opening"><span id="fire" class="hide" style="transition:opacity .6s">🔥</span></div></div>
+        <span class="prop balloon hide" id="b1" style="left:30%;top:4%">🎈</span>
+        <span class="prop balloon hide" id="b2" style="left:44%;top:9%">🎈</span>
+        <span class="prop puddle" id="puddle">💧</span>
+        <span class="prop mom">👩</span>
+        <span class="prop crib" id="crib">📦</span>
+        <span class="prop baby">👶</span>
+        <span class="bubble" id="mood">😭</span>
+        <span class="prop teddy hide" id="teddy">🧸</span>
+        <span class="prop bottle hide" id="bottle">🍼</span>
+        <span class="prop cake hide" id="cake">🎂</span>
+      </div>
+    </div>
+    <span class="chapter" id="chapter"></span>
+  </div>
+
+  <section class="story" id="story" aria-live="polite"></section>
+
+  <div class="bar"><span>⚡ <span id="energy">0</span></span><div class="meter"><i id="meter"></i></div><span id="regen" style="font-weight:600;color:var(--muted);font-size:13px"></span></div>
+  <div class="gens" id="gens"></div>
+  <div class="board" id="board" aria-label="Merge board"></div>
+  <button class="trash" id="trash" type="button">Drag here to throw away</button>
+
+  <div class="foot"><span>Tap a box to get items. Drag matching items together to merge.</span><button id="reset">Restart</button></div>
+</main>
+
+<script>
+const CH = {
+  t:{gen:['🧰','Toolbox'], h:28,  items:[['🔩','Screws'],['🔨','Hammer'],['🪚','Saw'],['🪜','Ladder'],['🛠️','Power tools']]},
+  k:{gen:['🛒','Groceries'], h:200, items:[['🥛','Milk'],['🍼','Bottle'],['🥣','Baby food'],['🍲','Hot meal'],['🎂','Cake']]},
+  c:{gen:['🧺','Sewing'], h:320, items:[['🧵','Thread'],['🧶','Yarn'],['🧣','Scarf'],['🧸','Teddy bear'],['🎁','Gift']]},
+};
+const MAXL = 5, N = 30, EMAX = 60, REGEN = 3, SAVE = 'home-for-leo-v1';
+const em = (c,l) => CH[c].items[l-1][0];
+const nm = (c,l) => CH[c].items[l-1][1];
+
+const STEPS = [
+  { title:'The leaky roof', mood:'😭',
+    say:'Rain is pouring through the roof, right onto Leo’s box. What should Maya do?',
+    opts:[{l:'Put a pot under the leak', fail:'The pot fills up in an hour. Leo is soaked and screaming.'},
+          {l:'Patch the roof', ok:true}],
+    order:'Maya needs a hammer and screws to patch that hole.',
+    need:[['t',2],['t',1]], flag:'roof', done:'No more drips. Leo finally stops crying.' },
+  { title:'An empty fridge', mood:'😫',
+    say:'Leo is hungry, and there’s almost nothing in the fridge.',
+    opts:[{l:'Give him cold tap water', fail:'Leo spits it out and wails even louder.'},
+          {l:'Warm up a bottle', ok:true}],
+    order:'Make a warm bottle for Leo.',
+    need:[['k',2]], flag:'bottle', done:'Leo drinks every drop and gives Maya a sleepy smile.' },
+  { title:'A freezing night', mood:'🥶',
+    say:'It’s freezing tonight. Maya can see her breath inside the house.',
+    opts:[{l:'Burn the furniture', fail:'Now there’s nowhere to sit, and it’s still cold.'},
+          {l:'Chop firewood, knit a scarf', ok:true}],
+    order:'She needs a saw for firewood and a scarf for Leo.',
+    need:[['t',3],['c',3]], flag:'fire', done:'The fireplace crackles. The whole house finally feels warm.' },
+  { title:'A real bed', mood:'😣',
+    say:'Leo has been sleeping in a cardboard box since they moved in.',
+    opts:[{l:'Tape on more cardboard', fail:'It’s still a box. Just a slightly bigger box.'},
+          {l:'Build a real crib', ok:true}],
+    order:'Build a crib: a ladder’s worth of wood and some yarn for a blanket.',
+    need:[['t',4],['c',2]], flag:'bed', done:'A real crib with a soft blanket. Leo sleeps through the night.' },
+  { title:'Scared of the dark', mood:'😨',
+    say:'Leo keeps waking up scared of the dark.',
+    opts:[{l:'Leave every light on all night', fail:'The electric bill arrives. Maya almost faints.'},
+          {l:'Give him something to hug', ok:true}],
+    order:'Sew Leo a teddy bear.',
+    need:[['c',4]], flag:'teddy', done:'Leo hugs the bear and drifts off, smiling.' },
+  { title:'First birthday', mood:'🥺',
+    say:'It’s Leo’s first birthday! Money is still tight.',
+    opts:[{l:'Skip it this year', fail:'Leo looks at the empty table. Maya can’t do that to him.'},
+          {l:'Throw a little party', ok:true}],
+    order:'Bake a cake and make a hot meal for the guests.',
+    need:[['k',5],['k',4]], flag:'party', done:'Candles, balloons, and a very messy baby. Best day ever.' },
+];
+
+const R = Math.random;
+let S;
+function fresh(){
+  const b = Array(N).fill(null);
+  b[13] = {c:'t',l:1}; b[16] = {c:'k',l:1};
+  return {step:0, phase:'intro', board:b, energy:EMAX, flags:{}, fails:0, t:Date.now(), regenT:0};
+}
+
+/* ---------- scene ---------- */
+const $id = id => document.getElementById(id);
+function show(id, on){ $id(id).classList.toggle('hide', !on); }
+function renderScene(){
+  const f = S.flags, scene = $id('scene'), house = $id('house');
+  scene.classList.toggle('storm', !f.roof);
+  house.classList.toggle('fixed', !!f.roof);
+  house.classList.toggle('warm', !!f.fire);
+  document.querySelectorAll('.cloud').forEach(c=>c.style.display = f.roof ? 'none' : '');
+  document.querySelector('.moon').style.display = f.roof ? '' : 'none';
+  document.querySelectorAll('.star').forEach(s=>s.style.display = f.roof ? '' : 'none');
+  const rain = $id('rain');
+  if (!f.roof && !rain.children.length){
+    for (let i=0;i<22;i++){ const d=document.createElement('i'); d.style.left=(i*4.6+R()*3)+'%'; d.style.animationDelay=(-R()*0.75)+'s'; rain.appendChild(d); }
+  } else if (f.roof) rain.innerHTML='';
+  $id('drip').style.display = f.roof ? 'none' : '';
+  show('puddle', !f.roof);
+  show('fire', !!f.fire);
+  $id('crib').textContent = f.bed ? '🛏️' : '📦';
+  show('bottle', !!f.bottle && !f.party);
+  show('teddy', !!f.teddy);
+  show('cake', !!f.party); show('b1', !!f.party); show('b2', !!f.party);
+  let mood = '😊';
+  if (S.phase === 'end') mood = '🥳';
+  else if (S.phase !== 'done' && STEPS[S.step]) mood = S.lastFail ? '😭' : STEPS[S.step].mood;
+  else if (S.phase === 'done' && S.step === 4) mood = '😴';
+  $id('mood').textContent = mood;
+  $id('chapter').textContent = S.phase === 'end' ? 'The end' : `Chapter ${Math.min(S.step+1, STEPS.length)} of ${STEPS.length}`;
+}
+
+/* ---------- story ---------- */
+const storyEl = $id('story');
+function renderStory(){
+  const st = STEPS[S.step];
+  let h = `<p class="who">Maya</p>`;
+  if (S.phase === 'intro'){
+    h += `<p class="say">Maya and baby Leo just moved into the only place she could afford. It’s falling apart, but it’s theirs.</p><button class="go" id="next">Let’s make it a home</button>`;
+  } else if (S.phase === 'choice'){
+    h += S.lastFail ? `<p class="say fail">${S.lastFail}</p><p class="say">Try again. ${st.say}</p>` : `<p class="say">${st.say}</p>`;
+    h += `<div class="opts">${st.opts.map((o,i)=>`<button data-o="${i}">${o.l}</button>`).join('')}</div>`;
+  } else if (S.phase === 'order'){
+    h += `<p class="say">${st.order}</p><div class="needs">${st.need.map(([c,l],i)=>`<span class="need" data-n="${i}"><b>${em(c,l)}</b>${nm(c,l)} · level ${l}</span>`).join('')}</div><button class="go" id="deliver">Use these</button>`;
+  } else if (S.phase === 'done'){
+    h += `<p class="say yay">${st.done}</p><button class="go" id="next">${S.step === STEPS.length-1 ? 'Finish' : 'Next chapter'}</button>`;
+  } else {
+    h += `<p class="say">A dry roof, a warm fire, a full fridge, and a happy kid. It’s not a mansion. It’s home.</p><p class="say" style="color:var(--muted);font-size:14px">Wrong choices along the way: ${S.fails}</p><button class="go" id="again">Play again</button>`;
+  }
+  storyEl.innerHTML = h;
+  const nx = $id('next'); if (nx) nx.onclick = advance;
+  const dv = $id('deliver'); if (dv) dv.onclick = deliver;
+  const ag = $id('again'); if (ag) ag.onclick = ()=>{ S = fresh(); renderAll(); save(); };
+  storyEl.querySelectorAll('[data-o]').forEach(b=>b.onclick = ()=>choose(+b.dataset.o));
+  updateNeeds();
+}
+function advance(){
+  if (S.phase === 'intro'){ S.phase = 'choice'; }
+  else if (S.phase === 'done'){
+    if (S.step >= STEPS.length-1) S.phase = 'end';
+    else { S.step++; S.phase = 'choice'; }
+  }
+  renderAll(); save();
+}
+function choose(i){
+  const o = STEPS[S.step].opts[i];
+  if (o.ok){ S.lastFail = null; S.phase = 'order'; }
+  else {
+    S.lastFail = o.fail; S.fails++;
+    const sc = $id('scene'); sc.classList.remove('shake'); void sc.offsetWidth; sc.classList.add('shake');
+  }
+  renderAll(); save();
+}
+function findNeeds(){
+  const st = STEPS[S.step], used = new Set();
+  return st.need.map(([c,l])=>{
+    const i = S.board.findIndex((x,j)=>x && x.c===c && x.l===l && !used.has(j));
+    if (i >= 0) used.add(i); return i;
+  });
+}
+function updateNeeds(){
+  if (S.phase !== 'order') return;
+  const found = findNeeds();
+  storyEl.querySelectorAll('.need').forEach(el=>el.classList.toggle('have', found[+el.dataset.n] >= 0));
+  const dv = $id('deliver'); if (dv) dv.disabled = found.some(i=>i<0);
+}
+function deliver(){
+  const found = findNeeds(); if (found.some(i=>i<0)) return;
+  found.forEach(i=>S.board[i]=null);
+  S.flags[STEPS[S.step].flag] = true;
+  S.energy = Math.min(EMAX, S.energy + 15);
+  S.phase = 'done'; selected = null;
+  renderAll(); save();
+}
+
+/* ---------- generators + board ---------- */
+const gensEl = $id('gens'), boardEl = $id('board'), trashEl = $id('trash');
+gensEl.innerHTML = Object.entries(CH).map(([k,v])=>`<button class="gen" data-g="${k}" type="button"><span>${v.gen[0]}</span>${v.gen[1]}</button>`).join('');
+gensEl.querySelectorAll('.gen').forEach(b=>b.onclick = ()=>spawn(b.dataset.g));
+let popAt = -1, selected = null;
+function spawn(c){
+  if (S.energy < 1) return;
+  const e = S.board.map((x,i)=>x?-1:i).filter(i=>i>=0);
+  if (!e.length){ storyFlash('The board is full. Merge or throw something away.'); return; }
+  const i = e[Math.floor(R()*e.length)];
+  S.board[i] = {c, l: R() < .15 ? 2 : 1};
+  S.energy--; popAt = i;
+  renderBoard(); renderEnergy(); save();
+}
+function storyFlash(msg){ trashEl.textContent = msg; setTimeout(renderTrash, 2200); }
+
+function renderBoard(){
+  const want = S.phase === 'order' ? STEPS[S.step].need : [];
+  const sel = selected !== null ? S.board[selected] : null;
+  boardEl.innerHTML = '';
+  S.board.forEach((x,i)=>{
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cell'; b.dataset.i = i;
+    if (x){
+      b.classList.add('full'); b.style.setProperty('--h', CH[x.c].h);
+      b.innerHTML = `<span>${em(x.c,x.l)}</span><span class="lv">${x.l}</span>`;
+      b.setAttribute('aria-label', `${nm(x.c,x.l)}, level ${x.l}`);
+      if (want.some(([c,l])=>c===x.c && l===x.l)) b.classList.add('want');
+      if (sel && i !== selected && x.c===sel.c && x.l===sel.l && x.l<MAXL) b.classList.add('match');
+    } else b.setAttribute('aria-label','Empty');
+    if (i === selected) b.classList.add('sel');
+    if (i === popAt) b.classList.add('pop');
+    boardEl.appendChild(b);
+  });
+  popAt = -1;
+  renderTrash(); updateNeeds();
+}
+function renderTrash(){
+  const x = selected !== null ? S.board[selected] : null;
+  trashEl.classList.toggle('ready', !!x);
+  trashEl.textContent = x ? `Throw away ${nm(x.c,x.l)}` : 'Drag here to throw away';
+}
+function act(a,b){
+  if (a===b) return;
+  const A = S.board[a], B = S.board[b]; if (!A) return;
+  if (!B){ S.board[b]=A; S.board[a]=null; }
+  else if (A.c===B.c && A.l===B.l && A.l<MAXL){ S.board[b]={c:A.c,l:A.l+1}; S.board[a]=null; popAt=b; }
+  else { S.board[a]=B; S.board[b]=A; }
+}
+trashEl.onclick = ()=>{ if (selected!==null){ S.board[selected]=null; selected=null; renderBoard(); save(); } };
+
+let drag = null;
+boardEl.addEventListener('pointerdown', e=>{
+  const cell = e.target.closest('.cell'); if (!cell) return;
+  drag = {from:+cell.dataset.i, x:e.clientX, y:e.clientY, moved:false, ghost:null};
+});
+window.addEventListener('pointermove', e=>{
+  if (!drag) return;
+  const x = S.board[drag.from];
+  if (!drag.moved && x && Math.hypot(e.clientX-drag.x, e.clientY-drag.y) > 6){
+    drag.moved = true; selected = drag.from; renderBoard();
+    boardEl.children[drag.from].classList.add('lifting');
+    drag.ghost = document.createElement('div'); drag.ghost.className='ghost'; drag.ghost.textContent = em(x.c,x.l);
+    document.body.appendChild(drag.ghost);
+  }
+  if (drag.moved){
+    drag.ghost.style.left = e.clientX+'px'; drag.ghost.style.top = e.clientY+'px';
+    const over = document.elementFromPoint(e.clientX, e.clientY);
+    trashEl.classList.toggle('hover', !!(over && over.closest('#trash')));
+  }
+});
+window.addEventListener('pointerup', e=>{
+  if (!drag) return; const d = drag; drag = null;
+  if (d.moved){
+    d.ghost.remove(); trashEl.classList.remove('hover');
+    const over = document.elementFromPoint(e.clientX, e.clientY);
+    const cell = over && over.closest('.cell');
+    if (cell) act(d.from, +cell.dataset.i);
+    else if (over && over.closest('#trash')) S.board[d.from] = null;
+    selected = null;
+  } else {
+    const i = d.from;
+    if (selected === null){ if (S.board[i]) selected = i; }
+    else if (selected === i) selected = null;
+    else { act(selected, i); selected = null; }
+  }
+  renderBoard(); save();
+});
+window.addEventListener('pointercancel', ()=>{ if (drag&&drag.ghost) drag.ghost.remove(); drag=null; selected=null; renderBoard(); });
+
+/* ---------- energy ---------- */
+function renderEnergy(){
+  $id('energy').textContent = Math.floor(S.energy);
+  $id('meter').style.width = (S.energy/EMAX*100)+'%';
+  $id('regen').textContent = S.energy >= EMAX ? 'Full' : `+1 in ${Math.ceil(REGEN - S.regenT)}s`;
+  gensEl.querySelectorAll('.gen').forEach(b=>b.disabled = S.energy < 1);
+}
+setInterval(()=>{
+  if (S.energy < EMAX){
+    S.regenT += 0.25;
+    if (S.regenT >= REGEN){ S.regenT = 0; S.energy++; }
+  } else S.regenT = 0;
+  renderEnergy();
+}, 250);
+
+/* ---------- save ---------- */
+function save(){ S.t = Date.now(); try{ localStorage.setItem(SAVE, JSON.stringify(S)); }catch(e){} }
+function load(){
+  S = fresh();
+  try{
+    const d = JSON.parse(localStorage.getItem(SAVE));
+    if (d && Array.isArray(d.board) && d.board.length === N){
+      S = Object.assign(fresh(), d);
+      S.energy = Math.min(EMAX, S.energy + Math.floor((Date.now()-S.t)/1000/REGEN));
+    }
+  }catch(e){}
+}
+let resetArmed = null;
+$id('reset').onclick = ()=>{
+  const btn = $id('reset');
+  if (!resetArmed){
+    btn.textContent = 'Tap again to restart';
+    btn.style.color = 'var(--bad)';
+    resetArmed = setTimeout(()=>{ resetArmed = null; btn.textContent = 'Restart'; btn.style.color = ''; }, 3000);
+    return;
+  }
+  clearTimeout(resetArmed); resetArmed = null;
+  btn.textContent = 'Restart'; btn.style.color = '';
+  S = fresh(); selected = null; renderAll(); save();
+};
+
+function renderAll(){ renderScene(); renderStory(); renderBoard(); renderEnergy(); }
+load(); renderAll();
+window.addEventListener('pagehide', save);
+</script>
+</body>
+</html>
