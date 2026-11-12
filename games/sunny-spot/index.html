@@ -58,6 +58,7 @@
 </div>
 <a class="exit-btn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
 
+<script src="../../arcade-progress.js"></script>
 <script>
 (function () {
 "use strict";
@@ -478,7 +479,7 @@ function update(dt) {
 }
 
 function win() {
-  mode = "won"; sfx.win(); cat.state = "nap"; cat.x = CHAIR[0] + 0.5; cat.y = CHAIR[1] + 0.5;
+  mode = "won"; sfx.win(); if (window.ArcadeProgress) ArcadeProgress.complete(); cat.state = "nap"; cat.x = CHAIR[0] + 0.5; cat.y = CHAIR[1] + 0.5;
   actions.classList.remove("show");
   setTimeout(() => showEnd(true), 1600);
 }

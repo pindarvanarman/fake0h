@@ -170,13 +170,14 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
   <div class="foot"><span>Tap a box to get items. Drag matching items together to merge.</span><button id="reset">Restart</button></div>
 </main>
 
+<script src="../../arcade-progress.js"></script>
 <script>
 const CH = {
   t:{gen:['🧰','Toolbox'], h:28,  items:[['🔩','Screws'],['🔨','Hammer'],['🪚','Saw'],['🪜','Ladder'],['🛠️','Power tools']]},
   k:{gen:['🛒','Groceries'], h:200, items:[['🥛','Milk'],['🍼','Bottle'],['🥣','Baby food'],['🍲','Hot meal'],['🎂','Cake']]},
   c:{gen:['🧺','Sewing'], h:320, items:[['🧵','Thread'],['🧶','Yarn'],['🧣','Scarf'],['🧸','Teddy bear'],['🎁','Gift']]},
 };
-const MAXL = 5, N = 30, EMAX = 60, REGEN = 3, SAVE = 'home-for-leo-v1';
+const MAXL = 5, N = 30, EMAX = 60, REGEN = 3, SAVE = 'home-for-leo-v1' + (window.ArcadeProgress && ArcadeProgress.player() ? ':' + ArcadeProgress.player() : '');
 const em = (c,l) => CH[c].items[l-1][0];
 const nm = (c,l) => CH[c].items[l-1][1];
 
@@ -284,7 +285,7 @@ function renderStory(){
 function advance(){
   if (S.phase === 'intro'){ S.phase = 'choice'; }
   else if (S.phase === 'done'){
-    if (S.step >= STEPS.length-1) S.phase = 'end';
+    if (S.step >= STEPS.length-1){ S.phase = 'end'; if (window.ArcadeProgress) ArcadeProgress.complete(); }
     else { S.step++; S.phase = 'choice'; }
   }
   renderAll(); save();

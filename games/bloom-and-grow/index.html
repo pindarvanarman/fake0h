@@ -102,6 +102,7 @@
 <div id="modal" class="hidden"><div class="card" id="card"></div></div>
 <a class="exit-btn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
 
+<script src="../../arcade-progress.js"></script>
 <script>
 (function () {
 "use strict";
@@ -152,7 +153,9 @@ const LEVELS = [
 // total XP needed to reach each level (index = level - 1)
 const XP_AT = [0];
 for (let i = 1; i < 16; i++) XP_AT.push(XP_AT[i - 1] + Math.round(40 * Math.pow(1.62, i - 1)));
-const SAVE_KEY = "fake0hs-bloom-and-grow-v1";
+const PLAYER = window.ArcadeProgress && ArcadeProgress.player();
+// each family member grows their own farm (free play keeps the original farm)
+const SAVE_KEY = "fake0hs-bloom-and-grow-v1" + (PLAYER ? ":" + PLAYER : "");
 const PLOT = 64; // world units per plot
 
 // =====================================================================
@@ -161,7 +164,7 @@ const PLOT = 64; // world units per plot
 let S;
 function freshState() { return { coins: 10, xp: 0, level: 1, plots: [], basket: {}, sel: "carrot", music: true, tipStep: 0, seen16: false }; }
 function load() {
-  try { const d = JSON.parse(localStorage.getItem(SAVE_KEY)); if (d && d.level) { S = Object.assign(freshState(), d); return; } } catch (e) {}
+  try { const d = JSON.parse(localStorage.getItem(SAVE_KEY)); if (d && d.level) { S = Object.assign(freshState(), d); if (S.level >= 16) if (window.ArcadeProgress) ArcadeProgress.complete(); return; } } catch (e) {}
   S = freshState();
 }
 let saveT = 0;
@@ -418,6 +421,7 @@ function showLevelUp() {
   const lv = LEVELS[S.level - 1];
   confetti = 220;
   if (S.level === 16) {
+    if (window.ArcadeProgress) ArcadeProgress.complete();
     showModal(`<h1>🏛️ Level 16!</h1><h2>Your farm is now a Botanical Museum!</h2>
       <p>From a tiny carrot patch to a garden as big as a museum. Visitors come from all over to see your plants.</p>
       <ul><li>💐 Prize Bouquets unlocked</li><li>🏛️ The Botanical Museum (+5 coins every second)</li></ul>
