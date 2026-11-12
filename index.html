@@ -250,6 +250,14 @@
       desc: "Pop 100 balloons on a giant floor piano.",
       needs: ["Webcam", "Full body", "Sound on"],
       art: "piano"
+    },
+    {
+      ready: true,
+      title: "Home for Leo",
+      href: "games/home-for-leo/index.html",
+      desc: "Merge items to make a cozy home for baby Leo.",
+      needs: ["Mouse or touch", "Story", "Saves progress"],
+      art: "leo"
     }
   ];
   var TOTAL = 9;
@@ -301,7 +309,32 @@
     '<circle cx="160" cy="100" r="10" fill="#fff" stroke="#140a28" stroke-width="3"/>' +
     '<circle cx="144" cy="102" r="4.5" fill="#ffdd55" stroke="#140a28" stroke-width="2"/><circle cx="178" cy="100" r="4.5" fill="#ffdd55" stroke="#140a28" stroke-width="2"/>' +
     '</svg>';
-  var ARTS = { cactus: cactusArt, piano: pianoArt };
+  var leoRain = "";
+  for (var r = 0; r < 14; r++) {
+    var rx = 12 + r * 22 + (r % 3) * 5, ry = 8 + (r % 4) * 16;
+    leoRain += '<path d="M' + rx + ' ' + ry + 'l-3 12"/>';
+  }
+  var leoArt =
+    '<svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" role="img" aria-label="A little house in the rain with a mother and baby inside by a warm window">' +
+    '<defs><linearGradient id="storm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B4152"/><stop offset="1" stop-color="#5D6474"/></linearGradient></defs>' +
+    '<rect width="320" height="200" fill="url(#storm)"/>' +
+    '<g fill="#c9cede"><ellipse cx="60" cy="26" rx="34" ry="14"/><ellipse cx="84" cy="18" rx="22" ry="14"/><ellipse cx="248" cy="30" rx="38" ry="14"/><ellipse cx="272" cy="20" rx="22" ry="14"/></g>' +
+    '<g stroke="#d2deff" stroke-opacity=".7" stroke-width="2" stroke-linecap="round">' + leoRain + '</g>' +
+    '<rect x="0" y="184" width="320" height="16" fill="#3a3f4e"/>' +
+    '<path d="M160 48 262 104H58z" fill="#6B3E5E"/>' +
+    '<rect x="196" y="66" width="22" height="14" rx="2" fill="#B98552" transform="rotate(-8 207 73)"/>' +
+    '<path d="M197 70h20M199 76h18" stroke="#7a5530" stroke-width="1.5"/>' +
+    '<rect x="72" y="104" width="176" height="80" fill="#93A4C2"/>' +
+    '<rect x="88" y="132" width="32" height="52" rx="4" fill="#8a4a3a"/><path d="M95 184v-30a9 9 0 0 1 18 0v30z" fill="#2b2030"/>' +
+    '<path d="M104 180c-6-6-3-12 0-16 2 5 6 6 6 11a6 6 0 0 1-6 5z" fill="#ff8a1f"/><path d="M104 180c-3-3-1-6 0-8 1 3 3 3 3 5a3 3 0 0 1-3 3z" fill="#ffdd55"/>' +
+    '<rect x="196" y="116" width="36" height="30" rx="3" fill="#ffd86b" stroke="#2A2340" stroke-width="3"/><path d="M214 116v30M196 131h36" stroke="#2A2340" stroke-width="3"/>' +
+    '<circle cx="148" cy="146" r="9" fill="#f1c7a3"/><path d="M139 142q9-14 18 0 1 10-2 14l-2-10h-10l-2 10q-3-4-2-14z" fill="#5a3a2a"/>' +
+    '<path d="M136 184q0-26 12-28 12 2 12 28z" fill="#c77dff"/>' +
+    '<rect x="166" y="166" width="30" height="14" rx="3" fill="#e9d4b0" stroke="#8a6a3a" stroke-width="2"/><path d="M168 180v4M194 180v4" stroke="#8a6a3a" stroke-width="2"/>' +
+    '<circle cx="181" cy="162" r="7" fill="#ffdfc4"/><path d="M176 160q5-6 10 0" stroke="#5a3a2a" stroke-width="2" fill="none"/>' +
+    '<path d="M181 92c-4-6-14-2-9 6l9 8 9-8c5-8-5-12-9-6z" fill="#ff4f8b" stroke="#fff" stroke-width="2"/>' +
+    '</svg>';
+  var ARTS = { cactus: cactusArt, piano: pianoArt, leo: leoArt };
 
   var coneIcon =
     '<svg viewBox="0 0 30 34" aria-hidden="true"><rect x="2" y="29" width="26" height="4" rx="1" fill="#ff6a00" stroke="#22104a" stroke-width="1.5"/>' +

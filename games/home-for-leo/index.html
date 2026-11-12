@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Home for Leo</title>
+<title>Home for Leo · fake0hs Arcade</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
@@ -119,9 +119,18 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 .foot{display:flex;justify-content:space-between;margin-top:12px;font-size:13px;color:var(--muted)}
 .foot button{background:none;border:none;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0}
 @media (prefers-reduced-motion:reduce){.rain i,.drip,.pop,.scene.shake{animation:none}.prop{transition:none}}
+
+/* ---------- exit to arcade ---------- */
+.exit-btn{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:14px;z-index:50;
+  font:800 .9rem Nunito,system-ui,sans-serif;color:#fff;text-decoration:none;
+  background:rgba(42,35,64,.85);border:2px solid rgba(255,255,255,.75);border-radius:99px;padding:6px 14px}
+.exit-btn:hover{background:#C2413B}
+.exit-btn:focus-visible{outline:3px solid var(--sun);outline-offset:3px}
+@media (max-width:620px){main{padding-top:56px}}
 </style>
 </head>
 <body>
+<a class="exit-btn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
 <main>
   <div class="scene storm" id="scene" aria-hidden="true">
     <div class="sky">
