@@ -405,14 +405,13 @@
       art: "space"
     },
     {
-      // TEMPORARY test game for checking scores. Replace with a real game later.
       ready: true,
-      id: "space-win-2",
-      title: "Spacebar Win 2",
-      href: "games/space-win/index.html?slot=2",
-      desc: "Test game: press the space bar to win. For checking scores.",
-      needs: ["Keyboard or tap", "Test game"],
-      art: "space"
+      id: "beta-theta-why",
+      title: "Beta Theta Why?",
+      href: "games/beta-theta-why/index.html",
+      desc: "Pledge night! Do 10 silly tasks for the brothers. Dodge the gorilla. Avoid Frank.",
+      needs: ["Keyboard or touch", "Sound on"],
+      art: "frat"
     },
     {
       // TEMPORARY test game for checking scores. Replace with a real game later.
@@ -579,7 +578,21 @@
       '<circle cx="70" cy="44" r="6" fill="#0b0624"/><path d="M70 50 L68 70 M68 70 L76 90 M68 70 L54 64 L44 66 M69 55 L78 62 L74 50 M69 55 L60 50"/></g>' +
     '<text x="50" y="30" text-anchor="middle" font-family="Bungee, Impact, sans-serif" font-size="11" fill="#ffd23f" stroke="#07040f" stroke-width="1">POW!</text>' +
     '</svg>';
-  var ARTS = { fight: fightArt, space: spaceArt, cactus: cactusArt, piano: pianoArt, leo: leoArt, abducted: abductedArt, sunny: sunnyArt, bloom: bloomArt };
+  var fratArt =
+    '<svg viewBox="0 0 100 120" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">' +
+    '<rect width="100" height="120" fill="#1a1030"/>' +
+    '<circle cx="82" cy="16" r="8" fill="#fff6c8"/>' +
+    '<rect x="10" y="44" width="80" height="52" fill="#8a3a2a"/>' +
+    '<polygon points="4,46 50,18 96,46" fill="#4a2a1a"/>' +
+    '<rect x="16" y="54" width="14" height="12" fill="#ffd23f"/><rect x="70" y="54" width="14" height="12" fill="#ffd23f"/>' +
+    '<rect x="42" y="70" width="16" height="26" fill="#3a1a10"/>' +
+    '<text x="50" y="42" text-anchor="middle" font-family="Georgia, serif" font-weight="700" font-size="12" fill="#ffd23f">ΒΘΥ</text>' +
+    '<rect x="0" y="96" width="100" height="24" fill="#2a4a1a"/>' +
+    '<g transform="translate(22,98)"><circle r="7" fill="#2a2220"/><circle cy="-9" r="5" fill="#2a2220"/><circle cx="1.5" cy="-10" r="1" fill="#fff"/></g>' +
+    '<g transform="translate(72,100)"><rect x="-5" y="-8" width="10" height="10" rx="2" fill="#8a6a3a"/><circle cy="-12" r="4" fill="#e8b080"/><path d="M-4 -14 a4 4 0 0 1 8 0z" fill="#3a5a3a"/></g>' +
+    '<text x="50" y="114" text-anchor="middle" font-family="Bungee, Impact, sans-serif" font-size="8" fill="#ffd23f">PLEDGE NIGHT</text>' +
+    '</svg>';
+  var ARTS = { frat: fratArt, fight: fightArt, space: spaceArt, cactus: cactusArt, piano: pianoArt, leo: leoArt, abducted: abductedArt, sunny: sunnyArt, bloom: bloomArt };
 
   var coneIcon =
     '<svg viewBox="0 0 30 34" aria-hidden="true"><rect x="2" y="29" width="26" height="4" rx="1" fill="#ff6a00" stroke="#22104a" stroke-width="1.5"/>' +
@@ -594,6 +607,7 @@
     abducted: { body: "#1d2a22", hi: "#2f4436", accent: "#7dff6b", neon: "#7dff6b" },
     sunny: { body: "#2f9a84", hi: "#4fbaa4", accent: "#ffd23f", neon: "#ffe27a" },
     bloom: { body: "#4f9a3a", hi: "#6fba5a", accent: "#ff8fb8", neon: "#b8ff9a" },
+    frat: { body: "#6a3a1a", hi: "#8a5a2a", accent: "#ffd23f", neon: "#ffd88a" },
     fight: { body: "#a8233a", hi: "#cc3a52", accent: "#4fd6ff", neon: "#ff8fa3" },
     space: { body: "#2b4a7a", hi: "#3f66a0", accent: "#4fd6ff", neon: "#7fe4ff" }
   };

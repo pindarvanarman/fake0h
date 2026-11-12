@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Beta Theta Why? · fake0hs Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+<!--
+  Beta Theta Why? — Pledge Night
+  You are a pledge called "the Hobo". Brothers of the house hand out tasks. Finish 10 to reach
+  Pledge Night. Watch out for the guy in the gorilla suit charging down the hallway, and for
+  Frank, who really wants you to watch TV with him.
+  Controls: arrow keys / WASD to move, E or Space to do things. Touch buttons on phones and tablets.
+-->
+<style>
+  :root { color-scheme: dark; --ink: #fff4e0; --gold: #ffd23f; --red: #e8473f; --panel: #2a1a10; --blue: #4fb0ff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a0f08; color: var(--ink); font-family: Nunito, system-ui, sans-serif; }
+  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .exit-btn {
+    position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); right: 12px; z-index: 30;
+    font: 900 0.9rem Nunito, sans-serif; color: var(--ink); text-decoration: none;
+    background: rgba(26, 15, 8, 0.85); border: 2px solid rgba(255, 244, 224, 0.5); border-radius: 99px; padding: 5px 14px;
+  }
+  .exit-btn:hover { border-color: #fff; background: #5a1a10; }
+  button:focus-visible, .exit-btn:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
+  #overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 18px; background: rgba(10, 6, 3, 0.75); }
+  #overlay.hidden { display: none; }
+  .card {
+    width: min(580px, 100%); max-height: 92vh; overflow: auto; text-align: center;
+    background: var(--panel); border: 3px solid #6a4020; border-radius: 18px; padding: 22px 24px;
+    box-shadow: 0 0 50px rgba(255, 210, 63, 0.15);
+  }
+  .card h1 { font-family: Bungee, Impact, sans-serif; font-weight: 400; margin: 0; font-size: clamp(1.8rem, 6vw, 2.7rem); color: var(--gold); text-shadow: 3px 3px 0 #8a2a10; }
+  .card h2 { font-family: Bungee, Impact, sans-serif; font-weight: 400; margin: 2px 0 10px; color: #ff9a6a; font-size: 1.1rem; letter-spacing: 0.1em; }
+  .card p { margin: 8px 0; line-height: 1.45; }
+  .card ul { text-align: left; margin: 8px 0; padding-left: 22px; line-height: 1.5; }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+  .card button {
+    font: 900 1rem Nunito, sans-serif; cursor: pointer; padding: 11px 22px; border-radius: 12px;
+    border: 2px solid var(--gold); background: var(--gold); color: #2a1a10;
+  }
+  .card button.secondary { background: transparent; color: var(--ink); border-color: #6a4020; }
+  .card input {
+    font: 800 1.1rem Nunito, sans-serif; width: 100%; padding: 10px 12px; border-radius: 10px;
+    border: 2px solid #6a4020; background: #120a05; color: var(--ink); margin-top: 8px;
+  }
+  .small { font-size: 0.85rem; opacity: 0.75; }
+  .card.dark { background: #050505; border-color: #222; box-shadow: none; }
+  .card.dark h1 { color: #b0b0b0; text-shadow: none; font-size: 1.6rem; }
+
+  #touch { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: none; justify-content: space-between; align-items: flex-end;
+           padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px)); pointer-events: none; }
+  #touch.on { display: flex; }
+  #touch button {
+    pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer;
+    font: 900 1.1rem Nunito, sans-serif; color: var(--ink); background: rgba(42, 26, 16, 0.85);
+    border: 2px solid #8a5a30; border-radius: 14px; width: 58px; height: 52px;
+  }
+  #touch button.down, #touch button:active { background: #6a4020; }
+  .pad { display: grid; grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(2, 52px); gap: 6px; }
+  .pad .up { grid-column: 2; grid-row: 1; } .pad .left { grid-column: 1; grid-row: 2; }
+  .pad .down { grid-column: 2; grid-row: 2; } .pad .right { grid-column: 3; grid-row: 2; }
+  #touch .act { width: 96px; height: 96px; border-radius: 50%; background: rgba(200, 140, 20, 0.9); border-color: var(--gold); color: #2a1a10; font-size: 1.3rem; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<a class="exit-btn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
+
+<div id="touch" aria-hidden="true">
+  <div class="pad">
+    <button class="up" data-k="up">▲</button><button class="left" data-k="left">◀</button>
+    <button class="down" data-k="down">▼</button><button class="right" data-k="right">▶</button>
+  </div>
+  <button class="act" data-k="act">DO IT</button>
+</div>
+
+<div id="overlay">
+  <div class="card" id="card">
+    <h1>Beta Theta Why?</h1>
+    <h2>Pledge Night</h2>
+    <p>You're a pledge they call <b>the Hobo</b>. The brothers of the house have jobs for you, and some of them are… strange.</p>
+    <ul>
+      <li>Find a brother with a <b style="color:var(--gold)">!</b> over his head and talk to him to get a task.</li>
+      <li>Finish <b>10 tasks</b> to reach <b>Pledge Night</b>.</li>
+      <li>🦍 When you hear a roar, get out of the hallway! The guy in the gorilla suit costs you points.</li>
+      <li>📺 Avoid <b>Frank</b>. He just wants you to watch TV with him… for a <i>long</i> time.</li>
+    </ul>
+    <p><b>Move</b>: arrow keys or WASD &nbsp; · &nbsp; <b>Do things</b>: E or Space</p>
+    <div class="row"><button id="btnStart">Start pledging</button></div>
+  </div>
+</div>
+
+<script src="../../arcade-progress.js"></script>
+<script>
+(function () {
+"use strict";
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const overlay = document.getElementById("overlay");
+const card = document.getElementById("card");
+const touchEl = document.getElementById("touch");
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const isTouch = window.matchMedia("(pointer: coarse)").matches;
+
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+// =====================================================================
+// AUDIO
+// =====================================================================
+let actx = null, noiseBuf = null;
+function audio() {
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+function tone(f, dur, type, vol, delay, slide) {
+  const a = audio(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain(), t0 = a.currentTime + (delay || 0);
+  o.type = type || "square"; o.frequency.setValueAtTime(f, t0);
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide, t0 + dur);
+  g.gain.setValueAtTime(vol || 0.06, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(a.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+}
+function noise(dur, vol, freq, q) {
+  const a = audio(); if (!a) return;
+  const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(), t0 = a.currentTime;
+  s.buffer = noiseBuf; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = q || 1;
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  s.connect(f).connect(g).connect(a.destination); s.start(t0); s.stop(t0 + dur + 0.05);
+}
+const sfx = {
+  talk() { tone(520 + Math.random() * 200, 0.06, "square", 0.04); tone(420, 0.06, "square", 0.03, 0.07); },
+  pick() { tone(660, 0.08, "triangle", 0.08); tone(990, 0.1, "triangle", 0.07, 0.06); },
+  done() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, "square", 0.06, i * 0.08)); },
+  roar() { tone(110, 0.9, "sawtooth", 0.12, 0, 60); noise(0.9, 0.25, 300, 0.6); },
+  thud() { tone(90, 0.3, "sine", 0.3, 0, 40); noise(0.2, 0.4, 600); },
+  tick() { tone(880, 0.04, "square", 0.04); },
+  wrong() { tone(200, 0.3, "square", 0.06, 0, 120); },
+  tv() { [392, 523, 659, 523].forEach((f, i) => tone(f, 0.18, "triangle", 0.05, i * 0.2)); },
+  water() { noise(0.6, 0.12, 2500, 0.5); },
+  splat() { noise(0.15, 0.3, 800, 1); tone(300, 0.1, "sine", 0.1, 0, 120); },
+  siren() {
+    const a = audio(); if (!a) return;
+    const o = a.createOscillator(), g = a.createGain(), t0 = a.currentTime;
+    o.type = "sawtooth";
+    for (let i = 0; i < 6; i++) { o.frequency.setValueAtTime(600, t0 + i * 0.6); o.frequency.linearRampToValueAtTime(1100, t0 + i * 0.6 + 0.3); o.frequency.linearRampToValueAtTime(600, t0 + i * 0.6 + 0.6); }
+    g.gain.setValueAtTime(0.05, t0); g.gain.setValueAtTime(0.05, t0 + 3.5); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 3.7);
+    o.connect(g).connect(a.destination); o.start(t0); o.stop(t0 + 3.8);
+  },
+  rumble() { tone(55, 2.2, "sawtooth", 0.08, 0, 40); noise(2, 0.15, 120, 0.5); },
+  fanfare() { [392, 523, 659, 784, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, "square", 0.06, i * 0.14)); }
+};
+function say(text, deep) {
+  try {
+    if (!("speechSynthesis" in window)) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.pitch = deep ? 0.1 : 1; u.rate = deep ? 0.75 : 1; u.volume = 1;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+// =====================================================================
+// THE HOUSE (world is 1200 x 800; a hallway runs across the middle)
+// =====================================================================
+const WW = 1200, WH = 800, HALL_Y1 = 360, HALL_Y2 = 440, HALL_MID = 400, WT = 12;
+const ROOMS = [
+  { id: "kitchen",  name: "Kitchen",       x: 0,   y: 0,   w: 300, h: 360, floor: "#c9a36a", door: 150 },
+  { id: "dining",   name: "Dining Room",   x: 300, y: 0,   w: 260, h: 360, floor: "#8a5a3a", door: 430 },
+  { id: "living",   name: "Living Room",   x: 560, y: 0,   w: 340, h: 360, floor: "#6a3a5a", door: 730 },
+  { id: "bath",     name: "Bathroom",      x: 900, y: 0,   w: 300, h: 360, floor: "#7ab0c0", door: 1050 },
+  { id: "front",    name: "Front Hall",    x: 0,   y: 440, w: 300, h: 360, floor: "#7a3a2a", door: 150 },
+  { id: "bedroom",  name: "Brad's Room",   x: 300, y: 440, w: 260, h: 360, floor: "#4a5a8a", door: 430 },
+  { id: "chapter",  name: "Chapter Room",  x: 560, y: 440, w: 340, h: 360, floor: "#5a2a2a", door: 730 },
+  { id: "yard",     name: "Backyard",      x: 900, y: 440, w: 300, h: 360, floor: "#4a8a3a", door: 1050 }
+];
+const DOOR_W = 90;
+// walls: outer box, the two hallway walls (with door gaps), and walls between rooms
+const WALLS = [];
+(function buildWalls() {
+  WALLS.push({ x: -WT, y: -WT, w: WW + 2 * WT, h: WT }, { x: -WT, y: WH, w: WW + 2 * WT, h: WT },
+             { x: -WT, y: 0, w: WT, h: WH }, { x: WW, y: 0, w: WT, h: WH });
+  [[HALL_Y1 - WT / 2, ROOMS.slice(0, 4)], [HALL_Y2 - WT / 2, ROOMS.slice(4)]].forEach(([y, rooms]) => {
+    let x = 0;
+    rooms.forEach(r => { const g1 = r.door - DOOR_W / 2; WALLS.push({ x, y, w: g1 - x, h: WT }); x = r.door + DOOR_W / 2; });
+    WALLS.push({ x, y, w: WW - x, h: WT });
+  });
+  [300, 560, 900].forEach(x => { WALLS.push({ x: x - WT / 2, y: 0, w: WT, h: HALL_Y1 }); WALLS.push({ x: x - WT / 2, y: HALL_Y2, w: WT, h: WH - HALL_Y2 }); });
+})();
+function roomAt(x, y) {
+  if (y > HALL_Y1 && y < HALL_Y2) return "hall";
+  const r = ROOMS.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+  return r ? r.id : "hall";
+}
+function roomById(id) { return ROOMS.find(r => r.id === id); }
+
+// places you can do things
+const SPOTS = {
+  fridge:   { x: 50,   y: 60,  label: "Fridge" },
+  sink:     { x: 200,  y: 50,  label: "Sink" },
+  plate:    { x: 430,  y: 175, label: "Vlad's plate" },
+  plant:    { x: 520,  y: 50,  label: "Gerald the plant" },
+  tv:       { x: 730,  y: 40,  label: "TV" },
+  couch:    { x: 730,  y: 260, label: "Couch" },
+  tank:     { x: 600,  y: 60,  label: "Sir Bubbles" },
+  shower:   { x: 1140, y: 70,  label: "Shower" },
+  washer:   { x: 960,  y: 60,  label: "Washer" },
+  closet:   { x: 1150, y: 300, label: "Closet" },
+  line:     { x: 245,  y: 640, label: "Pledge line" },
+  bed:      { x: 360,  y: 730, label: "Brad's bed" },
+  couch2:   { x: 500,  y: 520, label: "Brad's couch" },
+  basket:   { x: 330,  y: 500, label: "Laundry" },
+  trophy:   { x: 620,  y: 760, label: "Trophy" },
+  portrait: { x: 860,  y: 480, label: "Founder's portrait" },
+  banner:   { x: 740,  y: 770, label: "Banner" },
+  bell:     { x: 860,  y: 760, label: "Chapter bell" },
+  wall:     { x: 1170, y: 600, label: "Climbing wall" },
+  mat:      { x: 960,  y: 740, label: "Push-up mat" },
+  hallEnd:  { x: 30,   y: 400, label: "End of the hall" }
+};
+
+// the brothers
+const BROTHERS = [
+  { name: "Chad", x: 210, y: 250, shirt: "#2a6ad0" },
+  { name: "Vlad", x: 360, y: 290, shirt: "#d04a2a" },
+  { name: "Tad",  x: 650, y: 560, shirt: "#2a9a5a" },
+  { name: "Thad", x: 1060, y: 520, shirt: "#9a2ad0" },
+  { name: "Brad", x: 480, y: 690, shirt: "#d09a2a" }
+];
+// other pledges standing in line in the Front Hall (there's a gap for you)
+const PLEDGES = [{ x: 45, y: 640 }, { x: 95, y: 640 }, { x: 145, y: 640 }, { x: 195, y: 640 }];
+
+// =====================================================================
+// TASKS (no grown-up stuff: this is a kids' game)
+// =====================================================================
+// step kinds: press (tap once), hold (hold the button), mash (tap N times),
+// stand (stand still), arrows (press the arrows shown), climb (climb up and dance on the roof)
+const MUST = [
+  { text: "Climb the walls and dance on the roof", steps: [{ at: "wall", kind: "climb", msg: "What a roof dance! The whole street saw it." }] },
+  { text: "Hide a fish behind Brad's couch", steps: [
+      { at: "fridge", kind: "press", carry: "🐟", msg: "You grab a slippery fish. Ew!" },
+      { at: "couch2", kind: "press", msg: "Fish hidden. Brad will smell it in about a week." }] },
+  { text: "Take a shower fully clothed", steps: [{ at: "shower", kind: "hold", dur: 3, msg: "Squeaky clean… and totally soaked." }] },
+  { text: "Stand in line with all the other pledges", steps: [{ at: "line", kind: "stand", dur: 4, msg: "Perfectly straight line. Nobody moved!" }] },
+  { text: "Eat a single fry off Vlad's plate", steps: [{ at: "plate", kind: "press", msg: "One fry. Just one. Vlad didn't even notice." }] },
+  { text: "Get a soda for {giver}", steps: [
+      { at: "fridge", kind: "press", carry: "🥤", msg: "Got an ice-cold soda!" },
+      { at: "giver", kind: "press", msg: "\"Ahhh. Good work, Hobo.\"" }] }
+];
+const EXTRA = [
+  { text: "Polish the house trophy until it shines", steps: [{ at: "trophy", kind: "hold", dur: 2.5, msg: "So shiny you can see your face in it." }] },
+  { text: "Sing the house song to the founder's portrait", steps: [{ at: "portrait", kind: "arrows", n: 5, msg: "Beautiful singing! The portrait almost smiled." }] },
+  { text: "Make Brad's bed", steps: [{ at: "bed", kind: "hold", dur: 2.5, msg: "Hospital corners and everything." }] },
+  { text: "Feed Sir Bubbles the goldfish", steps: [{ at: "tank", kind: "press", msg: "Sir Bubbles says blub." }] },
+  { text: "Carry Brad's laundry to the washer", steps: [
+      { at: "basket", kind: "press", carry: "🧺", msg: "Phew, that's a lot of socks." },
+      { at: "washer", kind: "press", msg: "Laundry's in. Spin cycle go!" }] },
+  { text: "Ring the chapter bell 3 times", steps: [{ at: "bell", kind: "mash", n: 3, msg: "DONG! DONG! DONG!" }] },
+  { text: "Do 10 push-ups in the backyard", steps: [{ at: "mat", kind: "mash", n: 10, msg: "Ten push-ups. Your arms are noodles." }] },
+  { text: "Water Gerald the house plant", steps: [
+      { at: "sink", kind: "press", carry: "💧", msg: "Watering can, filled." },
+      { at: "plant", kind: "press", msg: "Gerald looks happier already." }] },
+  { text: "Paint the Greek letters on the banner", steps: [{ at: "banner", kind: "hold", dur: 3, msg: "ΒΘΥ in big bold letters. Art!" }] },
+  { text: "Mop the whole hallway", steps: [
+      { at: "closet", kind: "press", carry: "🧹", msg: "Got the mop. Now mop all the way down the hall!" },
+      { at: "hallEnd", kind: "press", msg: "Sparkling floors. Watch out, it's slippery!" }] }
+];
+const GOAL = 10;
+
+// =====================================================================
+// GAME STATE
+// =====================================================================
+let mode = "menu";        // menu, play, tv, roof, arrows, sirens, dark, wrong, reveal, done
+let T = 0, playT = 0, score = 0, doneCount = 0;
+let tasks = [], task = null, stepI = 0, giverIdx = -1, waitingIdx = -1;
+let carrying = null, progress = 0, mashN = 0, standT = 0, msg = null;
+let arrowsSeq = [], arrowsI = 0, arrowsOk = 0;
+let roofT = 0, climbT = 0;
+let tvT = 0, frankCool = 12, gorillaT = 14, gorilla = null, warnT = 0;
+let stunT = 0, shake = 0, endT = 0, answer = "";
+let floats = [], confetti = [];
+const P = { x: 150, y: 400, dir: 1, walk: 0 };
+const frank = { x: 700, y: 300, path: [], wander: 0, chase: false, line: 0 };
+
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function newGame() {
+  tasks = shuffle(MUST.concat(shuffle(EXTRA.slice()).slice(0, GOAL - MUST.length)).map(t => JSON.parse(JSON.stringify(t))));
+  task = null; stepI = 0; doneCount = 0; score = 0; playT = 0; carrying = null; giverIdx = -1;
+  P.x = 150; P.y = 400; frank.x = 700; frank.y = 300; frank.path = []; frank.chase = false; frankCool = 15;
+  gorillaT = 12 + Math.random() * 6; gorilla = null; warnT = 0; stunT = 0;
+  floats = []; confetti = []; msg = null;
+  nextGiver();
+  mode = "play";
+}
+function nextGiver() {
+  let i; do { i = Math.floor(Math.random() * BROTHERS.length); } while (i === giverIdx && BROTHERS.length > 1);
+  waitingIdx = i;
+}
+function say2(text, who, t) { msg = { text, who, t: t || 3.2 }; }
+function addFloat(x, y, txt, color) { floats.push({ x, y, txt, color: color || "#ffd23f", life: 1.4 }); }
+
+function curStep() { return task ? task.steps[stepI] : null; }
+function stepTarget(st) {
+  if (!st) return null;
+  if (st.at === "giver") { const b = BROTHERS[giverIdx]; return { x: b.x, y: b.y, label: b.name }; }
+  return SPOTS[st.at];
+}
+function nearPt(pt, r) { return pt && Math.hypot(P.x - pt.x, P.y - pt.y) < (r || 56); }
+
+function finishStep() {
+  const st = curStep();
+  sfx.pick();
+  if (st.carry) carrying = st.carry; else if (stepI === task.steps.length - 1) carrying = null;
+  if (st.msg) say2(st.msg, "", 3);
+  progress = 0; mashN = 0; standT = 0;
+  stepI++;
+  if (stepI >= task.steps.length) {
+    doneCount++; score += 100; carrying = null; sfx.done();
+    addFloat(P.x, P.y - 40, "+100  Task " + doneCount + "/" + GOAL + " done!");
+    burst(P.x, P.y - 20);
+    task = null; stepI = 0;
+    if (doneCount >= GOAL) { setTimeout(startPledgeNight, 1600); mode = "waitEnd"; }
+    else setTimeout(nextGiver, 900);
+  }
+}
+
+// =====================================================================
+// MOVEMENT AND COLLISIONS
+// =====================================================================
+const keys = {};
+function moveCircle(o, dx, dy, r) {
+  o.x += dx; WALLS.forEach(w => collide(o, w, r));
+  o.y += dy; WALLS.forEach(w => collide(o, w, r));
+}
+function collide(o, w, r) {
+  const cx = Math.max(w.x, Math.min(o.x, w.x + w.w)), cy = Math.max(w.y, Math.min(o.y, w.y + w.h));
+  const dx = o.x - cx, dy = o.y - cy, d = Math.hypot(dx, dy);
+  if (d < r) {
+    if (d === 0) {   // centre is inside the wall: push out the shortest way
+      const l = o.x - w.x, rr = w.x + w.w - o.x, t = o.y - w.y, b = w.y + w.h - o.y, m = Math.min(l, rr, t, b);
+      if (m === l) o.x = w.x - r; else if (m === rr) o.x = w.x + w.w + r; else if (m === t) o.y = w.y - r; else o.y = w.y + w.h + r;
+      return;
+    }
+    o.x += dx / d * (r - d); o.y += dy / d * (r - d);
+  }
+}
+// route through doors: room -> its door -> hallway -> the other door -> room
+function route(from, to) {
+  const a = roomAt(from.x, from.y), b = roomAt(to.x, to.y), pts = [];
+  if (a === b) return [to];
+  if (a !== "hall") { const r = roomById(a); const top = r.y < HALL_Y1; pts.push({ x: r.door, y: top ? HALL_Y1 - 30 : HALL_Y2 + 30 }, { x: r.door, y: HALL_MID }); }
+  if (b !== "hall") { const r = roomById(b); const top = r.y < HALL_Y1; pts.push({ x: r.door, y: HALL_MID }, { x: r.door, y: top ? HALL_Y1 - 30 : HALL_Y2 + 30 }); }
+  pts.push(to);
+  return pts;
+}
+function inputDir() {
+  let dx = 0, dy = 0;
+  if (keys.arrowleft || keys.a || keys.tleft) dx -= 1;
+  if (keys.arrowright || keys.d || keys.tright) dx += 1;
+  if (keys.arrowup || keys.w || keys.tup) dy -= 1;
+  if (keys.arrowdown || keys.s || keys.tdown) dy += 1;
+  const l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l, dx !== 0 || dy !== 0];
+}
+
+// =====================================================================
+// UPDATE
+// =====================================================================
+let actHeld = false, actPressed = false;
+function update(dt) {
+  T += dt;
+  if (msg) { msg.t -= dt; if (msg.t <= 0) msg = null; }
+  floats.forEach(f => { f.life -= dt; f.y -= 30 * dt; }); floats = floats.filter(f => f.life > 0);
+  confetti.forEach(c => { c.x += c.vx * dt; c.y += c.vy * dt; c.vy += 300 * dt; c.r += c.vr * dt; c.life -= dt; });
+  confetti = confetti.filter(c => c.life > 0);
+  shake = Math.max(0, shake - dt * 30);
+
+  if (mode === "play" || mode === "waitEnd") playUpdate(dt);
+  else if (mode === "tv") tvUpdate(dt);
+  else if (mode === "roof") roofUpdate(dt);
+  else if (mode === "arrows") { playT += dt; }
+  else if (mode === "sirens" || mode === "wrong" || mode === "reveal") endT += dt;
+  actPressed = false;
+}
+
+function playUpdate(dt) {
+  playT += dt;
+  stunT = Math.max(0, stunT - dt);
+  const [dx, dy, moving] = inputDir();
+  const st = curStep();
+  const busy = stunT > 0 || mode === "waitEnd";
+  if (!busy) {
+    const sp = 230;
+    moveCircle(P, dx * sp * dt, dy * sp * dt, 15);
+    if (dx) P.dir = Math.sign(dx);
+    P.walk = moving ? P.walk + dt * 10 : 0;
+  }
+
+  // talking to the brother with the "!"
+  if (!task && waitingIdx >= 0 && actPressed && nearPt(BROTHERS[waitingIdx], 60)) {
+    giverIdx = waitingIdx; waitingIdx = -1;
+    task = tasks[doneCount]; stepI = 0;
+    task.shown = task.text.replace("{giver}", BROTHERS[giverIdx].name);
+    sfx.talk(); say2("\"Hey Hobo! " + task.shown + ".\"", BROTHERS[giverIdx].name, 4);
+    actPressed = false;
+  }
+
+  // doing the current step
+  if (st && !busy) {
+    const tgt = stepTarget(st), near = nearPt(tgt, st.kind === "stand" ? 28 : 58);
+    if (near) {
+      if (st.kind === "press" && actPressed) finishStep();
+      else if (st.kind === "hold") {
+        if (actHeld) { progress += dt / st.dur; if (st.at === "shower" && Math.random() < dt * 3) sfx.water(); if (progress >= 1) finishStep(); }
+        else progress = Math.max(0, progress - dt * 0.5);
+      } else if (st.kind === "mash" && actPressed) {
+        mashN++; sfx.tick(); addFloat(P.x, P.y - 30, mashN + "!", "#fff");
+        if (st.at === "bell") tone(392, 0.8, "triangle", 0.12);
+        if (mashN >= st.n) finishStep();
+      } else if (st.kind === "stand") {
+        if (moving) { if (standT > 0.3) say2("\"DON'T MOVE, PLEDGE!\"", "Tad", 1.5); standT = 0; }
+        else { standT += dt; if (standT >= st.dur) finishStep(); }
+      } else if (st.kind === "arrows" && actPressed) startArrows(st.n);
+      else if (st.kind === "climb" && actHeld) { climbT += dt; if (climbT > 1.6) { climbT = 0; startRoof(); } }
+      else if (st.kind === "climb" && !actHeld) climbT = Math.max(0, climbT - dt);
+    } else if (st.kind !== "stand") { if (st.kind !== "hold") progress = 0; }
+    if (!near && st.kind === "stand") standT = 0;
+  }
+
+  updateFrank(dt);
+  updateGorilla(dt);
+}
+
+// ---------- Frank ----------
+const FRANK_LINES = ["Hey buddy! Wanna watch TV?", "Just one episode!", "C'mon, it's a good one!", "The couch is SO comfy…", "Frank's Couch Club! Join now!"];
+function updateFrank(dt) {
+  frankCool = Math.max(0, frankCool - dt);
+  const d = Math.hypot(P.x - frank.x, P.y - frank.y);
+  frank.chase = frankCool <= 0 && d < 300 && mode === "play";
+  let target;
+  if (frank.chase) {
+    target = { x: P.x, y: P.y };
+    frank.line -= dt;
+    if (frank.line <= 0) { frank.line = 3; say2("\"" + FRANK_LINES[Math.floor(Math.random() * FRANK_LINES.length)] + "\"", "Frank", 2.2); }
+  } else {
+    frank.wander -= dt;
+    if (frank.wander <= 0 || !frank.goal) {
+      frank.wander = 4 + Math.random() * 4;
+      const r = ROOMS[Math.floor(Math.random() * ROOMS.length)];
+      frank.goal = { x: r.x + 40 + Math.random() * (r.w - 80), y: r.y + 60 + Math.random() * (r.h - 120) };
+    }
+    target = frank.goal;
+  }
+  const path = route(frank, target);
+  while (path.length > 1 && Math.hypot(path[0].x - frank.x, path[0].y - frank.y) < 12) path.shift();
+  const next = path[0];
+  const dx = next.x - frank.x, dy = next.y - frank.y, l = Math.hypot(dx, dy);
+  const sp = frank.chase ? 150 : 80;
+  if (l > 4) moveCircle(frank, dx / l * sp * dt, dy / l * sp * dt, 15);
+  frank.walk = l > 4 ? (frank.walk || 0) + dt * 8 : 0;
+  if (dx) frank.dir = Math.sign(dx);
+  if (frank.chase && d < 30 && stunT <= 0 && mode === "play") startTV();
+}
+function startTV() {
+  mode = "tv"; tvT = 9; mashN = 0; sfx.tv();
+  say2("\"Yesss! Couch time, buddy!\"", "Frank", 2.5);
+  P.x = SPOTS.couch.x - 26; P.y = SPOTS.couch.y; frank.x = SPOTS.couch.x + 26; frank.y = SPOTS.couch.y;
+}
+function tvUpdate(dt) {
+  playT += dt;               // the clock keeps ticking while you watch TV!
+  tvT -= dt;
+  if (actPressed) { tvT -= 0.5; sfx.tick(); }
+  if (tvT <= 0) {
+    mode = "play"; frankCool = 22; frank.goal = null;
+    P.y = SPOTS.couch.y + 60;
+    say2("\"Aww, but it was just getting good…\"", "Frank", 2.5);
+  }
+  updateGorilla(dt);
+}
+
+// ---------- the gorilla ----------
+function updateGorilla(dt) {
+  if (gorilla) {
+    gorilla.x += gorilla.vx * dt; gorilla.step += dt * 14;
+    if (mode === "play" && stunT <= 0 && Math.abs(P.y - HALL_MID) < 45 && Math.abs(P.x - gorilla.x) < 36 && roomAt(P.x, P.y) === "hall") {
+      score = Math.max(0, score - 50); stunT = 1.4; shake = reduceMotion ? 0 : 12; sfx.thud();
+      addFloat(P.x, P.y - 40, "-50  BONK!", "#ff6a5a");
+      P.y += P.y < HALL_MID ? -30 : 30;
+      moveCircle(P, 0, 0, 15);
+    }
+    if (gorilla.x < -80 || gorilla.x > WW + 80) { gorilla = null; gorillaT = 12 + Math.random() * 12; }
+  } else if (mode === "play" || mode === "tv") {
+    gorillaT -= dt;
+    if (gorillaT <= 0 && !warnT) { warnT = 1.6; sfx.roar(); say2("ROOOAR! Gorilla in the hallway!", "🦍", 2); }
+    if (warnT) {
+      warnT -= dt;
+      if (warnT <= 0) {
+        warnT = 0;
+        const fromLeft = Math.random() < 0.5;
+        gorilla = { x: fromLeft ? -60 : WW + 60, vx: fromLeft ? 560 : -560, step: 0 };
+      }
+    }
+  }
+}
+
+// ---------- arrow mini-games (singing, roof dance) ----------
+const ARROWS = ["up", "down", "left", "right"], ARROW_CH = { up: "▲", down: "▼", left: "◀", right: "▶" };
+let arrowsFor = "song";
+function startArrows(n, kind) {
+  arrowsSeq = []; for (let i = 0; i < n; i++) arrowsSeq.push(ARROWS[Math.floor(Math.random() * 4)]);
+  arrowsI = 0; arrowsFor = kind || "song"; mode = kind === "dance" ? "roof" : "arrows";
+}
+function arrowInput(dir) {
+  if (arrowsI >= arrowsSeq.length) return;
+  if (dir === arrowsSeq[arrowsI]) {
+    arrowsI++;
+    tone(arrowsFor === "dance" ? 330 + arrowsI * 60 : 392 + arrowsI * 50, 0.18, "triangle", 0.08);
+    if (arrowsI >= arrowsSeq.length) {
+      setTimeout(() => {
+        if (arrowsFor === "dance") { mode = "play"; P.x = SPOTS.wall.x - 40; P.y = SPOTS.wall.y; }
+        else mode = "play";
+        finishStep();
+      }, 600);
+    }
+  } else { sfx.wrong(); shake = reduceMotion ? 0 : 5; }
+}
+function startRoof() { roofT = 0; sfx.done(); startArrows(6, "dance"); }
+function roofUpdate(dt) { roofT += dt; playT += dt; }
+
+// =====================================================================
+// PLEDGE NIGHT (the ending)
+// =====================================================================
+function startPledgeNight() {
+  mode = "sirens"; endT = 0; sfx.siren();
+  say2("", "", 0);
+  setTimeout(() => {
+    mode = "dark"; endT = 0; sfx.rumble();
+    setTimeout(askQuestion, 1800);
+  }, 4000);
+}
+function askQuestion() {
+  say("What… is the Greek alphabet?", true);
+  overlay.classList.remove("hidden");
+  card.className = "card dark";
+  card.innerHTML = `
+    <h1>A deep voice in the dark says…</h1>
+    <p style="font-size:1.35rem; color:#ddd"><b>"WHAT… IS THE GREEK ALPHABET?"</b></p>
+    <input id="ans" type="text" autocomplete="off" placeholder="Type your answer…" aria-label="Your answer">
+    <div class="row"><button id="ansGo">Answer</button></div>`;
+  const inp = document.getElementById("ans");
+  inp.focus();
+  const go = () => { answer = inp.value.trim(); overlay.classList.add("hidden"); card.className = "card"; wrongAnswer(); };
+  document.getElementById("ansGo").onclick = go;
+  inp.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") go(); });
+}
+function wrongAnswer() {
+  mode = "wrong"; endT = 0; sfx.wrong();
+  say("Wrong. It's Beta Theta Pi.", true);
+  setTimeout(() => {
+    mode = "reveal"; endT = 0; sfx.fanfare();
+    say("Welcome to the fraternity, Hobo!", false);
+    for (let i = 0; i < 160; i++) confettiPiece();
+    if (window.ArcadeProgress) ArcadeProgress.complete();
+    setTimeout(showEndCard, 5200);
+  }, 3600);
+}
+function showEndCard() {
+  const mins = Math.floor(playT / 60), secs = Math.floor(playT % 60);
+  const bonus = Math.max(0, Math.round(600 - playT));
+  overlay.classList.remove("hidden");
+  card.className = "card";
+  card.innerHTML = `
+    <h1>Welcome, Brother Hobo!</h1>
+    <h2>Beta Theta Pi… er, Why?</h2>
+    <p>You finished all ${GOAL} tasks and made it through Pledge Night.</p>
+    <p>Tasks: <b>${score}</b> points &nbsp;·&nbsp; Speed bonus: <b>${bonus}</b><br>Time: <b>${mins}:${String(secs).padStart(2, "0")}</b></p>
+    <p style="font-size:1.4rem"><b style="color:var(--gold)">Final score: ${score + bonus}</b></p>
+    ${answer ? `<p class="small">Your answer was "${escapeHtml(answer)}". The dragon says it was a good try.</p>` : ""}
+    <div class="row"><button id="again">Pledge again</button></div>`;
+  document.getElementById("again").onclick = () => { overlay.classList.add("hidden"); newGame(); };
+  document.getElementById("again").focus();
+  mode = "done";
+}
+function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+function burst(x, y) { for (let i = 0; i < 20; i++) confettiPieceAt(x, y); }
+function confettiPieceAt(x, y) {
+  const a = Math.random() * Math.PI * 2, v = 80 + Math.random() * 200;
+  confetti.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 150, r: 0, vr: (Math.random() - 0.5) * 10, life: 1.4, c: ["#ffd23f", "#4fb0ff", "#e8473f", "#5ad17a", "#ff8fb8"][i3()], world: true });
+}
+let ci = 0; function i3() { return (ci++) % 5; }
+function confettiPiece() {
+  confetti.push({ x: Math.random() * W, y: -20 - Math.random() * H * 0.5, vx: (Math.random() - 0.5) * 80, vy: 60 + Math.random() * 120, r: 0, vr: (Math.random() - 0.5) * 10, life: 6, c: ["#ffd23f", "#4fb0ff", "#e8473f", "#5ad17a", "#ff8fb8"][i3()], world: false });
+}
+
+// =====================================================================
+// DRAWING
+// =====================================================================
+let view = { s: 1, ox: 0, oy: 0 };
+function computeView() {
+  const top = 70, bottom = isTouch ? 130 : 20;
+  const s = Math.min((W - 20) / WW, (H - top - bottom) / WH);
+  view = { s, ox: (W - WW * s) / 2, oy: top + (H - top - bottom - WH * s) / 2 };
+}
+function drawHouse() {
+  // floors
+  ctx.fillStyle = "#3a2a1a"; ctx.fillRect(0, HALL_Y1, WW, HALL_Y2 - HALL_Y1);
+  ctx.fillStyle = "#4a3422"; for (let x = 0; x < WW; x += 40) ctx.fillRect(x, HALL_Y1 + 6, 20, HALL_Y2 - HALL_Y1 - 12);
+  ROOMS.forEach(r => {
+    ctx.fillStyle = r.floor; ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.fillStyle = "rgba(0,0,0,0.08)";
+    if (r.id === "yard") { for (let i = 0; i < 60; i++) ctx.fillRect(r.x + (i * 47) % r.w, r.y + (i * 31) % r.h, 3, 7); }
+    else if (r.id === "kitchen" || r.id === "bath") { for (let x = r.x; x < r.x + r.w; x += 30) for (let y = r.y; y < r.y + r.h; y += 30) if (((x + y) / 30) % 2 === 0) ctx.fillRect(x, y, 30, 30); }
+    else for (let y = r.y; y < r.y + r.h; y += 24) ctx.fillRect(r.x, y, r.w, 2);
+    ctx.fillStyle = "rgba(255,244,224,0.55)"; ctx.font = "900 15px Nunito, sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(r.name, r.x + r.w / 2, r.y < HALL_Y1 ? r.y + r.h - 14 : r.y + 26);
+  });
+  ctx.fillStyle = "rgba(255,244,224,0.35)"; ctx.font = "900 13px Nunito, sans-serif";
+  ctx.fillText("~ HALLWAY ~", WW / 2, HALL_MID + 5);
+  drawFurniture();
+  ctx.fillStyle = "#2a1a10";
+  WALLS.forEach(w => ctx.fillRect(w.x, w.y, w.w, w.h));
+}
+function box(x, y, w, h, c, label) {
+  ctx.fillStyle = c; ctx.fillRect(x - w / 2, y - h / 2, w, h);
+  ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 2; ctx.strokeRect(x - w / 2, y - h / 2, w, h);
+  if (label) { ctx.fillStyle = "#fff"; ctx.font = "900 11px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText(label, x, y + 4); }
+}
+function emoji(ch, x, y, size) { ctx.font = `${size || 26}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(ch, x, y); ctx.textBaseline = "alphabetic"; }
+function drawFurniture() {
+  const S = SPOTS;
+  box(S.fridge.x, S.fridge.y, 60, 70, "#e8eef4", "FRIDGE");
+  box(S.sink.x, S.sink.y, 80, 40, "#b8c8d8", "SINK");
+  box(110, 50, 60, 40, "#444", "STOVE");
+  // dining table with a plate of fries
+  box(430, 175, 160, 90, "#6a3a1a"); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(430, 175, 22, 0, 7); ctx.fill(); emoji("🍟", 430, 175, 22);
+  emoji("🪴", S.plant.x, S.plant.y, 34);
+  // living room: TV, couch, fish tank
+  box(S.tv.x, S.tv.y, 120, 26, "#111");
+  ctx.fillStyle = mode === "tv" ? `hsl(${(T * 120) % 360},70%,55%)` : "#2a4a7a"; ctx.fillRect(S.tv.x - 54, S.tv.y - 9, 108, 18);
+  box(S.couch.x, S.couch.y, 170, 50, "#8a3a3a", "COUCH");
+  box(S.tank.x, S.tank.y, 60, 40, "#4ab0e0"); emoji("🐠", S.tank.x + Math.sin(T * 2) * 12, S.tank.y, 18);
+  // bathroom
+  box(S.shower.x, S.shower.y, 90, 100, "#d0eef8", "SHOWER");
+  box(S.washer.x, S.washer.y, 60, 60, "#f4f4f4", "WASH");
+  box(S.closet.x, S.closet.y, 70, 40, "#7a5a3a", "CLOSET");
+  // front hall
+  box(150, 760, 120, 40, "#5a2a1a", "FRONT DOOR");
+  // Brad's room
+  box(S.bed.x, S.bed.y, 90, 120, "#d0d8f0", "BED");
+  box(S.couch2.x, S.couch2.y, 90, 46, "#6a7a3a", "COUCH");
+  box(S.basket.x, S.basket.y, 40, 34, "#c09060"); emoji("🧺", S.basket.x, S.basket.y, 24);
+  // chapter room
+  box(S.trophy.x, S.trophy.y, 60, 50, "#3a1a10"); emoji("🏆", S.trophy.x, S.trophy.y, 30);
+  box(S.portrait.x, S.portrait.y, 54, 54, "#c09030"); emoji("🧔", S.portrait.x, S.portrait.y, 32);
+  box(S.banner.x, S.banner.y, 140, 30, "#e8e0c8"); ctx.fillStyle = "#2a3a8a"; ctx.font = "900 18px serif"; ctx.textAlign = "center"; ctx.fillText("Β Θ Υ", S.banner.x, S.banner.y + 7);
+  emoji("🔔", S.bell.x, S.bell.y, 30);
+  box(730, 640, 140, 70, "#3a2010", "SECRET?");
+  // backyard
+  ctx.fillStyle = "#8a6a4a"; ctx.fillRect(1180, 470, 20, 300);
+  for (let y = 480; y < 770; y += 26) { ctx.fillStyle = ["#e8473f", "#ffd23f", "#4fb0ff", "#5ad17a"][(y / 26 | 0) % 4]; ctx.beginPath(); ctx.arc(1188 + (y % 3) * 2, y, 5, 0, 7); ctx.fill(); }
+  ctx.fillStyle = "#fff"; ctx.font = "900 11px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("CLIMB", 1150, 470);
+  box(S.mat.x, S.mat.y, 90, 40, "#3a6aa0", "MAT");
+  emoji("🌳", 1000, 560, 46);
+}
+
+function person(x, y, opts) {
+  const step = opts.walk ? Math.sin(opts.walk) * 4 : 0;
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.ellipse(x, y + 18, 14, 5, 0, 0, 7); ctx.fill();
+  // legs
+  ctx.fillStyle = opts.pants || "#2a2a4a";
+  ctx.fillRect(x - 8, y + 6, 6, 12 + step); ctx.fillRect(x + 2, y + 6, 6, 12 - step);
+  // body
+  ctx.fillStyle = opts.shirt; ctx.beginPath(); ctx.roundRect(x - 13, y - 14, 26, 24, 6); ctx.fill();
+  if (opts.patch) { ctx.fillStyle = "#c0a060"; ctx.fillRect(x - 9, y - 6, 7, 7); ctx.fillStyle = "#6a8ac0"; ctx.fillRect(x + 3, y + 1, 6, 6); }
+  if (opts.text) { ctx.fillStyle = opts.textColor || "#fff"; ctx.font = `900 ${opts.textSize || 8}px Nunito, sans-serif`; ctx.textAlign = "center"; ctx.fillText(opts.text, x, y + 2); }
+  // head
+  ctx.fillStyle = opts.skin || "#f0c090"; ctx.beginPath(); ctx.arc(x, y - 24, 11, 0, 7); ctx.fill();
+  ctx.fillStyle = "#1a1008"; const ed = (opts.dir || 1) * 3;
+  ctx.beginPath(); ctx.arc(x - 4 + ed, y - 25, 1.8, 0, 7); ctx.arc(x + 4 + ed, y - 25, 1.8, 0, 7); ctx.fill();
+  if (opts.hat) { ctx.fillStyle = opts.hat; ctx.beginPath(); ctx.arc(x, y - 28, 11, Math.PI, 0); ctx.fill(); ctx.fillRect(x - 12, y - 29, 24, 4); }
+  else if (opts.hair) { ctx.fillStyle = opts.hair; ctx.beginPath(); ctx.arc(x, y - 27, 11, Math.PI * 1.05, Math.PI * 1.95); ctx.fill(); }
+}
+function drawHobo() {
+  const wet = curStep() && curStep().at === "shower" && progress > 0;
+  // bindle on a stick
+  ctx.strokeStyle = "#7a4a20"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(P.x - 10 * P.dir, P.y - 4); ctx.lineTo(P.x - 24 * P.dir, P.y - 36); ctx.stroke();
+  ctx.fillStyle = "#d04a3a"; ctx.beginPath(); ctx.arc(P.x - 26 * P.dir, P.y - 40, 8, 0, 7); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(P.x - 28 * P.dir, P.y - 42, 1.5, 0, 7); ctx.arc(P.x - 23 * P.dir, P.y - 38, 1.5, 0, 7); ctx.fill();
+  person(P.x, P.y, { shirt: "#8a6a3a", pants: "#4a4a5a", hat: "#3a5a3a", patch: true, dir: P.dir, walk: P.walk, skin: "#e8b080" });
+  if (stunT > 0) { ctx.fillStyle = "#ffd23f"; ctx.font = "14px sans-serif"; for (let i = 0; i < 3; i++) { const a = T * 6 + i * 2.1; ctx.fillText("★", P.x + Math.cos(a) * 14, P.y - 42 + Math.sin(a) * 4); } }
+  if (wet) { ctx.fillStyle = "rgba(120,200,255,0.8)"; for (let i = 0; i < 8; i++) ctx.fillRect(P.x - 16 + ((i * 9 + T * 200) % 32), P.y - 50 + ((i * 17 + T * 300) % 50), 2, 6); }
+  if (carrying) emoji(carrying, P.x + 16 * P.dir, P.y - 6, 20);
+  // name tag
+  ctx.fillStyle = "#fff4e0"; ctx.font = "900 11px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("HOBO", P.x, P.y + 32);
+}
+function drawGorilla() {
+  if (!gorilla) return;
+  const x = gorilla.x, y = HALL_MID, b = Math.sin(gorilla.step) * 3;
+  ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.ellipse(x, y + 22, 26, 7, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#2a2220";
+  ctx.beginPath(); ctx.ellipse(x, y - b, 24, 22, 0, 0, 7); ctx.fill();
+  ctx.fillRect(x - 30, y - 10 + b, 10, 26); ctx.fillRect(x + 20, y - 10 - b, 10, 26);
+  ctx.beginPath(); ctx.arc(x, y - 28 - b, 15, 0, 7); ctx.fill();
+  ctx.fillStyle = "#6a5a50"; ctx.beginPath(); ctx.ellipse(x + Math.sign(gorilla.vx) * 3, y - 24 - b, 9, 7, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x - 4 + Math.sign(gorilla.vx) * 3, y - 32 - b, 2.5, 0, 7); ctx.arc(x + 4 + Math.sign(gorilla.vx) * 3, y - 32 - b, 2.5, 0, 7); ctx.fill();
+  // you can see the zipper. It's a costume!
+  ctx.strokeStyle = "#bbb"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, y - 14 - b); ctx.lineTo(x, y + 12 - b); ctx.stroke();
+  // dust
+  ctx.fillStyle = "rgba(200,180,150,0.4)"; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(x - Math.sign(gorilla.vx) * (30 + i * 12), y + 18 - (i % 2) * 6, 6 - i, 0, 7); ctx.fill(); }
+}
+function drawMarker(t) {
+  if (!t) return;
+  const bob = Math.sin(T * 5) * 4;
+  ctx.strokeStyle = "#ffd23f"; ctx.lineWidth = 3; ctx.setLineDash([6, 5]);
+  ctx.beginPath(); ctx.arc(t.x, t.y, 36 + Math.sin(T * 4) * 3, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.moveTo(t.x, t.y - 44 + bob); ctx.lineTo(t.x - 9, t.y - 58 + bob); ctx.lineTo(t.x + 9, t.y - 58 + bob); ctx.fill();
+}
+function drawWorld() {
+  computeView();
+  ctx.save();
+  if (shake) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+  ctx.translate(view.ox, view.oy); ctx.scale(view.s, view.s);
+  drawHouse();
+  // where to go
+  const st = curStep();
+  if (st) drawMarker(stepTarget(st));
+  else if (waitingIdx >= 0) drawMarker(BROTHERS[waitingIdx]);
+  // pledges in line
+  PLEDGES.forEach((p, i) => person(p.x, p.y, { shirt: "#c0c0c0", text: "PLEDGE", textSize: 6, textColor: "#333", hair: ["#3a2a1a", "#c09030", "#1a1a1a", "#8a3a1a"][i] }));
+  // brothers
+  BROTHERS.forEach((b, i) => {
+    person(b.x, b.y, { shirt: b.shirt, text: "ΒΘΥ", textSize: 9, hair: ["#3a2a1a", "#1a1a1a", "#c09030", "#8a3a1a", "#5a3a1a"][i], dir: P.x < b.x ? -1 : 1 });
+    ctx.fillStyle = "#fff4e0"; ctx.font = "900 11px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText(b.name, b.x, b.y + 32);
+    if (i === waitingIdx && !task) {
+      ctx.fillStyle = "#ffd23f"; ctx.font = "900 26px Bungee, sans-serif"; ctx.fillText("!", b.x, b.y - 44 + Math.sin(T * 6) * 3);
+    }
+  });
+  // Frank
+  person(frank.x, frank.y, { shirt: "#e0e0e0", text: "FRANK", textSize: 7, textColor: "#c02a2a", hair: "#6a4a2a", dir: frank.dir, walk: frank.walk, pants: "#4a6a9a" });
+  if (frank.chase) { emoji("📺", frank.x + 18, frank.y - 40, 16); }
+  drawHobo();
+  drawGorilla();
+  // progress ring / counters near you
+  if (st && nearPt(stepTarget(st), 58)) {
+    if (st.kind === "hold" || st.kind === "climb") ring(P.x, P.y - 54, st.kind === "climb" ? climbT / 1.6 : progress);
+    if (st.kind === "stand") ring(P.x, P.y - 54, standT / st.dur);
+    if (st.kind === "mash") { ctx.fillStyle = "#fff"; ctx.font = "900 14px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText(mashN + " / " + st.n, P.x, P.y - 50); }
+  }
+  floats.forEach(f => { ctx.globalAlpha = Math.min(1, f.life); ctx.fillStyle = f.color; ctx.font = "900 16px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText(f.txt, f.x, f.y); ctx.globalAlpha = 1; });
+  confetti.filter(c => c.world).forEach(drawConf);
+  ctx.restore();
+}
+function ring(x, y, v) {
+  ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(x, y, 12, 0, 7); ctx.stroke();
+  ctx.strokeStyle = "#5ad17a"; ctx.beginPath(); ctx.arc(x, y, 12, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, v)); ctx.stroke();
+}
+function drawConf(c) { ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.r); ctx.fillStyle = c.c; ctx.fillRect(-4, -2, 8, 4); ctx.restore(); }
+
+function hint() {
+  const st = curStep();
+  if (mode === "tv") return "Frank got you! Tap E / Space fast to escape the couch";
+  if (stunT > 0) return "BONK! The gorilla got you";
+  if (!task) return waitingIdx >= 0 ? "Go talk to " + BROTHERS[waitingIdx].name + " (the one with the !). Press E" : "";
+  const t = stepTarget(st);
+  const near = nearPt(t, st.kind === "stand" ? 28 : 58);
+  if (!near) return (st.kind === "stand" ? "Go to the gap in the pledge line" : "Go to: " + t.label);
+  return { press: "Press E / Space", hold: "Hold E / Space", mash: "Tap E / Space " + st.n + " times", stand: "Stand still… don't move!", arrows: "Press E / Space to start singing", climb: "Hold E / Space to climb" }[st.kind];
+}
+function drawHUD() {
+  const pad = 12;
+  ctx.fillStyle = "rgba(26,15,8,0.88)"; ctx.fillRect(0, 0, W, 62);
+  ctx.textBaseline = "middle"; ctx.textAlign = "left";
+  ctx.fillStyle = "#ffd23f"; ctx.font = "16px Bungee, Impact, sans-serif"; ctx.fillText("ΒΘΥ?", pad, 20);
+  ctx.fillStyle = "#fff4e0"; ctx.font = "900 15px Nunito, sans-serif";
+  const m = Math.floor(playT / 60), s = Math.floor(playT % 60);
+  ctx.fillText(`Tasks ${doneCount}/${GOAL}   ·   Points ${score}   ·   ${m}:${String(s).padStart(2, "0")}`, pad + 70, 20);
+  ctx.fillStyle = "#ffe6a0"; ctx.font = "900 14px Nunito, sans-serif";
+  const st = task ? "Task: " + task.shown + (task.steps.length > 1 ? "  (step " + (stepI + 1) + " of " + task.steps.length + ")" : "") : "No task yet";
+  ctx.fillText(st, pad, 44);
+  ctx.textAlign = "right"; ctx.fillStyle = "#9ad0ff"; ctx.fillText(hint(), W - 110, 44);
+  ctx.textBaseline = "alphabetic";
+  // speech bubble
+  if (msg && msg.text) {
+    ctx.font = "900 16px Nunito, sans-serif"; ctx.textAlign = "center";
+    const tw = Math.min(W - 40, ctx.measureText(msg.text).width + 40), y = H - (isTouch ? 150 : 50);
+    ctx.fillStyle = "rgba(255,244,224,0.95)"; ctx.beginPath(); ctx.roundRect(W / 2 - tw / 2, y - 22, tw, 40, 12); ctx.fill();
+    ctx.fillStyle = "#2a1a10"; ctx.fillText((msg.who ? msg.who + ": " : "") + msg.text, W / 2, y + 4, W - 60);
+  }
+}
+
+// ---------- special scenes ----------
+function drawTV() {
+  // a big TV with a silly show while Frank laughs
+  drawWorld();
+  ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(0, 0, W, H);
+  const w = Math.min(W * 0.7, 560), h = w * 0.6, x = W / 2 - w / 2, y = H * 0.42 - h / 2;
+  ctx.fillStyle = "#111"; ctx.beginPath(); ctx.roundRect(x - 16, y - 16, w + 32, h + 32, 16); ctx.fill();
+  ctx.fillStyle = `hsl(${(T * 40) % 360},60%,45%)`; ctx.fillRect(x, y, w, h);
+  emoji(["🐔", "🦆", "🐄", "🐸"][Math.floor(T / 1.5) % 4], x + w / 2 + Math.sin(T * 3) * w * 0.25, y + h * 0.55, h * 0.45);
+  ctx.fillStyle = "#fff"; ctx.font = `900 ${Math.round(h * 0.09)}px Nunito, sans-serif`; ctx.textAlign = "center";
+  ctx.fillText("THE BIG CHICKEN SHOW — Episode " + (1 + Math.floor(T / 3) % 99), W / 2, y + h * 0.15);
+  ctx.fillStyle = "#ffd23f"; ctx.font = "900 22px Nunito, sans-serif";
+  ctx.fillText("Frank: \"HAHAHA! Classic!\"", W / 2, y + h + 50);
+  ctx.fillStyle = "#fff4e0"; ctx.font = "900 18px Nunito, sans-serif";
+  ctx.fillText("Tap E / Space fast to escape!  (" + Math.max(0, tvT).toFixed(1) + "s of TV left)", W / 2, y + h + 82);
+}
+function drawRoof() {
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#0a0a2a"); g.addColorStop(1, "#3a2a5a");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#fff"; for (let i = 0; i < 70; i++) ctx.fillRect((i * 137) % W, (i * 71) % (H * 0.5), 2, 2);
+  ctx.fillStyle = "#fff6c8"; ctx.beginPath(); ctx.arc(W * 0.8, H * 0.18, 40, 0, 7); ctx.fill();
+  // the roof
+  ctx.fillStyle = "#5a2a1a"; ctx.beginPath(); ctx.moveTo(0, H); ctx.lineTo(W * 0.2, H * 0.62); ctx.lineTo(W * 0.8, H * 0.62); ctx.lineTo(W, H); ctx.fill();
+  ctx.strokeStyle = "#3a1a10"; ctx.lineWidth = 2; for (let y = H * 0.66; y < H; y += 22) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  // the Hobo dancing, big
+  const s = Math.min(W, H) / 280, x = W / 2, y = H * 0.64 - 20 * s;
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.rotate(Math.sin(roofT * 8) * 0.25);
+  person(0, 0, { shirt: "#8a6a3a", pants: "#4a4a5a", hat: "#3a5a3a", patch: true, walk: roofT * 12, skin: "#e8b080" });
+  ctx.strokeStyle = "#e8b080"; ctx.lineWidth = 5; ctx.lineCap = "round";
+  const a = Math.sin(roofT * 10);
+  ctx.beginPath(); ctx.moveTo(-12, -10); ctx.lineTo(-26, -26 - a * 8); ctx.moveTo(12, -10); ctx.lineTo(26, -26 + a * 8); ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = "#ffd23f"; ctx.font = `${Math.round(Math.min(W, H) * 0.06)}px Bungee, Impact, sans-serif`; ctx.textAlign = "center";
+  ctx.fillText("ROOF DANCE!", W / 2, H * 0.1);
+  drawArrowPrompt(H * 0.21);
+}
+function drawArrowPrompt(y) {
+  const n = arrowsSeq.length, size = Math.min(70, (W - 40) / n - 10);
+  for (let i = 0; i < n; i++) {
+    const x = W / 2 + (i - (n - 1) / 2) * (size + 10);
+    ctx.fillStyle = i < arrowsI ? "#5ad17a" : i === arrowsI ? "#ffd23f" : "rgba(255,255,255,0.25)";
+    ctx.beginPath(); ctx.roundRect(x - size / 2, y - size / 2, size, size, 12); ctx.fill();
+    ctx.fillStyle = "#2a1a10"; ctx.font = `900 ${Math.round(size * 0.55)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(ARROW_CH[arrowsSeq[i]], x, y + 2); ctx.textBaseline = "alphabetic";
+  }
+  ctx.fillStyle = "#fff4e0"; ctx.font = "900 18px Nunito, sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("Press the arrows in order!", W / 2, y + size);
+}
+function drawSinging() {
+  drawWorld();
+  ctx.fillStyle = "rgba(10,6,3,0.7)"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#ffd23f"; ctx.font = `${Math.round(Math.min(W, H) * 0.05)}px Bungee, Impact, sans-serif`; ctx.textAlign = "center";
+  ctx.fillText("🎵 The House Song 🎵", W / 2, H * 0.3);
+  ctx.fillStyle = "#fff4e0"; ctx.font = "900 18px Nunito, sans-serif";
+  ctx.fillText("\"Oh Beta Theta Whyyy, we don't know whyyyy…\"", W / 2, H * 0.37);
+  drawArrowPrompt(H * 0.52);
+}
+function drawEnding() {
+  if (mode === "sirens") {
+    drawWorld();
+    const red = Math.floor(endT * 4) % 2 === 0;
+    ctx.fillStyle = red ? "rgba(232,40,40,0.4)" : "rgba(40,100,232,0.4)"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#fff"; ctx.font = `${Math.round(Math.min(W, H) * 0.1)}px Bungee, Impact, sans-serif`; ctx.textAlign = "center";
+    ctx.fillText("🚨 PLEDGE NIGHT 🚨", W / 2, H * 0.45);
+    ctx.font = "900 22px Nunito, sans-serif"; ctx.fillText("Everyone to the secret room!", W / 2, H * 0.55);
+  } else if (mode === "dark" || mode === "wrong") {
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+    // just a pair of glowing eyes up high in the dark…
+    const a = mode === "wrong" ? 1 : Math.min(1, endT / 2) * 0.6;
+    ctx.fillStyle = `rgba(255,200,40,${a})`;
+    ctx.beginPath(); ctx.ellipse(W / 2 - 60, H * 0.28, 22, 10, 0.2, 0, 7); ctx.ellipse(W / 2 + 60, H * 0.28, 22, 10, -0.2, 0, 7); ctx.fill();
+    if (mode === "wrong") {
+      ctx.fillStyle = "#ddd"; ctx.font = `${Math.round(Math.min(W, H) * 0.08)}px Bungee, Impact, sans-serif`; ctx.textAlign = "center";
+      ctx.fillText("\"WRONG.\"", W / 2, H * 0.55);
+      if (endT > 1.2) { ctx.font = `${Math.round(Math.min(W, H) * 0.05)}px Bungee, Impact, sans-serif`; ctx.fillText("\"It's Beta Theta Pi.\"", W / 2, H * 0.66); }
+    }
+  } else if (mode === "reveal" || mode === "done") {
+    drawReveal();
+  }
+}
+function drawReveal() {
+  const k = Math.min(1, endT / 0.6);
+  const g = ctx.createRadialGradient(W / 2, H * 0.5, 50, W / 2, H * 0.5, Math.max(W, H));
+  g.addColorStop(0, "#7a3a2a"); g.addColorStop(1, "#2a0f08");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // banner and candles
+  ctx.fillStyle = "#e8e0c8"; ctx.fillRect(W * 0.2, H * 0.06, W * 0.6, H * 0.08);
+  ctx.fillStyle = "#2a3a8a"; ctx.font = `${Math.round(H * 0.05)}px serif`; ctx.textAlign = "center"; ctx.fillText("Β Θ Π", W / 2, H * 0.12);
+  drawDragon(W / 2, H * 0.64, Math.min(W, H) / 560);
+  // brothers cheering on the sides
+  const s = Math.min(W, H) / 260;
+  BROTHERS.forEach((b, i) => {
+    const x = i < 3 ? W * (0.08 + i * 0.07) : W * (0.86 + (i - 3) * 0.07), y = H * 0.85 - Math.abs(Math.sin(T * 6 + i)) * 10;
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s); person(0, 0, { shirt: b.shirt, text: "ΒΘΥ", textSize: 9, hair: "#3a2a1a" }); ctx.restore();
+  });
+  // you!
+  ctx.save(); ctx.translate(W / 2, H * 0.9); ctx.scale(s * 1.1, s * 1.1); person(0, 0, { shirt: "#8a6a3a", pants: "#4a4a5a", hat: "#3a5a3a", patch: true, skin: "#e8b080" }); ctx.restore();
+  // speech
+  ctx.globalAlpha = k;
+  ctx.fillStyle = "rgba(255,244,224,0.96)"; const bw = Math.min(W * 0.8, 520), bx = W / 2 - bw / 2, by = H * 0.17;
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, 64, 16); ctx.fill();
+  ctx.fillStyle = "#2a1a10"; ctx.font = `900 ${Math.round(Math.min(26, bw / 18))}px Nunito, sans-serif`; ctx.textAlign = "center";
+  ctx.fillText("\"Welcome to the fraternity, Hobo!\"", W / 2, by + 40);
+  ctx.globalAlpha = 1;
+  confetti.filter(c => !c.world).forEach(drawConf);
+}
+function drawDragon(cx, cy, s) {
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(s, s);
+  const flap = Math.sin(T * 3) * 0.2;
+  // wings
+  ctx.fillStyle = "#2a8a4a";
+  ctx.save(); ctx.rotate(-flap); ctx.beginPath(); ctx.moveTo(-40, -40); ctx.lineTo(-200, -170); ctx.lineTo(-170, -60); ctx.lineTo(-210, -40); ctx.lineTo(-60, 10); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.rotate(flap); ctx.beginPath(); ctx.moveTo(40, -40); ctx.lineTo(200, -170); ctx.lineTo(170, -60); ctx.lineTo(210, -40); ctx.lineTo(60, 10); ctx.fill(); ctx.restore();
+  // body and belly
+  ctx.fillStyle = "#3aaa5a"; ctx.beginPath(); ctx.ellipse(0, 40, 90, 100, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#e8d080"; ctx.beginPath(); ctx.ellipse(0, 55, 55, 75, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = "#c0a050"; ctx.lineWidth = 3; for (let y = 10; y < 120; y += 18) { ctx.beginPath(); ctx.moveTo(-40, y); ctx.quadraticCurveTo(0, y + 8, 40, y); ctx.stroke(); }
+  // fraternity sash
+  ctx.strokeStyle = "#2a3a8a"; ctx.lineWidth = 16; ctx.beginPath(); ctx.moveTo(-70, -10); ctx.lineTo(70, 110); ctx.stroke();
+  ctx.fillStyle = "#fff"; ctx.font = "900 16px serif"; ctx.save(); ctx.translate(0, 50); ctx.rotate(0.7); ctx.fillText("ΒΘΠ", 0, 5); ctx.restore();
+  // neck and head
+  ctx.fillStyle = "#3aaa5a"; ctx.beginPath(); ctx.ellipse(0, -80, 40, 50, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -130, 70, 52, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -105, 50, 30, 0, 0, 7); ctx.fill();
+  // horns
+  ctx.fillStyle = "#f0e0b0"; ctx.beginPath(); ctx.moveTo(-40, -170); ctx.lineTo(-60, -215); ctx.lineTo(-22, -176); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(40, -170); ctx.lineTo(60, -215); ctx.lineTo(22, -176); ctx.fill();
+  // friendly eyes
+  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(-28, -140, 16, 0, 7); ctx.arc(28, -140, 16, 0, 7); ctx.fill();
+  ctx.fillStyle = "#1a1008"; ctx.beginPath(); ctx.arc(-25, -138, 8, 0, 7); ctx.arc(31, -138, 8, 0, 7); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(-23, -141, 3, 0, 7); ctx.arc(33, -141, 3, 0, 7); ctx.fill();
+  // nostrils and a big smile
+  ctx.fillStyle = "#1a5a2a"; ctx.beginPath(); ctx.arc(-12, -110, 4, 0, 7); ctx.arc(12, -110, 4, 0, 7); ctx.fill();
+  ctx.strokeStyle = "#1a5a2a"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, -105, 30, 0.3, Math.PI - 0.3); ctx.stroke();
+  // little puffs of smoke
+  ctx.fillStyle = "rgba(220,220,220,0.5)";
+  for (let i = 0; i < 3; i++) { const t = (T * 0.8 + i / 3) % 1; ctx.beginPath(); ctx.arc(-12 - t * 30, -115 - t * 60, 6 + t * 10, 0, 7); ctx.arc(12 + t * 30, -115 - t * 60, 6 + t * 10, 0, 7); ctx.fill(); }
+  ctx.restore();
+}
+
+function drawMenuBg() {
+  computeView();
+  ctx.save(); ctx.translate(view.ox, view.oy); ctx.scale(view.s, view.s); drawHouse(); ctx.restore();
+}
+function draw() {
+  ctx.fillStyle = "#1a0f08"; ctx.fillRect(0, 0, W, H);
+  if (mode === "menu") drawMenuBg();
+  else if (mode === "play" || mode === "waitEnd") { drawWorld(); drawHUD(); }
+  else if (mode === "tv") { drawTV(); drawHUD(); }
+  else if (mode === "roof") drawRoof();
+  else if (mode === "arrows") drawSinging();
+  else drawEnding();
+}
+
+// =====================================================================
+// LOOP AND CONTROLS
+// =====================================================================
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  update(dt); draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function act(down) {
+  if (down && !actHeld) actPressed = true;
+  actHeld = down;
+}
+const ARROW_KEYS = { arrowup: "up", w: "up", arrowdown: "down", s: "down", arrowleft: "left", a: "left", arrowright: "right", d: "right" };
+window.addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+  if (e.target && (e.target.tagName === "INPUT" || (e.target.tagName === "BUTTON" && (k === "enter" || k === " ")))) return;
+  if ((mode === "roof" || mode === "arrows") && ARROW_KEYS[k]) { e.preventDefault(); if (!e.repeat) arrowInput(ARROW_KEYS[k]); return; }
+  if (k === "e" || k === " " || k === "enter") { e.preventDefault(); if (!e.repeat) act(true); return; }
+  if (k.startsWith("arrow")) e.preventDefault();
+  keys[k] = true;
+});
+window.addEventListener("keyup", e => {
+  const k = e.key.toLowerCase();
+  if (k === "e" || k === " " || k === "enter") act(false);
+  keys[k] = false;
+});
+window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; act(false); });
+
+touchEl.querySelectorAll("button").forEach(b => {
+  const k = b.dataset.k;
+  const down = e => {
+    e.preventDefault(); b.classList.add("down"); audio();
+    if (k === "act") act(true);
+    else if (mode === "roof" || mode === "arrows") arrowInput(k);
+    else keys["t" + k] = true;
+    try { b.setPointerCapture(e.pointerId); } catch (err) {}
+  };
+  const up = () => { b.classList.remove("down"); if (k === "act") act(false); else keys["t" + k] = false; };
+  b.addEventListener("pointerdown", down); b.addEventListener("pointerup", up);
+  b.addEventListener("pointercancel", up); b.addEventListener("lostpointercapture", up);
+});
+
+document.getElementById("btnStart").onclick = () => {
+  audio(); overlay.classList.add("hidden");
+  if (isTouch) touchEl.classList.add("on");
+  newGame();
+};
+document.getElementById("btnStart").focus();
+
+// testing hook: ?test=1
+if (/[?&]test=1/.test(location.search)) {
+  window.BTW_TEST = {
+    state: () => ({ climbT, actHeld, mode, doneCount, score, task: task && task.shown, step: stepI, waiting: waitingIdx, carrying, P: { x: P.x | 0, y: P.y | 0 } }),
+    finishAll: () => { while (doneCount < GOAL - 1) { if (!task) { giverIdx = 0; task = tasks[doneCount]; task.shown = task.text; stepI = 0; } while (task) finishStep(); } },
+    teleport: (x, y) => { P.x = x; P.y = y; },
+    target: () => { const st = curStep(); return st ? stepTarget(st) : (waitingIdx >= 0 ? BROTHERS[waitingIdx] : null); },
+    step: () => curStep() && curStep().kind,
+    gorillaNow: () => { gorillaT = 0; },
+    calm: () => { gorillaT = 1e9; frankCool = 1e9; },
+    force: (word) => { const i = tasks.findIndex(t => t.text.indexOf(word) >= 0); const t = tasks.splice(i, 1)[0]; tasks.splice(doneCount, 0, t); },
+    seq: () => arrowsSeq.slice(arrowsI),
+    frankNow: () => { frankCool = 0; frank.x = P.x + 60; frank.y = P.y; }
+  };
+}
+})();
+</script>
+</body>
+</html>
