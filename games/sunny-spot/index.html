@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sunny Spot · fake0hs Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #4a3426; --cream: #fff6e6; --peach: #ffb37a; --sun: #ffd23f; --berry: #e0559a; color-scheme: light; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #f3e3c8; font-family: "Nunito", system-ui, sans-serif; color: var(--ink); }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(74, 52, 38, 0.35); z-index: 10; }
+  #overlay.hidden { display: none; }
+  .card { max-width: 540px; width: 100%; background: var(--cream); border: 3px solid var(--ink); border-radius: 22px; padding: 26px 28px; text-align: center; box-shadow: 8px 8px 0 var(--peach); }
+  h1 { font-family: "Fredoka", "Trebuchet MS", sans-serif; font-weight: 700; font-size: clamp(2.4rem, 8vw, 3.6rem); line-height: 1; margin: 0 0 10px; color: #e07a2e; }
+  p { margin: 0 0 10px; line-height: 1.45; }
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; text-align: left; margin: 14px auto; max-width: 420px; font-size: 0.93rem; align-items: start; }
+  .keys b { white-space: nowrap; background: #fff; border: 2px solid var(--ink); border-radius: 8px; padding: 0 8px; font-weight: 900; text-align: center; }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+  button { font: 900 1rem "Nunito", system-ui, sans-serif; cursor: pointer; padding: 11px 20px; border-radius: 14px; border: 3px solid var(--ink); background: var(--sun); color: var(--ink); box-shadow: 0 4px 0 var(--ink); }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  button.secondary { background: #fff; }
+  button:focus-visible, .exit-btn:focus-visible { outline: 3px solid var(--berry); outline-offset: 3px; }
+  #actions { position: fixed; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: none; gap: 10px; z-index: 5; }
+  #actions.show { display: flex; }
+  #actions button { padding: 8px 14px; font-size: 0.95rem; }
+  #actions button[disabled] { opacity: 0.5; }
+  .exit-btn {
+    position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: 14px; z-index: 30;
+    font: 800 0.95rem "Nunito", system-ui, sans-serif; color: var(--ink); text-decoration: none;
+    background: var(--cream); border: 2px solid var(--ink); border-radius: 99px; padding: 6px 15px;
+  }
+  .exit-btn:hover { background: var(--sun); }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="actions">
+  <button id="bMeow" type="button">🐾 Meow (M)</button>
+  <button id="bPurr" type="button">💜 Purr (P)</button>
+  <button id="bUse" type="button">🍽️ Eat / Nap (E)</button>
+</div>
+<div id="overlay">
+  <div class="card" id="card">
+    <h1>Sunny Spot</h1>
+    <p>There’s a comfy chair upstairs in a beautiful patch of sunshine. You’re a cat. It belongs to you. Get there before the human does!</p>
+    <p>Yarn and lizards are impossible to resist, and they wear you out. Eat, nap, or purr for pets to recharge. More energy means you run faster, and you need energy to climb the stairs.</p>
+    <div class="keys">
+      <b>Click / WASD</b><span>Walk (click your bowl, a cat bed or the human to go there)</span>
+      <b>M</b><span>Meow. At your bowl, the human comes to fill it</span>
+      <b>P</b><span>Purr near the human to get petted</span>
+      <b>E / Right click</b><span>Eat from the bowl or nap in a cat bed</span>
+    </div>
+    <div class="row"><button id="btnStart">Let’s go!</button></div>
+  </div>
+</div>
+<a class="exit-btn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
+
+<script>
+(function () {
+"use strict";
+const canvas = document.getElementById("game"), ctx = canvas.getContext("2d");
+const overlay = document.getElementById("overlay"), card = document.getElementById("card"), actions = document.getElementById("actions");
+let W = 0, H = 0, T = 32, OX = 0, OY = 0;
+const HUD_TOP = 64, HUD_BOTTOM = 60;
+
+// =====================================================================
+// SETTINGS (easy to tweak)
+// =====================================================================
+const START_ENERGY = 30;      // the cat starts sleepy
+const STAIRS_ENERGY = 50;     // energy needed to climb the stairs
+const CAT_SLOW = 1.0;         // cat speed with no energy (tiles per second)
+const CAT_FAST = 2.4;         // extra speed at full energy
+const MOVE_DRAIN = 0.5;       // energy used per second of running
+const YARN_COST = 12;         // energy used playing with yarn
+const LIZARD_COST = 10;       // energy used chasing a lizard
+const LIZARD_SENSE = 1.7;     // how close a lizard has to be before you can't resist it
+const FOOD_GAIN = 45, NAP_GAIN = 40, PET_GAIN = 25;
+const HUMAN_SPEED = 1.7;      // the human's walking speed
+const MEOW_COOLDOWN = 14;     // seconds before the human answers another meow
+const PURR_COOLDOWN = 10;
+
+// The human's to-do list before they go sit in YOUR chair
+const ROUTE = [
+  { at: [21, 15], wait: 5, label: "Making a cup of tea", icon: "☕" },
+  { at: [5, 17], wait: 4, label: "Looking for the TV remote", icon: "📺" },
+  { at: [3, 4], wait: 4, label: "Washing hands", icon: "🧼" },
+  { at: [20, 3], wait: 0, label: "Heading for the comfy chair!", icon: "🪑" }
+];
+
+// =====================================================================
+// THE HOUSE
+// # wall  . floor  b bathroom  r rug  s sunshine  H comfy chair  S stairs  D doorway
+// T counter/table  c couch  t TV  f fridge  B bed  K bookshelf  p plant  F food bowl  N cat bed
+// =====================================================================
+const MAP = [
+  "##############################",
+  "#bbbbb#.......#..............#",
+  "#bbbbb#.BB....#..sssssss.....#",
+  "#bbbbb#.BB....#..sssHsss...p.#",
+  "#bbbbb#.......#..sssssss.....#",
+  "#bbbbb#.K...N.#..sssssss.....#",
+  "###D#####D#######D############",
+  "#............................#",
+  "#.p.......................p..#",
+  "#############SS###############",
+  "#############SS###############",
+  "#############SS###############",
+  "#............................#",
+  "#..p......................p..#",
+  "#####D##########D#############",
+  "#..........K.#...............#",
+  "#.rrrrrr.....#.fTTTTT........#",
+  "#.rrrrrr..t..#...............#",
+  "#.rrrrrr.....D......TT...F...#",
+  "#.cccc.....N.#......TT.......#",
+  "#............#...............#",
+  "##############################"
+];
+const MW = MAP[0].length, MH = MAP.length;
+const SOLID = "#TcfBKptF";
+const tile = (x, y) => (x < 0 || y < 0 || x >= MW || y >= MH) ? "#" : MAP[y][x];
+const BOWL = [25, 18];
+const CHAIR = [20, 3];
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const fit = Math.min((W - 24) / MW, (H - HUD_TOP - HUD_BOTTOM) / MH);
+  T = Math.floor(Math.max(fit, Math.min((W - 24) / MW, 50)));   // zoom in to fill the width; the camera scrolls up and down
+  OX = Math.floor((W - MW * T) / 2);
+  updateCamera(true);
+}
+window.addEventListener("resize", resize);
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rand = (a, b) => a + Math.random() * (b - a);
+const srand = (i) => { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
+
+// =====================================================================
+// AUDIO (all synthesized)
+// =====================================================================
+let actx = null, master = null, noiseBuf = null;
+function audio() {
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
+    master = actx.createGain(); master.gain.value = 0.85; master.connect(actx.destination);
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+const now = () => actx ? actx.currentTime : 0;
+function env(g, t, p, a, d) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(p, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
+function osc(type, f, t, d, p, a = 0.01, fEnd) {
+  if (!audio()) return;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); if (fEnd) o.frequency.exponentialRampToValueAtTime(fEnd, t + d);
+  env(g, t, p, a, d); o.connect(g).connect(master); o.start(t); o.stop(t + a + d + 0.05);
+}
+function noise(t, d, p, type, f, q = 1, a = 0.005) {
+  if (!audio()) return;
+  const s = actx.createBufferSource(), fl = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = noiseBuf; s.loop = true; fl.type = type; fl.frequency.value = f; fl.Q.value = q;
+  env(g, t, p, a, d); s.connect(fl).connect(g).connect(master); s.start(t); s.stop(t + a + d + 0.05);
+}
+const sfx = {
+  meow() {
+    if (!audio()) return;
+    const t = now(), o = actx.createOscillator(), o2 = actx.createOscillator(), bp = actx.createBiquadFilter(), g = actx.createGain();
+    o.type = "sawtooth"; o2.type = "triangle";
+    const base = rand(480, 560);
+    [o, o2].forEach((x, i) => { x.frequency.setValueAtTime(base * (i ? 2 : 1), t); x.frequency.linearRampToValueAtTime(base * 1.55 * (i ? 2 : 1), t + 0.18); x.frequency.linearRampToValueAtTime(base * 0.9 * (i ? 2 : 1), t + 0.55); });
+    bp.type = "bandpass"; bp.Q.value = 3; bp.frequency.setValueAtTime(900, t); bp.frequency.linearRampToValueAtTime(1800, t + 0.2); bp.frequency.linearRampToValueAtTime(1000, t + 0.55);
+    env(g, t, 0.35, 0.06, 0.5);
+    o.connect(bp); o2.connect(bp); bp.connect(g).connect(master); o.start(t); o2.start(t); o.stop(t + 0.7); o2.stop(t + 0.7);
+  },
+  purr() {
+    if (!audio()) return;
+    const t = now(), s = actx.createBufferSource(), lp = actx.createBiquadFilter(), g = actx.createGain(), am = actx.createGain(), lfo = actx.createOscillator(), lg = actx.createGain();
+    s.buffer = noiseBuf; s.loop = true; lp.type = "lowpass"; lp.frequency.value = 180;
+    lfo.frequency.value = 24; lg.gain.value = 0.5; am.gain.value = 0.5; lfo.connect(lg).connect(am.gain);
+    env(g, t, 0.9, 0.2, 1.6);
+    s.connect(lp).connect(am).connect(g).connect(master); s.start(t); lfo.start(t); s.stop(t + 1.9); lfo.stop(t + 1.9);
+  },
+  boing() { const t = now(); osc("sine", 300, t, 0.25, 0.25, 0.005, 700); osc("sine", 700, t + 0.12, 0.2, 0.15, 0.005, 400); },
+  scurry() { const t = now(); for (let i = 0; i < 6; i++) noise(t + i * 0.04, 0.03, 0.15, "highpass", 3000); },
+  crunch() { const t = now(); for (let i = 0; i < 5; i++) noise(t + i * 0.18 + rand(0, 0.05), 0.07, 0.3, "bandpass", rand(1500, 2500), 1.5); },
+  pour() { const t = now(); noise(t, 1.2, 0.25, "bandpass", 3000, 0.8, 0.1); for (let i = 0; i < 10; i++) osc("sine", rand(2500, 4500), t + i * 0.1, 0.05, 0.03); },
+  snore() { const t = now(); noise(t, 0.9, 0.18, "lowpass", 300, 0.7, 0.4); },
+  pet() { const t = now(); [523, 659, 784].forEach((f, i) => osc("sine", f, t + i * 0.1, 0.25, 0.08)); },
+  nope() { const t = now(); osc("triangle", 300, t, 0.15, 0.12); osc("triangle", 220, t + 0.15, 0.2, 0.12); },
+  win() { const t = now(); [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => osc("triangle", f, t + i * 0.12, 0.3, 0.12)); },
+  lose() { const t = now(); [392, 370, 349, 330].forEach((f, i) => osc("triangle", f, t + i * 0.3, 0.45, 0.12)); }
+};
+
+// =====================================================================
+// GAME STATE
+// =====================================================================
+let mode = "menu"; // menu | play | won | lost
+let cat, human, yarns, lizards, bowlFull, msg, meowCD, purrCD, time, floaters;
+const keys = {};
+
+function reset() {
+  cat = { x: 8.5, y: 19.5, dir: -Math.PI / 2, energy: START_ENERGY, state: "free", t: 0, target: null, path: [], onArrive: null, walk: 0, tail: 0, lizard: null, yarn: null, gain: 0 };
+  human = { x: 22.5, y: 17.5, dir: Math.PI, route: 0, waiting: 0, path: [], task: "route", walk: 0, petT: 0, bubble: null, sitting: false };
+  bowlFull = false; meowCD = 0; purrCD = 0; time = 0; floaters = []; msg = null;
+  yarns = [
+    { a: [3, 12], b: [12, 12], c: "#ff4f8b" },
+    { a: [18, 13], b: [27, 13], c: "#4fa3ff" },
+    { a: [4, 7], b: [12, 8], c: "#7a5cff" },
+    { a: [16, 7], b: [25, 7], c: "#5ad17a" }
+  ].map(y => ({ ...y, x: y.a[0] + 0.5, y: y.a[1] + 0.5, p: Math.random(), dirn: 1, cool: 0, spin: 0 }));
+  const zones = [
+    { x0: 1, y0: 12, x1: 28, y1: 13 },  // downstairs hallway
+    { x0: 1, y0: 7, x1: 28, y1: 8 },    // upstairs landing
+    { x0: 15, y0: 15, x1: 28, y1: 20 }  // kitchen
+  ];
+  lizards = zones.map(z => { const l = { zone: z, x: 0, y: 0, state: "roam", tx: 0, ty: 0, hideT: 0, wig: Math.random() * 6, dir: 0 }; placeLizard(l, true); return l; });
+  setHumanGoal();
+}
+function placeLizard(l, anywhere) {
+  for (let i = 0; i < 40; i++) {
+    const x = Math.floor(rand(l.zone.x0, l.zone.x1 + 1)), y = Math.floor(rand(l.zone.y0, l.zone.y1 + 1));
+    if (SOLID.includes(tile(x, y))) continue;
+    if (!anywhere && cat && Math.hypot(x + 0.5 - cat.x, y + 0.5 - cat.y) < 5) continue;
+    l.x = x + 0.5; l.y = y + 0.5; l.tx = l.x; l.ty = l.y; return;
+  }
+}
+
+function blockedFor(who, x, y) {
+  const c = tile(x, y);
+  if (SOLID.includes(c)) return true;
+  if (who === "cat" && c === "S" && cat.energy < STAIRS_ENERGY) return true;
+  return false;
+}
+function bfs(who, sx, sy, tx, ty) {
+  const key = (x, y) => y * MW + x, prev = new Map([[key(sx, sy), -1]]), q = [[sx, sy]];
+  while (q.length) {
+    const [x, y] = q.shift();
+    if (x === tx && y === ty) break;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, k = key(nx, ny);
+      if (prev.has(k) || blockedFor(who, nx, ny)) continue;
+      prev.set(k, key(x, y)); q.push([nx, ny]);
+    }
+  }
+  if (!prev.has(key(tx, ty))) return null;
+  const path = []; let k = key(tx, ty);
+  while (k !== key(sx, sy)) { path.push([k % MW + 0.5, Math.floor(k / MW) + 0.5]); k = prev.get(k); }
+  return path.reverse();
+}
+
+function say(text, life = 3) { msg = { text, t: 0, life }; }
+function floatText(text, x, y, color = "#4a3426") { floaters.push({ text, x, y, t: 0, color }); }
+
+// ---------- the human ----------
+function setHumanGoal() {
+  const r = ROUTE[human.route];
+  human.task = "route";
+  human.path = bfs("human", Math.floor(human.x), Math.floor(human.y), r.at[0], r.at[1]) || [];
+  human.bubble = { icon: r.icon, label: r.label };
+}
+function updateHuman(dt) {
+  if (human.sitting) return;
+  if (human.petT > 0) {
+    human.petT -= dt;
+    if (human.petT <= 0) { human.bubble = human.savedBubble; if (human.task === "route" && human.waiting <= 0) setHumanGoal(); }
+    return;
+  }
+  if (human.path.length) {
+    const [tx, ty] = human.path[0], dx = tx - human.x, dy = ty - human.y, d = Math.hypot(dx, dy);
+    const sp = HUMAN_SPEED * (tile(Math.floor(human.x), Math.floor(human.y)) === "S" ? 0.75 : 1);
+    if (d < sp * dt) { human.x = tx; human.y = ty; human.path.shift(); }
+    else { human.x += dx / d * sp * dt; human.y += dy / d * sp * dt; human.dir = Math.atan2(dy, dx); }
+    human.walk += dt * 8;
+    if (!human.path.length) arriveHuman();
+    return;
+  }
+  if (human.waiting > 0) {
+    human.waiting -= dt;
+    if (human.waiting <= 0) {
+      if (human.task === "feed") { bowlFull = true; sfx.pour(); floatText("There you go, kitty!", human.x, human.y - 1, "#e07a2e"); human.route = human.route; setHumanGoal(); }
+      else { human.route = Math.min(human.route + 1, ROUTE.length - 1); setHumanGoal(); }
+    }
+  }
+}
+function arriveHuman() {
+  if (human.task === "feed") { human.waiting = 2.5; human.bubble = { icon: "🥫", label: "Filling your bowl" }; human.dir = 0; return; }
+  const r = ROUTE[human.route];
+  if (human.route === ROUTE.length - 1) { human.sitting = true; lose(); return; }
+  human.waiting = r.wait;
+}
+
+// ---------- cat actions ----------
+const nearBowl = () => Math.hypot(cat.x - (BOWL[0] + 0.5), cat.y - (BOWL[1] + 0.5)) < 1.6;
+const nearBed = () => { const c = tile(Math.floor(cat.x), Math.floor(cat.y)); if (c === "N") return true; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (tile(Math.floor(cat.x) + dx, Math.floor(cat.y) + dy) === "N" && Math.hypot(Math.floor(cat.x) + dx + 0.5 - cat.x, Math.floor(cat.y) + dy + 0.5 - cat.y) < 1.2) return true; return false; };
+const nearHuman = () => Math.hypot(cat.x - human.x, cat.y - human.y) < 1.9;
+
+function meow() {
+  if (mode !== "play" || cat.state === "nap") return;
+  sfx.meow(); floatText("Meow!", cat.x, cat.y - 0.8, "#e07a2e");
+  if (!nearBowl()) { if (Math.random() < 0.5) say("Meow! (Meow at your food bowl in the kitchen to call the human.)", 3); return; }
+  if (bowlFull) { say("Your bowl is already full. Eat! (E)", 2.5); return; }
+  if (human.task === "feed") return;
+  if (meowCD > 0) { say("The human is ignoring you. Try again in a moment.", 2.5); return; }
+  meowCD = MEOW_COOLDOWN;
+  human.task = "feed"; human.waiting = 0; human.petT = 0;
+  human.path = bfs("human", Math.floor(human.x), Math.floor(human.y), BOWL[0] - 1, BOWL[1]) || [];
+  human.bubble = { icon: "🐟", label: "Coming to feed you!" };
+  say("It worked! The human is coming to fill your bowl.", 3);
+}
+function purr() {
+  if (mode !== "play" || cat.state !== "free") return;
+  sfx.purr(); floatText("Purrr…", cat.x, cat.y - 0.8, "#e0559a");
+  if (!nearHuman()) { say("Purr next to the human to get petted.", 2.5); return; }
+  if (purrCD > 0 || human.task === "feed" || human.sitting) { say("The human is busy right now.", 2); return; }
+  purrCD = PURR_COOLDOWN;
+  cat.state = "petted"; cat.t = 3; cat.gain = PET_GAIN;
+  human.savedBubble = human.bubble; human.petT = 3; human.path = []; human.bubble = { icon: "💕", label: "Aww, good kitty!" };
+  sfx.pet();
+}
+function useThing() {
+  if (mode !== "play" || cat.state !== "free") return;
+  if (nearBowl()) {
+    if (!bowlFull) { sfx.nope(); say("Your bowl is empty! Meow (M) at it to call the human.", 3); return; }
+    bowlFull = false; cat.state = "eat"; cat.t = 2.2; cat.gain = FOOD_GAIN; sfx.crunch();
+    cat.dir = Math.atan2(BOWL[1] + 0.5 - cat.y, BOWL[0] + 0.5 - cat.x);
+    return;
+  }
+  if (nearBed()) { cat.state = "nap"; cat.t = 4; cat.gain = NAP_GAIN; sfx.snore(); say("Zzz… a quick power nap.", 2); return; }
+  say("Nothing to eat or nap on here. Find your bowl or a cat bed.", 2.5);
+}
+
+// click-to-move: walk somewhere, and do the right thing when you get there
+function walkTo(tx, ty) {
+  const sx = Math.floor(cat.x), sy = Math.floor(cat.y);
+  const c = tile(tx, ty);
+  let dest = [tx, ty], after = null;
+  if (tx === BOWL[0] && ty === BOWL[1]) { dest = [BOWL[0] - 1, BOWL[1]]; after = () => bowlFull ? useThing() : meow(); }
+  else if (c === "N") after = useThing;
+  else if (Math.hypot(tx + 0.5 - human.x, ty + 0.5 - human.y) < 1) { dest = [Math.floor(human.x), Math.floor(human.y)]; after = purr; }
+  else if (c === "S" && cat.energy < STAIRS_ENERGY) { tooTired(); return; }
+  else if (SOLID.includes(c)) return;
+  const p = (dest[0] === sx && dest[1] === sy) ? [] : bfs("cat", sx, sy, dest[0], dest[1]);
+  if (p === null) {
+    if (cat.energy < STAIRS_ENERGY) tooTired(); else say("You can’t get there.", 2);
+    return;
+  }
+  cat.path = p; cat.target = [dest[0] + 0.5, dest[1] + 0.5]; cat.onArrive = after;
+  if (!p.length && after) { cat.onArrive = null; after(); }
+}
+let tiredMsgT = 0;
+// after yarn or a lizard distracts you, carry on to where you clicked
+function rememberTrip() { cat.trip = cat.target ? { tx: Math.floor(cat.target[0]), ty: Math.floor(cat.target[1]), after: cat.onArrive } : null; }
+function resumeTrip() {
+  const tr = cat.trip; cat.trip = null; if (!tr) return;
+  const p = bfs("cat", Math.floor(cat.x), Math.floor(cat.y), tr.tx, tr.ty);
+  if (p === null) { if (cat.energy < STAIRS_ENERGY) tooTired(); return; }
+  cat.path = p; cat.target = [tr.tx + 0.5, tr.ty + 0.5]; cat.onArrive = tr.after;
+  if (!p.length && tr.after) { cat.onArrive = null; tr.after(); }
+}
+function tooTired() {
+  if (tiredMsgT > 0) return;
+  tiredMsgT = 3; sfx.nope();
+  say(`Too sleepy to climb the stairs! You need ⚡${STAIRS_ENERGY} energy. Eat, nap, or get petted.`, 3.5);
+}
+
+// =====================================================================
+// UPDATE
+// =====================================================================
+function catSpeed() { return (CAT_SLOW + CAT_FAST * cat.energy / 100) * (tile(Math.floor(cat.x), Math.floor(cat.y)) === "S" ? 0.7 : 1); }
+function tryMoveCat(dx, dy) {
+  const r = 0.25;
+  const okX = (nx) => !blockedFor("cat", Math.floor(nx + Math.sign(dx) * r), Math.floor(cat.y - r)) && !blockedFor("cat", Math.floor(nx + Math.sign(dx) * r), Math.floor(cat.y + r));
+  const okY = (ny) => !blockedFor("cat", Math.floor(cat.x - r), Math.floor(ny + Math.sign(dy) * r)) && !blockedFor("cat", Math.floor(cat.x + r), Math.floor(ny + Math.sign(dy) * r));
+  let moved = false;
+  if (dx && okX(cat.x + dx)) { cat.x += dx; moved = true; }
+  else if (dx && tile(Math.floor(cat.x + Math.sign(dx) * 0.6), Math.floor(cat.y)) === "S" && cat.energy < STAIRS_ENERGY) tooTired();
+  if (dy && okY(cat.y + dy)) { cat.y += dy; moved = true; }
+  else if (dy && tile(Math.floor(cat.x), Math.floor(cat.y + Math.sign(dy) * 0.6)) === "S" && cat.energy < STAIRS_ENERGY) tooTired();
+  return moved;
+}
+
+function update(dt) {
+  time += dt; meowCD = Math.max(0, meowCD - dt); purrCD = Math.max(0, purrCD - dt); tiredMsgT = Math.max(0, tiredMsgT - dt);
+  if (msg) { msg.t += dt; if (msg.t > msg.life) msg = null; }
+  floaters.forEach(f => f.t += dt); floaters = floaters.filter(f => f.t < 1.4);
+  cat.tail += dt * (cat.state === "nap" ? 1 : 4);
+
+  // yarn rolls back and forth along its hallway
+  for (const y of yarns) {
+    y.cool = Math.max(0, y.cool - dt);
+    y.p += y.dirn * dt * 0.06; if (y.p > 1 || y.p < 0) { y.dirn *= -1; y.p = clamp(y.p, 0, 1); }
+    y.x = y.a[0] + 0.5 + (y.b[0] - y.a[0]) * y.p; y.y = y.a[1] + 0.5 + (y.b[1] - y.a[1]) * y.p;
+    y.spin += dt * y.dirn * 3;
+  }
+  // lizards wander, flee, hide
+  for (const l of lizards) {
+    l.wig += dt * 10;
+    if (l.state === "hidden") { l.hideT -= dt; if (l.hideT <= 0) { placeLizard(l, false); l.state = "roam"; } continue; }
+    const sp = l.state === "flee" ? 3.4 : 1.1;
+    if (l.state === "flee") {
+      const ax = l.x - cat.x, ay = l.y - cat.y, d = Math.hypot(ax, ay) || 1;
+      const nx = l.x + ax / d * sp * dt, ny = l.y + ay / d * sp * dt;
+      if (!SOLID.includes(tile(Math.floor(nx), Math.floor(l.y))) && tile(Math.floor(nx), Math.floor(l.y)) !== "S") l.x = nx; else l.y += (Math.random() < 0.5 ? -1 : 1) * sp * dt;
+      if (!SOLID.includes(tile(Math.floor(l.x), Math.floor(ny))) && tile(Math.floor(l.x), Math.floor(ny)) !== "S") l.y = ny;
+      l.dir = Math.atan2(ay, ax);
+    } else {
+      const dx = l.tx - l.x, dy = l.ty - l.y, d = Math.hypot(dx, dy);
+      if (d < 0.1) { if (Math.random() < dt * 0.8) { l.tx = clamp(l.x + rand(-3, 3), l.zone.x0 + 0.5, l.zone.x1 + 0.5); l.ty = clamp(l.y + rand(-2, 2), l.zone.y0 + 0.5, l.zone.y1 + 0.5); if (SOLID.includes(tile(Math.floor(l.tx), Math.floor(l.ty)))) { l.tx = l.x; l.ty = l.y; } } }
+      else { l.x += dx / d * sp * dt; l.y += dy / d * sp * dt; l.dir = Math.atan2(dy, dx); }
+    }
+  }
+
+  updateHuman(dt);
+  if (mode !== "play") return;
+
+  // ---------- the cat ----------
+  if (cat.state === "free") {
+    let mx = 0, my = 0;
+    if (keys.ArrowLeft || keys.a || keys.A) mx -= 1;
+    if (keys.ArrowRight || keys.d || keys.D) mx += 1;
+    if (keys.ArrowUp || keys.w || keys.W) my -= 1;
+    if (keys.ArrowDown || keys.s || keys.S) my += 1;
+    const sp = catSpeed();
+    if (mx || my) {
+      cat.path = []; cat.target = null; cat.onArrive = null;
+      const l = Math.hypot(mx, my); mx /= l; my /= l;
+      if (tryMoveCat(mx * sp * dt, my * sp * dt)) { cat.dir = Math.atan2(my, mx); cat.walk += dt * 10 * sp / 2; cat.energy = Math.max(0, cat.energy - MOVE_DRAIN * dt); }
+    } else if (cat.path.length) {
+      const [tx, ty] = cat.path[0], dx = tx - cat.x, dy = ty - cat.y, d = Math.hypot(dx, dy);
+      if (d < sp * dt + 0.02) {
+        cat.x = tx; cat.y = ty; cat.path.shift();
+        if (cat.path.length && blockedFor("cat", Math.floor(cat.path[0][0]), Math.floor(cat.path[0][1]))) { cat.path = []; tooTired(); }
+        if (!cat.path.length) { cat.target = null; const f = cat.onArrive; cat.onArrive = null; if (f) f(); }
+      } else { cat.x += dx / d * sp * dt; cat.y += dy / d * sp * dt; cat.dir = Math.atan2(dy, dx); }
+      cat.walk += dt * 10 * sp / 2; cat.energy = Math.max(0, cat.energy - MOVE_DRAIN * dt);
+    }
+    // instincts: yarn and lizards are impossible to resist
+    for (const y of yarns) if (y.cool <= 0 && Math.hypot(y.x - cat.x, y.y - cat.y) < 0.65) {
+      rememberTrip();
+      cat.state = "yarn"; cat.t = 2.2; cat.yarn = y; cat.path = []; cat.target = null; cat.onArrive = null;
+      cat.energy = Math.max(0, cat.energy - YARN_COST); sfx.boing();
+      say("YARN! You simply have to play with it.", 2.2); break;
+    }
+    if (cat.state === "free") for (const l of lizards) if (l.state === "roam" && Math.hypot(l.x - cat.x, l.y - cat.y) < LIZARD_SENSE) {
+      rememberTrip();
+      cat.state = "chase"; cat.t = 2.4; cat.lizard = l; l.state = "flee"; cat.path = []; cat.target = null; cat.onArrive = null;
+      cat.energy = Math.max(0, cat.energy - LIZARD_COST); sfx.scurry();
+      say("A LIZARD! Must… chase… lizard!", 2.4); break;
+    }
+  } else if (cat.state === "yarn") {
+    cat.t -= dt; cat.walk += dt * 18; cat.dir += dt * 6;
+    if (cat.t <= 0) {
+      const y = cat.yarn; y.cool = 4; y.p = y.p < 0.5 ? rand(0.75, 1) : rand(0, 0.25); y.dirn = -y.dirn;
+      cat.state = "free"; cat.yarn = null; sfx.boing(); resumeTrip();
+    }
+  } else if (cat.state === "chase") {
+    cat.t -= dt; const l = cat.lizard;
+    const dx = l.x - cat.x, dy = l.y - cat.y, d = Math.hypot(dx, dy) || 1, sp = catSpeed() * 1.2;
+    if (d > 0.3) { tryMoveCat(dx / d * sp * dt, dy / d * sp * dt); cat.dir = Math.atan2(dy, dx); cat.walk += dt * 14; }
+    if (cat.t <= 0) { l.state = "hidden"; l.hideT = 14; cat.state = "free"; cat.lizard = null; say("The lizard got away under the furniture.", 2); resumeTrip(); }
+  } else if (cat.state === "eat" || cat.state === "nap" || cat.state === "petted") {
+    const total = cat.state === "eat" ? 2.2 : cat.state === "nap" ? 4 : 3;
+    cat.energy = Math.min(100, cat.energy + cat.gain * dt / total);
+    cat.t -= dt;
+    if (cat.state === "nap" && Math.random() < dt * 0.6) sfx.snore();
+    if (cat.t <= 0) { floatText(`+${cat.gain}⚡`, cat.x, cat.y - 0.8, "#2f8a57"); cat.state = "free"; }
+  }
+
+  // the sunny chair!
+  if (Math.hypot(cat.x - (CHAIR[0] + 0.5), cat.y - (CHAIR[1] + 0.5)) < 0.7) win();
+}
+
+function win() {
+  mode = "won"; sfx.win(); cat.state = "nap"; cat.x = CHAIR[0] + 0.5; cat.y = CHAIR[1] + 0.5;
+  actions.classList.remove("show");
+  setTimeout(() => showEnd(true), 1600);
+}
+function lose() {
+  if (mode !== "play") return;
+  mode = "lost"; sfx.lose(); actions.classList.remove("show");
+  setTimeout(() => showEnd(false), 1600);
+}
+function showEnd(won) {
+  overlay.classList.remove("hidden");
+  const secs = Math.round(time);
+  card.innerHTML = won
+    ? `<h1>The sunny spot is yours!</h1><p>You curled up in the warm sunshine on the comfiest chair in the house. The human will have to sit on the floor.</p><p>Time: ${secs} seconds.</p>`
+    : `<h1>Oh no!</h1><p>The human sat in YOUR comfy chair. In YOUR sunshine. Unbelievable.</p><p>Tip: meow at your bowl to lure the human back downstairs, and purr for pets to recharge.</p>`;
+  card.innerHTML += `<div class="row"><button id="btnAgain">Play again</button><button id="btnExit2" class="secondary">Exit to arcade</button></div>`;
+  document.getElementById("btnAgain").onclick = start;
+  document.getElementById("btnExit2").onclick = () => { location.href = "../../index.html"; };
+}
+function start() {
+  audio(); reset(); mode = "play";
+  overlay.classList.add("hidden"); actions.classList.add("show");
+  say("The human just got home. Race them to the sunny chair upstairs!", 4);
+}
+
+// =====================================================================
+// DRAWING
+// =====================================================================
+const X = (x) => OX + x * T, Y = (y) => OY + y * T;
+function updateCamera(snap) {
+  const avail = H - HUD_TOP - HUD_BOTTOM;
+  let want;
+  if (MH * T <= avail) want = HUD_TOP + Math.floor((avail - MH * T) / 2);
+  else {
+    const focus = cat ? cat.y : MH - 3;
+    want = clamp(HUD_TOP + avail / 2 - focus * T, HUD_TOP + avail - MH * T - 6, HUD_TOP + 6);
+  }
+  OY = snap ? want : OY + (want - OY) * 0.12;
+}
+function drawHouse(t) {
+  ctx.fillStyle = "#f3e3c8"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#6b4f3a"; ctx.fillRect(OX - 6, OY - 6, MW * T + 12, MH * T + 12);
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) drawTile(x, y, MAP[y][x], t);
+  // sunbeams pouring in from the sunroom window
+  ctx.save(); ctx.globalCompositeOperation = "lighter";
+  const g = ctx.createLinearGradient(X(17), Y(0), X(24), Y(6));
+  g.addColorStop(0, "rgba(255,220,120,0.32)"); g.addColorStop(1, "rgba(255,220,120,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.moveTo(X(16.5), Y(0.4)); ctx.lineTo(X(24.5), Y(0.4)); ctx.lineTo(X(25.5), Y(6)); ctx.lineTo(X(17.5), Y(6)); ctx.fill();
+  ctx.restore();
+  // floor labels
+  ctx.font = `800 ${Math.max(10, T * 0.36)}px Nunito, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(74,52,38,0.45)";
+  ctx.fillText("UPSTAIRS", X(5), Y(9.5)); ctx.fillText("DOWNSTAIRS", X(23), Y(10.5));
+}
+function drawTile(x, y, c, t) {
+  const px = X(x), py = Y(y);
+  const kitchen = x >= 14 && y >= 15;
+  // floors
+  if (c === "#") {
+    ctx.fillStyle = "#8a6a52"; ctx.fillRect(px, py, T, T);
+    ctx.fillStyle = "#a6856a"; ctx.fillRect(px, py, T, T * 0.2);
+    return;
+  }
+  if (c === "b") { ctx.fillStyle = (x + y) % 2 ? "#cfe8f2" : "#bfe0ee"; ctx.fillRect(px, py, T, T); }
+  else if (kitchen && c !== "S") { ctx.fillStyle = (x + y) % 2 ? "#f4ead8" : "#e3d3b8"; ctx.fillRect(px, py, T, T); }
+  else {
+    ctx.fillStyle = "#dcb784"; ctx.fillRect(px, py, T, T);
+    ctx.strokeStyle = "rgba(120,80,40,0.18)"; ctx.lineWidth = 1;
+    for (let i = 1; i < 3; i++) { ctx.beginPath(); ctx.moveTo(px, py + i * T / 3); ctx.lineTo(px + T, py + i * T / 3); ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(px + (srand(x * 7 + y) * T), py); ctx.lineTo(px + (srand(x * 7 + y) * T), py + T / 3); ctx.stroke();
+  }
+  switch (c) {
+    case "r": {
+      ctx.fillStyle = "#c4482b"; ctx.fillRect(px, py, T, T);
+      ctx.strokeStyle = "#ffd23f"; ctx.lineWidth = 2;
+      if (tile(x - 1, y) !== "r") { ctx.beginPath(); ctx.moveTo(px + 3, py); ctx.lineTo(px + 3, py + T); ctx.stroke(); }
+      if (tile(x + 1, y) !== "r") { ctx.beginPath(); ctx.moveTo(px + T - 3, py); ctx.lineTo(px + T - 3, py + T); ctx.stroke(); }
+      if (tile(x, y - 1) !== "r") { ctx.beginPath(); ctx.moveTo(px, py + 3); ctx.lineTo(px + T, py + 3); ctx.stroke(); }
+      if (tile(x, y + 1) !== "r") { ctx.beginPath(); ctx.moveTo(px, py + T - 3); ctx.lineTo(px + T, py + T - 3); ctx.stroke(); }
+      ctx.fillStyle = "rgba(255,210,63,0.5)"; ctx.beginPath(); ctx.arc(px + T / 2, py + T / 2, T * 0.12, 0, 7); ctx.fill();
+      break;
+    }
+    case "s": case "H": {
+      ctx.fillStyle = `rgba(255,214,90,${0.38 + 0.06 * Math.sin(t * 1.5 + x * 0.5)})`; ctx.fillRect(px, py, T, T);
+      if (c === "H") {
+        ctx.save(); ctx.shadowColor = "#ffd23f"; ctx.shadowBlur = 20;
+        ctx.fillStyle = "#7a3ab8"; ctx.beginPath(); ctx.roundRect(px - T * 0.35, py - T * 0.25, T * 1.7, T * 1.5, T * 0.35); ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = "#9a5ad8"; ctx.beginPath(); ctx.roundRect(px - T * 0.15, py + T * 0.05, T * 1.3, T * 1.0, T * 0.25); ctx.fill();
+        ctx.fillStyle = "#b07ae8"; ctx.beginPath(); ctx.roundRect(px + T * 0.05, py + T * 0.25, T * 0.9, T * 0.65, T * 0.2); ctx.fill();
+      }
+      break;
+    }
+    case "S": {
+      ctx.fillStyle = "#b08a5e"; ctx.fillRect(px, py, T, T);
+      for (let i = 0; i < 3; i++) { ctx.fillStyle = i % 2 ? "#9a7650" : "#c49d6e"; ctx.fillRect(px, py + i * T / 3, T, T / 3 - 1); }
+      ctx.fillStyle = "#6b4f3a"; ctx.fillRect(px - 2, py, 3, T);
+      if (x === 13 && y === 10) {
+        ctx.fillStyle = cat && cat.energy >= STAIRS_ENERGY ? "#2f8a57" : "#c2413b";
+        ctx.font = `900 ${Math.max(10, T * 0.38)}px Nunito, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("⚡" + STAIRS_ENERGY, px - T * 0.9, py + T / 2);
+      }
+      break;
+    }
+    case "D": { ctx.fillStyle = "rgba(107,79,58,0.35)"; ctx.fillRect(px + 2, py + T * 0.4, T - 4, T * 0.2); break; }
+    case "T": { ctx.fillStyle = "#a0683a"; ctx.fillRect(px, py + 2, T, T - 4); ctx.fillStyle = "#c08654"; ctx.fillRect(px + 2, py + 4, T - 4, T * 0.4); break; }
+    case "c": { ctx.fillStyle = "#4f7ac4"; ctx.beginPath(); ctx.roundRect(px, py + T * 0.1, T, T * 0.85, 6); ctx.fill(); ctx.fillStyle = "#6f9ae4"; ctx.beginPath(); ctx.roundRect(px + 3, py + T * 0.15, T - 6, T * 0.45, 5); ctx.fill(); break; }
+    case "t": { ctx.fillStyle = "#222"; ctx.fillRect(px + 2, py + T * 0.25, T - 4, T * 0.5); ctx.fillStyle = `rgba(120,200,255,${0.5 + 0.3 * Math.sin(t * 7)})`; ctx.fillRect(px + 5, py + T * 0.3, T - 10, T * 0.38); break; }
+    case "f": { ctx.fillStyle = "#f4f4f8"; ctx.fillRect(px + 2, py + 2, T - 4, T - 4); ctx.strokeStyle = "#999"; ctx.strokeRect(px + 2.5, py + 2.5, T - 5, T - 5); ctx.fillStyle = "#999"; ctx.fillRect(px + T - 8, py + T * 0.3, 2, T * 0.3); break; }
+    case "B": {
+      ctx.fillStyle = "#e0559a"; ctx.fillRect(px, py, T, T);
+      if (tile(x, y - 1) !== "B") { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.roundRect(px + 3, py + 3, T - 6, T * 0.4, 6); ctx.fill(); }
+      break;
+    }
+    case "K": { ctx.fillStyle = "#6b4f3a"; ctx.fillRect(px + 1, py + 1, T - 2, T - 2); ["#c4482b", "#4fa3ff", "#ffd23f", "#5ad17a"].forEach((col, i) => { ctx.fillStyle = col; ctx.fillRect(px + 4 + i * (T - 8) / 4, py + 4, (T - 8) / 4 - 2, T - 8); }); break; }
+    case "p": { ctx.fillStyle = "#b8653a"; ctx.beginPath(); ctx.arc(px + T / 2, py + T / 2, T * 0.32, 0, 7); ctx.fill(); ctx.fillStyle = "#3f9a4a"; for (let i = 0; i < 5; i++) { const a = i * 1.26 + Math.sin(t + x) * 0.1; ctx.beginPath(); ctx.ellipse(px + T / 2 + Math.cos(a) * T * 0.2, py + T / 2 + Math.sin(a) * T * 0.2, T * 0.2, T * 0.1, a, 0, 7); ctx.fill(); } break; }
+    case "F": {
+      ctx.fillStyle = "#4fa3ff"; ctx.beginPath(); ctx.ellipse(px + T / 2, py + T / 2, T * 0.38, T * 0.3, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = "#2a6ad8"; ctx.beginPath(); ctx.ellipse(px + T / 2, py + T / 2, T * 0.27, T * 0.2, 0, 0, 7); ctx.fill();
+      if (bowlFull) { ctx.fillStyle = "#b8653a"; for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.arc(px + T / 2 + (srand(i) - 0.5) * T * 0.36, py + T / 2 + (srand(i + 5) - 0.5) * T * 0.26, T * 0.06, 0, 7); ctx.fill(); } }
+      ctx.font = `900 ${Math.max(9, T * 0.28)}px Nunito, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillStyle = "#2a6ad8";
+      ctx.fillText(bowlFull ? "FOOD!" : "bowl", px + T / 2, py + T * 0.86);
+      break;
+    }
+    case "N": {
+      ctx.fillStyle = "#7a5cff"; ctx.beginPath(); ctx.arc(px + T / 2, py + T / 2, T * 0.44, 0, 7); ctx.fill();
+      ctx.fillStyle = "#c9b8ff"; ctx.beginPath(); ctx.arc(px + T / 2, py + T / 2, T * 0.3, 0, 7); ctx.fill();
+      break;
+    }
+  }
+}
+
+function drawCat(t) {
+  const s = T * 0.42, x = X(cat.x), y = Y(cat.y);
+  ctx.save(); ctx.translate(x, y);
+  if (cat.state === "nap" || cat.state === "eat" && false) {
+    // curled up
+    ctx.fillStyle = "rgba(0,0,0,0.15)"; ctx.beginPath(); ctx.ellipse(0, s * 0.3, s * 0.95, s * 0.5, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = "#f08a3a"; ctx.beginPath(); ctx.arc(0, 0, s * 0.75, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#c4602a"; ctx.lineWidth = s * 0.12;
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(0, 0, s * (0.3 + i * 0.15), -1 + i * 0.3, 0.5 + i * 0.3); ctx.stroke(); }
+    ctx.strokeStyle = "#f08a3a"; ctx.lineWidth = s * 0.22; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(0, 0, s * 0.85, 0.2, 2.4); ctx.stroke();
+    ctx.fillStyle = "#f08a3a"; ctx.beginPath(); ctx.arc(s * 0.45, -s * 0.45, s * 0.4, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(s * 0.2, -s * 0.7); ctx.lineTo(s * 0.25, -s * 1.05); ctx.lineTo(s * 0.45, -s * 0.8); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(s * 0.6, -s * 0.8); ctx.lineTo(s * 0.8, -s * 0.95); ctx.lineTo(s * 0.8, -s * 0.6); ctx.fill();
+    ctx.strokeStyle = "#4a3426"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(s * 0.35, -s * 0.45, s * 0.08, 0.2, Math.PI - 0.2); ctx.arc(s * 0.6, -s * 0.45, s * 0.08, 0.2, Math.PI - 0.2); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = "#4a3426"; ctx.font = `900 ${Math.round(T * 0.4)}px Nunito, sans-serif`; ctx.textAlign = "center";
+    ctx.fillText("z", x + T * 0.4 + Math.sin(t * 2) * 3, y - T * 0.6 - (t * 12 % 10)); ctx.fillText("Z", x + T * 0.6, y - T * 0.95 - (t * 12 % 10));
+    return;
+  }
+  const bounce = cat.state === "yarn" ? Math.abs(Math.sin(cat.walk)) * s * 0.3 : 0;
+  ctx.translate(0, -bounce);
+  ctx.fillStyle = "rgba(0,0,0,0.15)"; ctx.beginPath(); ctx.ellipse(0, s * 0.5 + bounce, s * 0.8, s * 0.35, 0, 0, 7); ctx.fill();
+  ctx.rotate(cat.dir);
+  // tail
+  ctx.strokeStyle = "#f08a3a"; ctx.lineWidth = s * 0.2; ctx.lineCap = "round";
+  const wag = Math.sin(cat.tail) * 0.6;
+  ctx.beginPath(); ctx.moveTo(-s * 0.7, 0); ctx.quadraticCurveTo(-s * 1.2, wag * s, -s * 1.45, wag * s * 1.6); ctx.stroke();
+  // legs
+  const step = Math.sin(cat.walk) * s * 0.18;
+  ctx.fillStyle = "#e07a2e";
+  [[s * 0.35, s * 0.32, step], [s * 0.35, -s * 0.32, -step], [-s * 0.4, s * 0.32, -step], [-s * 0.4, -s * 0.32, step]].forEach(([lx, ly, o]) => { ctx.beginPath(); ctx.ellipse(lx + o, ly, s * 0.14, s * 0.1, 0, 0, 7); ctx.fill(); });
+  // body
+  ctx.fillStyle = "#f08a3a"; ctx.beginPath(); ctx.ellipse(0, 0, s * 0.8, s * 0.42, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = "#c4602a"; ctx.lineWidth = s * 0.1;
+  for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(i * s * 0.25, -s * 0.38); ctx.lineTo(i * s * 0.25 + s * 0.05, s * 0.38); ctx.stroke(); }
+  // head
+  ctx.fillStyle = "#f08a3a"; ctx.beginPath(); ctx.arc(s * 0.8, 0, s * 0.4, 0, 7); ctx.fill();
+  const flat = cat.state === "chase" ? 0.15 : 0;
+  ctx.beginPath(); ctx.moveTo(s * 0.75, -s * 0.25); ctx.lineTo(s * (0.85 - flat), -s * (0.62 - flat)); ctx.lineTo(s * 1.0, -s * 0.28); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(s * 0.75, s * 0.25); ctx.lineTo(s * (0.85 - flat), s * (0.62 - flat)); ctx.lineTo(s * 1.0, s * 0.28); ctx.fill();
+  ctx.fillStyle = "#ffb0c0"; ctx.beginPath(); ctx.arc(s * 1.17, 0, s * 0.06, 0, 7); ctx.fill();
+  ctx.fillStyle = cat.state === "chase" ? "#7dff6b" : "#2f8a57";
+  ctx.beginPath(); ctx.arc(s * 0.95, -s * 0.15, s * 0.08, 0, 7); ctx.arc(s * 0.95, s * 0.15, s * 0.08, 0, 7); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 1;
+  for (const sd of [-1, 1]) for (let i = 0; i < 2; i++) { ctx.beginPath(); ctx.moveTo(s * 1.1, sd * s * 0.1); ctx.lineTo(s * 1.45, sd * s * (0.18 + i * 0.12)); ctx.stroke(); }
+  ctx.restore();
+  // effects
+  if (cat.state === "yarn" && cat.yarn) {
+    ctx.strokeStyle = cat.yarn.c; ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(x, y - bounce, s * (0.6 + i * 0.15), s * (0.3 + i * 0.1), t * 3 + i, 0, 7); ctx.stroke(); }
+  }
+  if (cat.state === "petted") for (let i = 0; i < 2; i++) { ctx.font = `${Math.round(T * 0.4)}px serif`; ctx.textAlign = "center"; ctx.fillText("💕", x + (i ? 0.4 : -0.3) * T, y - T * 0.6 - ((t * 20 + i * 10) % 16)); }
+  if (cat.state === "eat") { ctx.font = `900 ${Math.round(T * 0.3)}px Nunito, sans-serif`; ctx.fillStyle = "#4a3426"; ctx.textAlign = "center"; ctx.fillText("crunch", x, y - T * 0.6 - Math.abs(Math.sin(t * 8)) * 5); }
+  if (cat.state === "chase") { ctx.fillStyle = "#c2413b"; ctx.font = `900 ${Math.round(T * 0.5)}px Nunito, sans-serif`; ctx.textAlign = "center"; ctx.fillText("!", x, y - T * 0.55); }
+}
+
+function drawHuman(t) {
+  const s = T * 0.5, x = X(human.x), y = Y(human.y);
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = "rgba(0,0,0,0.15)"; ctx.beginPath(); ctx.ellipse(0, s * 0.55, s * 0.75, s * 0.3, 0, 0, 7); ctx.fill();
+  const step = human.path.length ? Math.sin(human.walk) * s * 0.2 : 0;
+  ctx.fillStyle = "#4a4560"; ctx.beginPath(); ctx.ellipse(-s * 0.2, s * 0.35 + step, s * 0.14, s * 0.2, 0, 0, 7); ctx.ellipse(s * 0.2, s * 0.35 - step, s * 0.14, s * 0.2, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#5ad17a"; ctx.beginPath(); ctx.roundRect(-s * 0.5, -s * 0.3, s, s * 0.75, s * 0.3); ctx.fill();
+  ctx.fillStyle = "#f1c7a3"; ctx.beginPath(); ctx.arc(-s * 0.55, s * 0.1 - step * 0.5, s * 0.13, 0, 7); ctx.arc(s * 0.55, s * 0.1 + step * 0.5, s * 0.13, 0, 7); ctx.fill();
+  ctx.fillStyle = "#f1c7a3"; ctx.beginPath(); ctx.arc(0, -s * 0.55, s * 0.33, 0, 7); ctx.fill();
+  ctx.fillStyle = "#6b3e2a"; ctx.beginPath(); ctx.arc(0, -s * 0.62, s * 0.34, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = "#4a3426"; ctx.beginPath(); ctx.arc(-s * 0.11, -s * 0.5, s * 0.04, 0, 7); ctx.arc(s * 0.11, -s * 0.5, s * 0.04, 0, 7); ctx.fill();
+  if (human.bubble && human.bubble.icon === "☕") { ctx.font = `${Math.round(s * 0.5)}px serif`; ctx.textAlign = "center"; ctx.fillText("☕", s * 0.6, s * 0.2); }
+  ctx.restore();
+  // thought bubble
+  if (human.bubble) {
+    const label = human.bubble.icon + " " + human.bubble.label;
+    ctx.font = `800 ${Math.max(11, T * 0.34)}px Nunito, sans-serif`;
+    const tw = ctx.measureText(label).width + 16, by = y - s * 1.45;
+    let bx = clamp(x, OX + tw / 2 + 4, OX + MW * T - tw / 2 - 4);
+    ctx.fillStyle = "rgba(255,246,230,0.95)"; ctx.strokeStyle = "#4a3426"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(bx - tw / 2, by - T * 0.3, tw, T * 0.6, 10); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#4a3426"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(label, bx, by + 1);
+  }
+}
+function drawYarn(y, t) {
+  const x = X(y.x), py = Y(y.y), r = T * 0.26;
+  ctx.fillStyle = "rgba(0,0,0,0.15)"; ctx.beginPath(); ctx.ellipse(x, py + r * 0.8, r, r * 0.35, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = y.c; ctx.beginPath(); ctx.arc(x, py, r, 0, 7); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 1.5;
+  for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(x, py, r * 0.9, r * 0.35, y.spin + i * 1.05, 0, 7); ctx.stroke(); }
+  ctx.strokeStyle = y.c; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - r * 0.8, py + r * 0.5);
+  ctx.quadraticCurveTo(x - r * 2, py + r * 1.4 + Math.sin(t * 3) * 3, x - r * 3, py + r * 0.4); ctx.stroke();
+  if (y.cool > 0) { ctx.globalAlpha = 0.5; ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x, py, r, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
+}
+function drawLizard(l) {
+  if (l.state === "hidden") return;
+  const s = T * 0.3, x = X(l.x), y = Y(l.y);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(l.dir);
+  const w = Math.sin(l.wig) * 0.4;
+  ctx.strokeStyle = "#3f9a4a"; ctx.lineWidth = s * 0.25; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(-s * 0.5, 0); ctx.quadraticCurveTo(-s * 1.0, w * s, -s * 1.5, -w * s * 0.6); ctx.stroke();
+  ctx.lineWidth = s * 0.14;
+  for (const [lx, sd] of [[s * 0.3, 1], [s * 0.3, -1], [-s * 0.3, 1], [-s * 0.3, -1]]) { ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx + w * s * 0.3 * sd, sd * s * 0.45); ctx.stroke(); }
+  ctx.fillStyle = "#5ad17a"; ctx.beginPath(); ctx.ellipse(0, 0, s * 0.6, s * 0.26, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(s * 0.6, 0, s * 0.28, s * 0.2, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#1d1a26"; ctx.beginPath(); ctx.arc(s * 0.7, -s * 0.12, s * 0.05, 0, 7); ctx.arc(s * 0.7, s * 0.12, s * 0.05, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function drawHUD(t) {
+  ctx.fillStyle = "#f3e3c8"; ctx.fillRect(0, 0, W, HUD_TOP - 4); ctx.fillRect(0, H - HUD_BOTTOM + 4, W, HUD_BOTTOM);
+  // energy
+  ctx.fillStyle = "#fff6e6"; ctx.strokeStyle = "#4a3426"; ctx.lineWidth = 2;
+  const bw = Math.min(260, W * 0.28), bx = 14, by = 14;
+  ctx.beginPath(); ctx.roundRect(bx, by, bw + 110, 40, 12); ctx.fill(); ctx.stroke();
+  ctx.font = `900 15px Nunito, sans-serif`; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = "#4a3426";
+  ctx.fillText("⚡ Energy", bx + 10, by + 20);
+  const ex = bx + 96, ew = bw;
+  ctx.fillStyle = "#e9dcc4"; ctx.beginPath(); ctx.roundRect(ex, by + 12, ew, 16, 8); ctx.fill();
+  const e = cat.energy / 100;
+  ctx.fillStyle = cat.energy >= STAIRS_ENERGY ? "#5ad17a" : cat.energy > 20 ? "#ffb02e" : "#e0402a";
+  ctx.beginPath(); ctx.roundRect(ex, by + 12, Math.max(8, ew * e), 16, 8); ctx.fill();
+  ctx.strokeStyle = "#4a3426"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ex + ew * STAIRS_ENERGY / 100, by + 8); ctx.lineTo(ex + ew * STAIRS_ENERGY / 100, by + 32); ctx.stroke();
+  ctx.font = "800 10px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("stairs", ex + ew * STAIRS_ENERGY / 100, by + 37);
+  // race: how far along the human is
+  const hx = bx + bw + 130, hw = Math.min(300, W - hx - 140);
+  if (hw > 120) {
+    ctx.fillStyle = "#fff6e6"; ctx.beginPath(); ctx.roundRect(hx, by, hw, 40, 12); ctx.fill(); ctx.stroke();
+    const prog = (human.route + (human.waiting > 0 ? 0.5 : 0)) / (ROUTE.length - 1);
+    ctx.fillStyle = "#4a3426"; ctx.textAlign = "left"; ctx.font = "900 13px Nunito, sans-serif";
+    ctx.fillText("Human’s to-do list", hx + 10, by + 13);
+    ROUTE.forEach((r, i) => {
+      const cx = hx + 16 + i * ((hw - 32) / (ROUTE.length - 1));
+      ctx.globalAlpha = i < human.route ? 0.35 : 1;
+      ctx.font = "16px serif"; ctx.textAlign = "center"; ctx.fillText(r.icon, cx, by + 29);
+      if (i < human.route) { ctx.globalAlpha = 1; ctx.fillStyle = "#2f8a57"; ctx.font = "900 14px Nunito"; ctx.fillText("✓", cx + 9, by + 25); ctx.fillStyle = "#4a3426"; }
+      ctx.globalAlpha = 1;
+    });
+  }
+  // message
+  if (msg) {
+    const a = Math.min(1, msg.t * 4, (msg.life - msg.t) * 2);
+    ctx.globalAlpha = a; ctx.font = `800 ${Math.max(14, H * 0.024)}px Nunito, sans-serif`;
+    const tw = Math.min(W * 0.8, ctx.measureText(msg.text).width + 30), ty = OY + MH * T * 0.47;
+    ctx.fillStyle = "rgba(255,246,230,0.96)"; ctx.strokeStyle = "#4a3426"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(W / 2 - tw / 2, ty - 20, tw, 40, 12); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#4a3426"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(msg.text, W / 2, ty + 1, W * 0.78);
+    ctx.globalAlpha = 1;
+  }
+  for (const f of floaters) {
+    ctx.globalAlpha = 1 - f.t / 1.4; ctx.fillStyle = f.color; ctx.font = `900 ${Math.max(12, T * 0.42)}px Nunito, sans-serif`; ctx.textAlign = "center";
+    ctx.fillText(f.text, X(f.x), Y(f.y) - f.t * T * 0.8); ctx.globalAlpha = 1;
+  }
+  if (cat.target) {
+    const p = (t * 2) % 1; ctx.strokeStyle = `rgba(224,122,46,${1 - p})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(X(cat.target[0]), Y(cat.target[1]) + T * 0.2, T * (0.15 + p * 0.25), T * (0.06 + p * 0.1), 0, 0, 7); ctx.stroke();
+  }
+}
+
+function drawHumanArrow() {
+  const hy = Y(human.y), top = HUD_TOP, bottom = H - HUD_BOTTOM;
+  if (hy > top + 10 && hy < bottom - 10) return;
+  const up = hy <= top + 10, x = clamp(X(human.x), 60, W - 60), y = up ? top + 22 : bottom - 22;
+  const label = (up ? "▲ " : "▼ ") + "Human: " + (human.bubble ? human.bubble.label : "");
+  ctx.font = "800 13px Nunito, sans-serif";
+  const tw = ctx.measureText(label).width + 18;
+  ctx.fillStyle = "rgba(255,246,230,0.95)"; ctx.strokeStyle = "#4a3426"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.roundRect(clamp(x - tw / 2, 6, W - tw - 6), y - 13, tw, 26, 10); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#4a3426"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(label, clamp(x, 6 + tw / 2, W - 6 - tw / 2), y + 1);
+}
+function render(t) {
+  updateCamera(false);
+  drawHouse(t);
+  for (const y of yarns) drawYarn(y, t);
+  for (const l of lizards) drawLizard(l);
+  const ents = [{ y: human.y, f: () => drawHuman(t) }, { y: cat.y, f: () => drawCat(t) }].sort((a, b) => a.y - b.y);
+  ents.forEach(e => e.f());
+  drawHumanArrow();
+  drawHUD(t);
+}
+
+let last = performance.now();
+function loop(n) {
+  const dt = Math.min(0.05, (n - last) / 1000); last = n;
+  if (mode === "menu") { ctx.fillStyle = "#f3e3c8"; ctx.fillRect(0, 0, W, H); if (cat) render(n / 1000); }
+  else { update(dt); render(n / 1000); }
+  requestAnimationFrame(loop);
+}
+reset();
+resize();
+requestAnimationFrame(loop);
+
+// =====================================================================
+// CONTROLS
+// =====================================================================
+document.getElementById("btnStart").onclick = start;
+document.getElementById("bMeow").onclick = meow;
+document.getElementById("bPurr").onclick = purr;
+document.getElementById("bUse").onclick = useThing;
+window.addEventListener("keydown", (e) => {
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
+  keys[e.key] = true;
+  if (mode !== "play" || e.repeat) return;
+  const k = e.key.toLowerCase();
+  if (k === "m") meow();
+  if (k === "p") purr();
+  if (k === "e" || k === " ") useThing();
+});
+window.addEventListener("keyup", (e) => { keys[e.key] = false; });
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+canvas.addEventListener("pointerdown", (e) => {
+  if (mode !== "play") return;
+  audio();
+  if (e.button === 2) { useThing(); return; }
+  if (cat.state === "nap" || cat.state === "eat" || cat.state === "petted") { say("Shh… you’re busy. Wait a moment.", 1.5); return; }
+  if (cat.state !== "free") return;
+  const tx = Math.floor((e.clientX - OX) / T), ty = Math.floor((e.clientY - OY) / T);
+  if (tx < 0 || ty < 0 || tx >= MW || ty >= MH) return;
+  walkTo(tx, ty);
+});
+})();
+</script>
+</body>
+</html>

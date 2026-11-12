@@ -291,6 +291,14 @@
       desc: "Escape an alien spaceship without getting spotted. Scary!",
       needs: ["Keyboard", "Sound on", "Horror"],
       art: "abducted"
+    },
+    {
+      ready: true,
+      title: "Sunny Spot",
+      href: "games/sunny-spot/index.html",
+      desc: "Be a cat. Beat the human to the comfy chair in the sun.",
+      needs: ["Mouse or keyboard", "Sound on", "Cozy"],
+      art: "sunny"
     }
   ];
   var TOTAL = 9;
@@ -384,7 +392,22 @@
     '<ellipse cy="-16" rx="9" ry="3" fill="#e8c45a"/><circle cx="-3" cy="-12" r="1.6" fill="#fff"/><circle cx="3" cy="-12" r="1.6" fill="#fff"/></g>' +
     '<g fill="#ff1a3c"><circle cx="150" cy="96" r="2"/><circle cx="157" cy="96" r="2"/></g>' +
     '</svg>';
-  var ARTS = { cactus: cactusArt, piano: pianoArt, leo: leoArt, abducted: abductedArt };
+  var sunnyArt =
+    '<svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" role="img" aria-label="An orange cat racing toward a purple armchair in a patch of sunshine">' +
+    '<rect width="320" height="200" fill="#dcb784"/>' +
+    '<g stroke="#c49d6e" stroke-width="2"><path d="M0 40h320M0 80h320M0 120h320M0 160h320"/></g>' +
+    '<rect width="320" height="26" fill="#8a6a52"/><rect x="170" y="4" width="110" height="18" rx="3" fill="#cfe8f2" stroke="#6b4f3a" stroke-width="3"/>' +
+    '<path d="M170 22h110l30 150H190z" fill="#ffd65a" opacity=".45"/>' +
+    '<g transform="translate(236 92)"><rect x="-40" y="-30" width="80" height="68" rx="18" fill="#7a3ab8"/><rect x="-30" y="-16" width="60" height="48" rx="12" fill="#9a5ad8"/><rect x="-20" y="-4" width="40" height="30" rx="9" fill="#b07ae8"/></g>' +
+    '<g transform="translate(92 128) rotate(-12)"><path d="M-34 2q-22-6-30-26" stroke="#f08a3a" stroke-width="8" fill="none" stroke-linecap="round"/>' +
+    '<ellipse rx="34" ry="18" fill="#f08a3a"/><path d="M-12-16l2 32M2-17l2 34M16-15l1 30" stroke="#c4602a" stroke-width="4"/>' +
+    '<circle cx="36" r="17" fill="#f08a3a"/><path d="M30-12l5-15 8 13zM30 12l5 15 8-13z" fill="#f08a3a"/>' +
+    '<circle cx="44" cy="-6" r="3.5" fill="#2f8a57"/><circle cx="44" cy="6" r="3.5" fill="#2f8a57"/><circle cx="52" r="2.5" fill="#ffb0c0"/>' +
+    '<path d="M-40-14h-14M-42 0h-18M-40 14h-14" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/></g>' +
+    '<g transform="translate(160 168)"><circle r="11" fill="#ff4f8b"/><path d="M-9-4q9 6 18 0M-8 4q8 5 16 0" stroke="#fff" stroke-opacity=".6" fill="none" stroke-width="2"/></g>' +
+    '<g transform="translate(44 60) rotate(20)" fill="#5ad17a"><ellipse rx="12" ry="5"/><ellipse cx="12" rx="6" ry="4"/><path d="M-11 0q-10 6-18 0" stroke="#3f9a4a" stroke-width="4" fill="none"/></g>' +
+    '</svg>';
+  var ARTS = { cactus: cactusArt, piano: pianoArt, leo: leoArt, abducted: abductedArt, sunny: sunnyArt };
 
   var coneIcon =
     '<svg viewBox="0 0 30 34" aria-hidden="true"><rect x="2" y="29" width="26" height="4" rx="1" fill="#ff6a00" stroke="#22104a" stroke-width="1.5"/>' +
@@ -396,7 +419,8 @@
     cactus: { body: "#d9663f", hi: "#f08a5a", accent: "#ffc46b", neon: "#ffdd55" },
     piano:  { body: "#5a2290", hi: "#7a3ab8", accent: "#ff4f8b", neon: "#ff7ab8" },
     leo:    { body: "#6b3e5e", hi: "#8c5a7c", accent: "#f4b63f", neon: "#ffd86b" },
-    abducted: { body: "#1d2a22", hi: "#2f4436", accent: "#7dff6b", neon: "#7dff6b" }
+    abducted: { body: "#1d2a22", hi: "#2f4436", accent: "#7dff6b", neon: "#7dff6b" },
+    sunny: { body: "#2f9a84", hi: "#4fbaa4", accent: "#ffd23f", neon: "#ffe27a" }
   };
   var READY_COUNT = GAMES.filter(function (g) { return g.ready; }).length;
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
