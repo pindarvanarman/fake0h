@@ -332,6 +332,7 @@
 </main>
 <nav class="players" id="players" aria-label="Who's playing?"></nav>
 <div class="notice" id="notice" role="status" aria-live="polite"></div>
+<script src="arcade-progress.js"></script>
 
 <script>
 (function () {
@@ -599,7 +600,7 @@
     try { if (p) sessionStorage.setItem(PLAYER_KEY, p); else sessionStorage.removeItem(PLAYER_KEY); } catch (e) {}
     refreshProgress(); defaultInfo();
   }
-  function doneList(p) { var r = readRecords(); return p && Array.isArray(r[p]) ? r[p] : []; }
+  var doneList = function (p) { var r = readRecords(); return p && Array.isArray(r[p]) ? r[p] : []; };
   function doneCount(p) {
     var d = doneList(p);
     return GAMES.filter(function (g) { return g.ready && d.indexOf(g.id) >= 0; }).length;
@@ -639,6 +640,12 @@
     var r = readRecords(); r[p] = [];
     try { localStorage.setItem(REC_KEY, JSON.stringify(r)); } catch (e) {}
     var cl = readClears(); if (cl[p]) { cl[p].counted = false; writeClears(cl); }
+    if (SERVER && AP) {
+      AP.setPending(AP.pending().filter(function (x) { return x.player !== p; }));
+      AP.send({ action: "reset", player: p });
+      if (remote && remote.players[p]) { remote.players[p].done = []; remote.players[p].counted = false; }
+      setTimeout(loadRemote, 4000);
+    }
     showAsk(false); refreshProgress();
     info.innerHTML = "";
     var s = document.createElement("strong"); s.textContent = p; info.appendChild(s);
@@ -650,14 +657,64 @@
   function countClears() {
     var cl = readClears(), changed = false, fresh = null;
     PLAYERS.forEach(function (p) {
-      var all = READY_COUNT > 0 && doneCount(p) === READY_COUNT;
+      var ld = localDone(p);
+      var all = READY_COUNT > 0 && GAMES.filter(function (g) { return g.ready && ld.indexOf(g.id) >= 0; }).length === READY_COUNT;
       var e = cl[p] || { count: 0, counted: false };
       if (all && !e.counted) { e.count++; e.counted = true; cl[p] = e; changed = true; if (p === getPlayer()) fresh = p; }
     });
     if (changed) writeClears(cl);
     return fresh;
   }
-  function trophies(p) { var e = readClears()[p]; return e ? e.count : 0; }
+  function localTrophies(p) { var e = readClears()[p]; return e ? e.count : 0; }
+  function localDone(p) { var r = readRecords(); return p && Array.isArray(r[p]) ? r[p] : []; }
+
+  // ---------- Online saves (optional) ----------
+  // When arcade-progress.js has a server address, everyone's progress comes from the
+  // family Google Sheet, so it follows them to any device. Otherwise this browser's storage is used.
+  var AP = window.ArcadeProgress || null;
+  var SERVER = AP && AP.serverUrl ? AP.serverUrl : "";
+  var remote = null;                                   // last state downloaded from the sheet
+  var READY_IDS = GAMES.filter(function (g) { return g.ready; }).map(function (g) { return g.id; });
+  try {   // let the games know the list of games and their names
+    var titles = {}; GAMES.forEach(function (g) { if (g.ready) titles[g.id] = g.title; });
+    localStorage.setItem("fake0hArcade.games", JSON.stringify(titles));
+  } catch (e) {}
+  function pendingFor(p) { return (AP ? AP.pending() : []).filter(function (x) { return x.player === p; }); }
+
+  doneList = function (p) {
+    if (!p) return [];
+    if (!(SERVER && remote)) return localDone(p);
+    var s = remote.players[p], d = s ? s.done.slice() : [];
+    pendingFor(p).forEach(function (x) { if (d.indexOf(x.game) < 0) d.push(x.game); });
+    return d;
+  };
+  function trophies(p) {
+    if (!(SERVER && remote)) return localTrophies(p);
+    var s = remote.players[p] || { trophies: 0, counted: false };
+    var allNow = READY_IDS.length && READY_IDS.every(function (id) { return doneList(p).indexOf(id) >= 0; });
+    return s.trophies + (allNow && !s.counted ? 1 : 0);     // trophy the sheet hasn't heard about yet
+  }
+
+  function loadRemote() {
+    if (!SERVER) return;
+    fetch(SERVER + (SERVER.indexOf("?") < 0 ? "?" : "&") + "t=" + Date.now())
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data || !data.players) return;
+        remote = data;
+        // wins the sheet now has can be dropped from the waiting list; resend any that got lost
+        var waiting = AP.pending(), still = [];
+        waiting.forEach(function (x) {
+          var s = remote.players[x.player];
+          if (s && s.done.indexOf(x.game) >= 0) return;
+          still.push(x);
+          if (Date.now() - x.t > 15000) AP.send({ action: "win", player: x.player, game: x.game, title: x.title, all: READY_IDS });
+        });
+        AP.setPending(still);
+        refreshProgress(); if (hover < 0) defaultInfo();
+      })
+      .catch(function () { /* offline: keep showing this device's records */ });
+  }
 
   function refreshProgress() {
     countClears();
@@ -706,6 +763,11 @@
     } else {
       s.textContent = "Free play"; info.appendChild(s);
       info.appendChild(document.createTextNode(READY_COUNT + " games ready, " + (TOTAL - READY_COUNT) + " coming soon. Pick your name below to save your progress!"));
+      var last = remote && remote.recent && remote.recent[0];
+      if (last) {
+        var lw = document.createElement("span"); lw.className = "needs"; lw.style.color = "#5aff8a";
+        lw.textContent = "Latest win: " + last.player + " beat " + last.title + " (" + ago(last.time) + ")"; info.appendChild(lw);
+      }
     }
   };
   var baseShowInfo = showInfo;
@@ -717,8 +779,15 @@
       d.textContent = "✓ Completed by " + p; info.appendChild(d);
     }
   };
+  function ago(t) {
+    var m = Math.round((Date.now() - t) / 60000);
+    if (m < 1) return "just now"; if (m < 60) return m + " min ago";
+    var hr = Math.round(m / 60); if (hr < 24) return hr + (hr === 1 ? " hour ago" : " hours ago");
+    var d = Math.round(hr / 24); return d + (d === 1 ? " day ago" : " days ago");
+  }
   // coming back from a game, or records changed in another tab
-  window.addEventListener("pageshow", function () { refreshProgress(); if (hover < 0) defaultInfo(); });
+  window.addEventListener("pageshow", function () { refreshProgress(); if (hover < 0) defaultInfo(); loadRemote(); });
+  setInterval(function () { if (!document.hidden) loadRemote(); }, 60000);
   window.addEventListener("storage", function (e) { if (e.key === REC_KEY) { refreshProgress(); if (hover < 0) defaultInfo(); } });
 
   refreshProgress();
