@@ -364,6 +364,7 @@ function updateDrums(dt) {
 // ---------- Win / lose ----------
 function showEnd(win) {
   state = win ? "won" : "lost";
+  if (win) if (window.ArcadeProgress) ArcadeProgress.complete(); // popped all 100 balloons
   beatOn = false;
   balloons = [];
   if (audio()) {

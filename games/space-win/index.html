@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spacebar Win · fake0hs Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+<!--
+  TEMPORARY TEST GAME for checking the player score system.
+  The arcade opens it as index.html?slot=1 ... ?slot=4, and each slot counts as its own game
+  (space-win-1 ... space-win-4). Press space (or tap the big key) to win.
+-->
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(ellipse at 50% 40%, #1a2a5a, #0c1430 70%);
+    color: #eaf2ff; font-family: Nunito, system-ui, sans-serif;
+    display: grid; place-items: center; text-align: center; padding: 20px;
+  }
+  h1 { font-family: Bungee, Impact, sans-serif; font-weight: 400; color: #7fe4ff; margin: 0 0 6px; font-size: clamp(1.8rem, 6vw, 3.4rem); }
+  .sub { font-weight: 900; color: #ffd23f; margin: 0 0 28px; font-size: 1.1rem; }
+  #key {
+    font: 900 clamp(1.2rem, 4vw, 2rem) Nunito, sans-serif; color: #2b4a7a; cursor: pointer;
+    width: min(520px, 86vw); padding: 22px 0; border-radius: 18px;
+    background: #dfe8ff; border: 4px solid #7fe4ff; box-shadow: 0 8px 0 #4a6aa8, 0 0 30px rgba(127, 228, 255, 0.4);
+    transition: transform 0.06s, box-shadow 0.06s;
+  }
+  #key:active, #key.down { transform: translateY(6px); box-shadow: 0 2px 0 #4a6aa8, 0 0 30px rgba(127, 228, 255, 0.4); }
+  #key:focus-visible { outline: 3px solid #ffd23f; outline-offset: 6px; }
+  #result { min-height: 3.2em; margin-top: 26px; font-weight: 900; font-size: 1.25rem; }
+  #result .big { display: block; font-family: Bungee, Impact, sans-serif; font-weight: 400; font-size: 2rem; color: #5aff8a; }
+  .debug {
+    margin: 24px auto 0; max-width: 520px; text-align: left; font-size: 0.85rem; font-weight: 700;
+    background: rgba(0, 0, 0, 0.3); border: 1px dashed #4a6aa8; border-radius: 10px; padding: 10px 14px; color: #b8c8ee;
+  }
+  .debug b { color: #fff; }
+  .exit-btn {
+    position: fixed; top: max(12px, env(safe-area-inset-top)); left: 12px; z-index: 5;
+    font: 900 0.95rem Nunito, sans-serif; color: #fff; text-decoration: none;
+    background: rgba(0, 0, 0, 0.45); border: 2px solid #7fe4ff; border-radius: 999px; padding: 6px 14px;
+  }
+</style>
+</head>
+<body>
+<a class="exit-btn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
+<main>
+  <h1 id="title">Spacebar Win</h1>
+  <p class="sub">Press the space bar to win!</p>
+  <button id="key" type="button">SPACE</button>
+  <div id="result" aria-live="polite"></div>
+  <div class="debug" id="debug"></div>
+</main>
+
+<script src="../../arcade-progress.js"></script>
+<script>
+(function () {
+  var slot = parseInt(new URLSearchParams(location.search).get("slot"), 10);
+  if (!(slot >= 1 && slot <= 4)) slot = 1;
+  var id = "space-win-" + slot;
+  var AP = window.ArcadeProgress;
+  var won = false;
+  document.getElementById("title").textContent = "Spacebar Win " + slot;
+  document.title = "Spacebar Win " + slot + " · fake0hs Arcade";
+
+  function showDebug() {
+    var p = AP ? AP.player() : null;
+    var recs = {};
+    try { recs = JSON.parse(localStorage.getItem("fake0hArcade.records")) || {}; } catch (e) {}
+    var lines = [
+      "Game ID: <b>" + id + "</b>",
+      "Player: <b>" + (p || "none (free play)") + "</b>",
+      "Helper loaded: <b>" + (AP ? "yes" : "NO, arcade-progress.js is missing") + "</b>",
+      "Online saves: <b>" + (AP && AP.serverUrl ? "on" : "off (this device only)") + "</b>",
+      "Waiting to upload: <b>" + (AP ? AP.pending().length : 0) + "</b>",
+      "Already beaten: <b>" + (p && recs[p] && recs[p].indexOf(id) >= 0 ? "yes" : "no") + "</b>"
+    ];
+    document.getElementById("debug").innerHTML = lines.join("<br>");
+  }
+
+  function win() {
+    if (won) return;
+    won = true;
+    var key = document.getElementById("key");
+    key.classList.add("down"); key.disabled = true;
+    var saved = AP ? AP.complete(id) : false;
+    var p = AP ? AP.player() : null;
+    document.getElementById("result").innerHTML =
+      '<span class="big">YOU WIN! 🎉</span>' +
+      (saved ? "Saved for " + p + ". Going back to the arcade…" : "Free play, so nothing was saved. Going back to the arcade…");
+    showDebug();
+    setTimeout(function () { location.href = "../../index.html"; }, 1800);
+  }
+
+  document.getElementById("key").addEventListener("click", win);
+  window.addEventListener("keydown", function (e) {
+    if (e.code === "Space" || e.key === " ") { e.preventDefault(); win(); }
+  });
+  showDebug();
+  document.getElementById("key").focus();
+})();
+</script>
+</body>
+</html>

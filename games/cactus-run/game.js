@@ -642,7 +642,9 @@ const feetY = () => H * 0.93;
 const roadTopHalf = () => W * 0.03;
 const roadBottomHalf = () => W * 0.62;
 
+let usedWorldJump = false; // the Shift+number test keys don't count toward winning
 function resetGame() {
+  usedWorldJump = false;
   objects = []; popups = [];
   score = 0; totalCoins = 0; charge = 0; lives = 3; level = 1;
   speed = 0.38; elapsed = 0; invuln = 0;
@@ -680,7 +682,11 @@ function activateBar() {
   initParticles();
   showBanner();
   sfx.levelUp();
-  if (theme().finale) { cheerBoost = 2; sfx.cheer(true); burstConfetti(); }
+  if (theme().finale) {
+    cheerBoost = 2; sfx.cheer(true); burstConfetti();
+    // made it through all 10 worlds to the stadium: that beats the game
+    if (!usedWorldJump) if (window.ArcadeProgress) ArcadeProgress.complete();
+  }
   score += 250;
   invuln = 1.5; // a moment to get your bearings
 }
@@ -1189,6 +1195,6 @@ window.addEventListener("keyup", (e) => { keys[e.key] = false; });
 window.addEventListener("keydown", (e) => {
   if (state !== "playing" || !e.shiftKey) return;
   const map = { "!": 1, "@": 2, "#": 3, "$": 4, "%": 5, "^": 6, "&": 7, "*": 8, "(": 9, ")": 10, "S": 11 };
-  if (map[e.key]) { level = map[e.key] - 1; charge = CHARGE_MAX; activateBar(); }
+  if (map[e.key]) { usedWorldJump = true; level = map[e.key] - 1; charge = CHARGE_MAX; activateBar(); }
 });
 })();
