@@ -89,7 +89,8 @@
       <li>🦍 When you hear a roar, get out of the hallway! The guy in the gorilla suit costs you points.</li>
       <li>📺 Avoid <b>Frank</b>. He just wants you to watch TV with him… for a <i>long</i> time.</li>
     </ul>
-    <p><b>Move</b>: arrow keys or WASD &nbsp; · &nbsp; <b>Do things</b>: E or Space</p>
+    <p><b>Mouse</b>: click where to walk, or click a brother or a task spot to go there and do it. Hold the button for "hold" jobs.<br>
+       <b>Keys</b>: arrow keys or WASD to move, E or Space to do things.</p>
     <div class="row"><button id="btnStart">Start pledging</button></div>
   </div>
 </div>
@@ -292,19 +293,25 @@ let tasks = [], task = null, stepI = 0, giverIdx = -1, waitingIdx = -1;
 let carrying = null, progress = 0, mashN = 0, standT = 0, msg = null;
 let arrowsSeq = [], arrowsI = 0, arrowsOk = 0;
 let roofT = 0, climbT = 0;
-let tvT = 0, frankCool = 12, gorillaT = 14, gorilla = null, warnT = 0;
+let tvT = 0, frankCool = 0, gorillaT = 14, gorilla = null, warnT = 0;
 let stunT = 0, shake = 0, endT = 0, answer = "";
 let floats = [], confetti = [];
 const P = { x: 150, y: 400, dir: 1, walk: 0 };
-const frank = { x: 700, y: 300, path: [], wander: 0, chase: false, line: 0 };
+let clickGoal = null, clickAct = false, clickStand = false, stuckT = 0, clickMark = null, mouseHeld = false;
+function clickActPt() {
+  const st = curStep();
+  if (st) return stepTarget(st);
+  return waitingIdx >= 0 ? BROTHERS[waitingIdx] : null;
+}
+const frank = { x: 700, y: 300, path: [], wander: 0, chase: false, line: 0, goal: null, tour: null, pause: 0 };
 
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 function newGame() {
   tasks = shuffle(MUST.concat(shuffle(EXTRA.slice()).slice(0, GOAL - MUST.length)).map(t => JSON.parse(JSON.stringify(t))));
   task = null; stepI = 0; doneCount = 0; score = 0; playT = 0; carrying = null; giverIdx = -1;
-  P.x = 150; P.y = 400; frank.x = 700; frank.y = 300; frank.path = []; frank.chase = false; frankCool = 15;
+  P.x = 150; P.y = 400; frank.x = 700; frank.y = 300; frank.path = []; frank.chase = false; frankCool = 0; frank.goal = null; frank.tour = null;
   gorillaT = 12 + Math.random() * 6; gorilla = null; warnT = 0; stunT = 0;
-  floats = []; confetti = []; msg = null;
+  floats = []; confetti = []; msg = null; clickGoal = null; clickAct = false;
   nextGiver();
   mode = "play";
 }
@@ -364,8 +371,20 @@ function collide(o, w, r) {
 function route(from, to) {
   const a = roomAt(from.x, from.y), b = roomAt(to.x, to.y), pts = [];
   if (a === b) return [to];
-  if (a !== "hall") { const r = roomById(a); const top = r.y < HALL_Y1; pts.push({ x: r.door, y: top ? HALL_Y1 - 30 : HALL_Y2 + 30 }, { x: r.door, y: HALL_MID }); }
-  if (b !== "hall") { const r = roomById(b); const top = r.y < HALL_Y1; pts.push({ x: r.door, y: HALL_MID }, { x: r.door, y: top ? HALL_Y1 - 30 : HALL_Y2 + 30 }); }
+  // someone already lined up in a doorway skips the waypoint they're standing on,
+  // otherwise they'd step back and forth between two points forever
+  const inDoorColumn = r => Math.abs(from.x - r.door) < DOOR_W / 2 - 18;
+  if (a !== "hall") {
+    const r = roomById(a), top = r.y < HALL_Y1, inside = { x: r.door, y: top ? HALL_Y1 - 30 : HALL_Y2 + 30 };
+    const pastInside = top ? from.y > inside.y - 4 : from.y < inside.y + 4;
+    if (!(inDoorColumn(r) && pastInside)) pts.push(inside);
+    pts.push({ x: r.door, y: HALL_MID });
+  }
+  if (b !== "hall") {
+    const r = roomById(b), top = r.y < HALL_Y1;
+    if (!(a === "hall" && inDoorColumn(r))) pts.push({ x: r.door, y: HALL_MID });
+    pts.push({ x: r.door, y: top ? HALL_Y1 - 30 : HALL_Y2 + 30 });
+  }
   pts.push(to);
   return pts;
 }
@@ -390,6 +409,7 @@ function update(dt) {
   confetti.forEach(c => { c.x += c.vx * dt; c.y += c.vy * dt; c.vy += 300 * dt; c.r += c.vr * dt; c.life -= dt; });
   confetti = confetti.filter(c => c.life > 0);
   shake = Math.max(0, shake - dt * 30);
+  if (padFlash) padFlash.t -= dt;
 
   if (mode === "play" || mode === "waitEnd") playUpdate(dt);
   else if (mode === "tv") tvUpdate(dt);
@@ -407,10 +427,30 @@ function playUpdate(dt) {
   const busy = stunT > 0 || mode === "waitEnd";
   if (!busy) {
     const sp = 230;
-    moveCircle(P, dx * sp * dt, dy * sp * dt, 15);
-    if (dx) P.dir = Math.sign(dx);
-    P.walk = moving ? P.walk + dt * 10 : 0;
+    if (moving) { clickGoal = null; clickAct = false; }        // keys take over from the mouse
+    if (moving) {
+      moveCircle(P, dx * sp * dt, dy * sp * dt, 15);
+      if (dx) P.dir = Math.sign(dx);
+      P.walk += dt * 10;
+    } else if (clickGoal) {
+      // follow the clicked spot, going through doorways
+      const path = route(P, clickGoal);
+      while (path.length > 1 && Math.hypot(path[0].x - P.x, path[0].y - P.y) < 12) path.shift();
+      const nx = path[0].x - P.x, ny = path[0].y - P.y, l = Math.hypot(nx, ny);
+      const arrived = clickAct ? nearPt(clickActPt(), 50) : (clickStand ? Math.hypot(clickGoal.x - P.x, clickGoal.y - P.y) < 6 : l < 6);
+      if (arrived) {
+        clickGoal = null; P.walk = 0;
+        if (clickAct) { clickAct = false; actPressed = true; }   // got there: do the thing
+      } else {
+        const bx = P.x, by = P.y;
+        moveCircle(P, nx / l * sp * dt, ny / l * sp * dt, 15);
+        if (Math.abs(nx) > 2) P.dir = Math.sign(nx);
+        P.walk += dt * 10;
+        if (Math.hypot(P.x - bx, P.y - by) < sp * dt * 0.1) { stuckT += dt; if (stuckT > 0.6) { clickGoal = null; stuckT = 0; } } else stuckT = 0;
+      }
+    } else P.walk = 0;
   }
+  const mouseMoving = !!clickGoal;
 
   // talking to the brother with the "!"
   if (!task && waitingIdx >= 0 && actPressed && nearPt(BROTHERS[waitingIdx], 60)) {
@@ -434,7 +474,7 @@ function playUpdate(dt) {
         if (st.at === "bell") tone(392, 0.8, "triangle", 0.12);
         if (mashN >= st.n) finishStep();
       } else if (st.kind === "stand") {
-        if (moving) { if (standT > 0.3) say2("\"DON'T MOVE, PLEDGE!\"", "Tad", 1.5); standT = 0; }
+        if (moving || mouseMoving) { if (standT > 0.3) say2("\"DON'T MOVE, PLEDGE!\"", "Tad", 1.5); standT = 0; }
         else { standT += dt; if (standT >= st.dur) finishStep(); }
       } else if (st.kind === "arrows" && actPressed) startArrows(st.n);
       else if (st.kind === "climb" && actHeld) { climbT += dt; if (climbT > 1.6) { climbT = 0; startRoof(); } }
@@ -459,13 +499,21 @@ function updateFrank(dt) {
     frank.line -= dt;
     if (frank.line <= 0) { frank.line = 3; say2("\"" + FRANK_LINES[Math.floor(Math.random() * FRANK_LINES.length)] + "\"", "Frank", 2.2); }
   } else {
-    frank.wander -= dt;
-    if (frank.wander <= 0 || !frank.goal) {
-      frank.wander = 4 + Math.random() * 4;
-      const r = ROOMS[Math.floor(Math.random() * ROOMS.length)];
-      frank.goal = { x: r.x + 40 + Math.random() * (r.w - 80), y: r.y + 60 + Math.random() * (r.h - 120) };
+    // Frank tours every room in the house (and the hallway), one after another, in a random order
+    if (!frank.goal) {
+      if (!frank.tour || !frank.tour.length) frank.tour = shuffle(ROOMS.map(r => r.id).concat(["hall", "hall"]));
+      const id = frank.tour.shift();
+      frank.goal = id === "hall"
+        ? { x: 60 + Math.random() * (WW - 120), y: HALL_MID + (Math.random() - 0.5) * 30 }
+        : (r => ({ x: r.x + 50 + Math.random() * (r.w - 100), y: r.y + 70 + Math.random() * (r.h - 140) }))(roomById(id));
+      frank.wander = 16;                               // give up on a spot if it takes too long
     }
-    target = frank.goal;
+    frank.wander -= dt;
+    if (Math.hypot(frank.goal.x - frank.x, frank.goal.y - frank.y) < 10) {
+      frank.pause = (frank.pause || 0) + dt;           // hang out for a moment, then move on
+      if (frank.pause > 2) { frank.goal = null; frank.pause = 0; }
+    } else if (frank.wander <= 0) frank.goal = null;
+    target = frank.goal || { x: frank.x, y: frank.y };
   }
   const path = route(frank, target);
   while (path.length > 1 && Math.hypot(path[0].x - frank.x, path[0].y - frank.y) < 12) path.shift();
@@ -487,7 +535,7 @@ function tvUpdate(dt) {
   tvT -= dt;
   if (actPressed) { tvT -= 0.5; sfx.tick(); }
   if (tvT <= 0) {
-    mode = "play"; frankCool = 22; frank.goal = null;
+    mode = "play"; frankCool = 3; frank.goal = null;   // 3-second head start to get away
     P.y = SPOTS.couch.y + 60;
     say2("\"Aww, but it was just getting good…\"", "Frank", 2.5);
   }
@@ -756,6 +804,10 @@ function drawWorld() {
   // Frank
   person(frank.x, frank.y, { shirt: "#e0e0e0", text: "FRANK", textSize: 7, textColor: "#c02a2a", hair: "#6a4a2a", dir: frank.dir, walk: frank.walk, pants: "#4a6a9a" });
   if (frank.chase) { emoji("📺", frank.x + 18, frank.y - 40, 16); }
+  if (clickGoal && clickMark) {
+    ctx.strokeStyle = "rgba(255,244,224,0.8)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(clickMark.x, clickMark.y + 14, 14 + Math.sin(T * 8) * 2, 6, 0, 0, 7); ctx.stroke();
+  }
   drawHobo();
   drawGorilla();
   // progress ring / counters near you
@@ -776,13 +828,13 @@ function drawConf(c) { ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.r); ctx
 
 function hint() {
   const st = curStep();
-  if (mode === "tv") return "Frank got you! Tap E / Space fast to escape the couch";
+  if (mode === "tv") return "Frank got you! Click or tap E / Space fast to escape the couch";
   if (stunT > 0) return "BONK! The gorilla got you";
-  if (!task) return waitingIdx >= 0 ? "Go talk to " + BROTHERS[waitingIdx].name + " (the one with the !). Press E" : "";
+  if (!task) return waitingIdx >= 0 ? "Talk to " + BROTHERS[waitingIdx].name + " (the one with the !): click him, or walk over and press E" : "";
   const t = stepTarget(st);
   const near = nearPt(t, st.kind === "stand" ? 28 : 58);
-  if (!near) return (st.kind === "stand" ? "Go to the gap in the pledge line" : "Go to: " + t.label);
-  return { press: "Press E / Space", hold: "Hold E / Space", mash: "Tap E / Space " + st.n + " times", stand: "Stand still… don't move!", arrows: "Press E / Space to start singing", climb: "Hold E / Space to climb" }[st.kind];
+  if (!near) return (st.kind === "stand" ? "Go to the gap in the pledge line (click it)" : "Go to: " + t.label + " (click it)");
+  return { press: "Click, or press E / Space", hold: "Hold the mouse button, or hold E / Space", mash: "Click or tap E / Space " + st.n + " times", stand: "Stand still… don't move!", arrows: "Click, or press E / Space, to start singing", climb: "Hold the mouse button, or E / Space, to climb" }[st.kind];
 }
 function drawHUD() {
   const pad = 12;
@@ -852,8 +904,28 @@ function drawArrowPrompt(y) {
     ctx.fillText(ARROW_CH[arrowsSeq[i]], x, y + 2); ctx.textBaseline = "alphabetic";
   }
   ctx.fillStyle = "#fff4e0"; ctx.font = "900 18px Nunito, sans-serif"; ctx.textAlign = "center";
-  ctx.fillText("Press the arrows in order!", W / 2, y + size);
+  ctx.fillText("Press the arrows in order! (keys, or click the arrows below)", W / 2, y + size);
+  drawPad();
 }
+// four big arrow buttons you can click
+let padRects = [];
+function drawPad() {
+  const b = Math.min(78, W / 7, H / 9), cx = W / 2, cy = H - (isTouch ? 130 : 30) - b * 1.6;
+  padRects = [
+    { d: "up", x: cx - b / 2, y: cy - b * 1.05, w: b, h: b },
+    { d: "left", x: cx - b * 1.6, y: cy, w: b, h: b },
+    { d: "down", x: cx - b / 2, y: cy, w: b, h: b },
+    { d: "right", x: cx + b * 0.6, y: cy, w: b, h: b }
+  ];
+  padRects.forEach(r => {
+    const lit = padFlash && padFlash.d === r.d && padFlash.t > 0;
+    ctx.fillStyle = lit ? "#ffd23f" : "rgba(255,244,224,0.9)";
+    ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 14); ctx.fill();
+    ctx.fillStyle = "#2a1a10"; ctx.font = `900 ${Math.round(b * 0.5)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(ARROW_CH[r.d], r.x + r.w / 2, r.y + r.h / 2 + 2); ctx.textBaseline = "alphabetic";
+  });
+}
+let padFlash = null;
 function drawSinging() {
   drawWorld();
   ctx.fillStyle = "rgba(10,6,3,0.7)"; ctx.fillRect(0, 0, W, H);
@@ -1005,6 +1077,43 @@ touchEl.querySelectorAll("button").forEach(b => {
   b.addEventListener("pointercancel", up); b.addEventListener("lostpointercapture", up);
 });
 
+// ---------- mouse (and finger) controls ----------
+function toWorld(e) { return { x: (e.clientX - view.ox) / view.s, y: (e.clientY - view.oy) / view.s }; }
+canvas.addEventListener("pointerdown", e => {
+  if (e.button !== 0 && e.pointerType === "mouse") return;
+  audio();
+  const sx = e.clientX, sy = e.clientY;
+  if (mode === "roof" || mode === "arrows") {
+    const r = padRects.find(r => sx >= r.x && sx <= r.x + r.w && sy >= r.y && sy <= r.y + r.h);
+    if (r) { arrowInput(r.d); padFlash = { d: r.d, t: 0.15 }; }
+    return;
+  }
+  if (mode === "tv") { act(true); mouseHeld = true; return; }
+  if (mode !== "play") return;
+  e.preventDefault();
+  const w = toWorld(e), tgt = clickActPt(), st = curStep();
+  const standing = st && st.kind === "stand";
+  // already at the spot? the mouse button works like E (click, hold, or click again and again)
+  if (tgt && nearPt(tgt, standing ? 28 : 58)) { act(true); mouseHeld = true; clickGoal = null; return; }
+  // clicked on the spot or the brother? walk there and do it
+  if (tgt && Math.hypot(w.x - tgt.x, w.y - tgt.y) < 60) {
+    clickGoal = { x: tgt.x, y: tgt.y }; clickAct = !standing; clickStand = standing;
+    if (standing) clickGoal = { x: tgt.x, y: tgt.y };
+  } else {
+    clickGoal = { x: Math.max(16, Math.min(WW - 16, w.x)), y: Math.max(16, Math.min(WH - 16, w.y)) }; clickAct = false;
+  }
+  clickMark = clickGoal; stuckT = 0;
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+});
+const mouseUp = () => { if (mouseHeld) { mouseHeld = false; act(false); } };
+canvas.addEventListener("pointerup", mouseUp);
+canvas.addEventListener("pointercancel", mouseUp);
+canvas.addEventListener("pointermove", e => {
+  if (mode !== "play") { canvas.style.cursor = (mode === "roof" || mode === "arrows" || mode === "tv") ? "pointer" : "default"; return; }
+  const w = toWorld(e), t = clickActPt();
+  canvas.style.cursor = t && Math.hypot(w.x - t.x, w.y - t.y) < 60 ? "pointer" : "crosshair";
+});
+
 document.getElementById("btnStart").onclick = () => {
   audio(); overlay.classList.add("hidden");
   if (isTouch) touchEl.classList.add("on");
@@ -1022,6 +1131,11 @@ if (/[?&]test=1/.test(location.search)) {
     step: () => curStep() && curStep().kind,
     gorillaNow: () => { gorillaT = 0; },
     calm: () => { gorillaT = 1e9; frankCool = 1e9; },
+    toScreen: (x, y) => ({ x: view.ox + x * view.s, y: view.oy + y * view.s }),
+    pad: () => padRects,
+    frank: () => ({ x: frank.x | 0, y: frank.y | 0, room: roomAt(frank.x, frank.y) }),
+    calmGorilla: () => { gorillaT = 1e9; },
+    noChase: () => { frankCool = 1e9; },
     force: (word) => { const i = tasks.findIndex(t => t.text.indexOf(word) >= 0); const t = tasks.splice(i, 1)[0]; tasks.splice(doneCount, 0, t); },
     seq: () => arrowsSeq.slice(arrowsI),
     frankNow: () => { frankCool = 0; frank.x = P.x + 60; frank.y = P.y; }
