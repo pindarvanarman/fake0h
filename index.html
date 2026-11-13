@@ -405,13 +405,15 @@
       art: "space"
     },
     {
+      // TEMPORARY test game for checking scores. Replace with a real game later.
+      // (Beta Theta Why? is now a secret: click the guy in the red cap in the crowd.)
       ready: true,
-      id: "beta-theta-why",
-      title: "Beta Theta Why?",
-      href: "games/beta-theta-why/index.html",
-      desc: "Pledge night! Do 10 silly tasks for the brothers. Dodge the gorilla. Avoid Frank.",
-      needs: ["Keyboard or touch", "Sound on"],
-      art: "frat"
+      id: "space-win-2",
+      title: "Spacebar Win 2",
+      href: "games/space-win/index.html?slot=2",
+      desc: "Test game: press the space bar to win. For checking scores.",
+      needs: ["Keyboard or tap", "Test game"],
+      art: "space"
     },
     {
       ready: true,
@@ -886,6 +888,25 @@
   // World coordinates: x across the screen, z into the screen (negative = farther away),
   // floor at y = G.yFloor. The same perspective numbers drive the CSS walls and the crowd.
   var room = document.getElementById("room");
+  var btpHover = false;
+  function btpAt(e) {
+    var bro = people.filter(function (q) { return q.btp && q.hit; })[0];
+    if (!bro) return false;
+    var r = room.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, b = bro.hit;
+    return mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h;
+  }
+  // he stands in front of the machines, so catch the click before a machine does
+  room.addEventListener("click", function (e) {
+    if (!btpAt(e)) return;
+    e.preventDefault(); e.stopPropagation();
+    location.href = "games/beta-theta-why/index.html";
+  }, true);
+  room.addEventListener("mousemove", function (e) {
+    var on = btpAt(e);
+    if (on !== btpHover) { btpHover = on; room.style.cursor = on ? "pointer" : ""; }
+  });
+  room.addEventListener("mouseleave", function () { btpHover = false; room.style.cursor = ""; });
+  if (/[?&]test=1/.test(location.search)) window.BTP_TEST = function () { var b = people.filter(function (q) { return q.btp; })[0]; return b && b.hit; };
   var wallL = document.getElementById("wallL"), wallR = document.getElementById("wallR");
   var floorEl = document.getElementById("floor"), backEl = document.getElementById("back");
   var canvas = document.getElementById("crowd"), ctx = canvas.getContext("2d");
@@ -1048,6 +1069,9 @@
       if (people[j + 3]) people[j + 3].hairStyle = st;
     });
     people.forEach(function (q) { q.mohawk = pick(["#ff4f8b", "#4fd6ff", "#5ad17a", "#ffd23f", q.hair]); });
+    // the Beta Theta Why? brother: baseball cap, "BTP" shirt. Click him to play his game!
+    var bro = people[8];
+    if (bro) { bro.btp = true; bro.kind = "human"; bro.hairStyle = "short"; bro.shirt = "#2a3a8a"; bro.pants = "#3a3a4a"; bro.joins = true; }
     people[0].joins = people[1].joins = people[2].joins = true;
     people[2].petal = pick(["#ff7ab8", "#ffd23f", "#c77dff"]);
   }
@@ -1248,6 +1272,11 @@
     } else {
       ctx.fillStyle = shirt;
       ctx.beginPath(); ctx.roundRect(x - s * 0.12 + lean * 0.6, shY - s * 0.02, s * 0.24, hipY - shY + s * 0.06, s * 0.06); ctx.fill();
+      if (p.btp) {
+        ctx.fillStyle = "#ffd23f"; ctx.font = "900 " + Math.max(6, Math.round(s * 0.085)) + "px Nunito, sans-serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("BTP", x + lean * 0.6, shY + (hipY - shY) * 0.38); ctx.textBaseline = "alphabetic";
+      }
       if (reveal) {
         // the disguise slips: green head, big black eyes, antennae
         ctx.strokeStyle = "#7dd65a"; ctx.lineWidth = s * 0.02;
@@ -1265,6 +1294,20 @@
       } else {
         drawHead(p, hx, headY, s, T);
         ctx.fillStyle = "#140a28"; ctx.beginPath(); ctx.arc(hx + p.dir * s * 0.05, headY + s * 0.01, Math.max(1, s * 0.018), 0, 7); ctx.fill();
+        if (p.btp) {
+          var cr = s * 0.125;
+          ctx.fillStyle = "#c8302a";                                         // red cap
+          ctx.beginPath(); ctx.arc(hx, headY - cr * 0.15, cr * 1.02, Math.PI * 1.02, Math.PI * 1.98); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(hx + p.dir * cr * 0.95, headY - cr * 0.2, cr * 0.75, cr * 0.2, 0, 0, 7); ctx.fill();   // brim
+          ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(hx, headY - cr * 1.12, Math.max(1, cr * 0.13), 0, 7); ctx.fill();
+          p.hit = { x: x - s * 0.22, y: headY - s * 0.2, w: s * 0.44, h: y - (headY - s * 0.2) };
+          if (btpHover) {   // a little "pledge?" bubble while you point at him
+            ctx.font = "900 " + Math.max(10, Math.round(s * 0.12)) + "px Nunito, sans-serif";
+            var bt = "Pledge? Click me!", bw = ctx.measureText(bt).width + 14, by = headY - s * 0.42;
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.roundRect(hx - bw / 2, by - s * 0.09, bw, s * 0.18, 8); ctx.fill();
+            ctx.fillStyle = "#2a1a10"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(bt, hx, by); ctx.textBaseline = "alphabetic";
+          }
+        }
         if (kind === "alien") {   // a tiny green antenna tip poking out of the hair. Shh!
           ctx.fillStyle = "#b8ff6b";
           ctx.beginPath(); ctx.arc(hx - p.dir * s * 0.04, headY - s * 0.14, Math.max(1, s * 0.016), 0, 7); ctx.fill();
