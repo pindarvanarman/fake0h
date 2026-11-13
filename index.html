@@ -405,15 +405,13 @@
       art: "space"
     },
     {
-      // TEMPORARY test game for checking scores. Replace with a real game later.
-      // (Beta Theta Why? is now a secret: click the guy in the red cap in the crowd.)
       ready: true,
-      id: "space-win-2",
-      title: "Spacebar Win 2",
-      href: "games/space-win/index.html?slot=2",
-      desc: "Test game: press the space bar to win. For checking scores.",
-      needs: ["Keyboard or tap", "Test game"],
-      art: "space"
+      id: "touchdown-toss",
+      title: "Touchdown Toss",
+      href: "games/touchdown-toss/index.html",
+      desc: "You're the QB with endless footballs! Throw TDs and beat the CPU in a 2-minute game.",
+      needs: ["Webcam", "Mouse works too"],
+      art: "football"
     },
     {
       ready: true,
@@ -606,7 +604,22 @@
     '<rect x="48" y="6" width="2.5" height="14" fill="#c08a20"/><path d="M42 24 a7 5 0 0 1 14 0z" fill="#ffd23f"/>' +
     '<g transform="translate(70,30)"><rect x="-3" y="-8" width="6" height="7" rx="1.5" fill="#ff6a3a"/><circle cy="-11" r="3" fill="#e8b080"/><rect x="-3" y="-13" width="6" height="1.5" fill="#3a8ad0"/></g>' +
     '</svg>';
-  var ARTS = { junk: junkArt, frat: fratArt, fight: fightArt, space: spaceArt, cactus: cactusArt, piano: pianoArt, leo: leoArt, abducted: abductedArt, sunny: sunnyArt, bloom: bloomArt };
+  var footballArt =
+    '<svg viewBox="0 0 100 120" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">' +
+    '<rect width="100" height="120" fill="#0b1a30"/>' +
+    '<polygon points="30,30 70,30 100,120 0,120" fill="#2f8a3a"/>' +
+    '<polygon points="34,30 66,30 70,42 30,42" fill="#a8233a"/>' +
+    '<g stroke="#fff" stroke-width="1.2"><line x1="29" y1="42" x2="71" y2="42"/><line x1="25" y1="55" x2="75" y2="55"/><line x1="20" y1="70" x2="80" y2="70"/><line x1="13" y1="90" x2="87" y2="90"/></g>' +
+    '<line x1="10" y1="80" x2="90" y2="80" stroke="#ffd23f" stroke-width="1.5"/>' +
+    '<g stroke="#ffd23f" stroke-width="2" fill="none"><path d="M50 30 V22 M44 22 H56 M44 22 V10 M56 22 V10"/></g>' +
+    '<ellipse cx="62" cy="48" rx="5" ry="3" transform="rotate(-30 62 48)" fill="#8a4a1a"/>' +
+    '<g stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M50 112 V100 M50 100 L46 112 M50 100 L54 112 M50 104 L44 96 M50 104 L57 93"/></g>' +
+    '<circle cx="50" cy="95" r="3.5" fill="#2a5ad0"/>' +
+    '<g stroke="#3a8ae8" stroke-width="1.6" stroke-linecap="round"><path d="M24 66 V59 M24 59 L22 66 M24 59 L26 66"/><path d="M76 66 V59 M76 59 L74 66 M76 59 L78 66"/></g>' +
+    '<g stroke="#e8473f" stroke-width="1.6" stroke-linecap="round"><path d="M30 58 V52 M30 52 L28 58 M30 52 L32 58"/><path d="M70 58 V52 M70 52 L68 58 M70 52 L72 58"/></g>' +
+    '<text x="50" y="7.5" text-anchor="middle" font-family="Bungee, Impact, sans-serif" font-size="6" fill="#ffd23f">TOUCHDOWN!</text>' +
+    '</svg>';
+  var ARTS = { football: footballArt, junk: junkArt, frat: fratArt, fight: fightArt, space: spaceArt, cactus: cactusArt, piano: pianoArt, leo: leoArt, abducted: abductedArt, sunny: sunnyArt, bloom: bloomArt };
 
   var coneIcon =
     '<svg viewBox="0 0 30 34" aria-hidden="true"><rect x="2" y="29" width="26" height="4" rx="1" fill="#ff6a00" stroke="#22104a" stroke-width="1.5"/>' +
@@ -621,6 +634,7 @@
     abducted: { body: "#1d2a22", hi: "#2f4436", accent: "#7dff6b", neon: "#7dff6b" },
     sunny: { body: "#2f9a84", hi: "#4fbaa4", accent: "#ffd23f", neon: "#ffe27a" },
     bloom: { body: "#4f9a3a", hi: "#6fba5a", accent: "#ff8fb8", neon: "#b8ff9a" },
+    football: { body: "#2a7a3a", hi: "#3a9a4a", accent: "#ffd23f", neon: "#a8ffb0" },
     junk: { body: "#3a6aa8", hi: "#5a8ac8", accent: "#ffd23f", neon: "#9ad8ff" },
     frat: { body: "#6a3a1a", hi: "#8a5a2a", accent: "#ffd23f", neon: "#ffd88a" },
     fight: { body: "#a8233a", hi: "#cc3a52", accent: "#4fd6ff", neon: "#ff8fa3" },
