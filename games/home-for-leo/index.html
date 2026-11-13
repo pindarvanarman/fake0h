@@ -127,6 +127,20 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 .exit-btn:hover{background:#C2413B}
 .exit-btn:focus-visible{outline:3px solid var(--sun);outline-offset:3px}
 @media (max-width:620px){main{padding-top:56px}}
+
+/* ---------- landscape screens (computers, tablets lying down): two columns, no scrolling ---------- */
+@media (orientation:landscape) and (min-width:820px){
+  main{max-width:min(1240px,96vw);display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);
+       grid-template-rows:auto auto auto auto 1fr;column-gap:24px;align-items:start;padding:54px 20px 12px}
+  .scene{grid-column:1;grid-row:1 / 6;align-self:start;width:min(100%,calc((100vh - 300px) * 16 / 11));justify-self:center}
+  .story{grid-column:1;grid-row:1 / 6;align-self:start;margin-top:calc(min(68.75%, 100vh - 300px) - 18px);width:min(100%,calc((100vh - 300px) * 16 / 11 + 40px));justify-self:center}   /* right under the house */
+  .bar{grid-column:2;grid-row:1;margin-top:0}
+  .gens{grid-column:2;grid-row:2}
+  .board{grid-column:2;grid-row:3;width:min(100%,calc((100vh - 270px) * 1.2));justify-self:center}
+  .cell{font-size:clamp(20px,4.2vh,40px)}
+  .trash{grid-column:2;grid-row:4;width:min(100%,calc((100vh - 270px) * 1.2));justify-self:center}
+  .foot{grid-column:2;grid-row:5}
+}
 </style>
 </head>
 <body>

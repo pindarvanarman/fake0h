@@ -44,6 +44,19 @@
   .exit-ask h2 { margin: 0 0 8px; font-size: 1.4rem; }
   .exit-ask p { margin: 0; opacity: 0.85; }
   .exit-ask .leave { background: #8a1f2a; border-color: #ff6b7a; color: #fff; }
+  /* on-screen controls for touch screens (tablets) */
+  #touchPad { position: fixed; left: 0; right: 0; bottom: 0; z-index: 12; display: none; justify-content: space-between; align-items: flex-end;
+              padding: 10px 16px calc(14px + env(safe-area-inset-bottom, 0px)); pointer-events: none; }
+  @media (pointer: coarse) { #touchPad.on { display: flex; } }
+  #touchPad button { pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
+                     font: 900 1.2rem Nunito, sans-serif; color: #e8f0ff; background: rgba(10, 14, 24, 0.75);
+                     border: 2px solid rgba(125, 255, 107, 0.6); border-radius: 14px; width: 64px; height: 58px; }
+  #touchPad button.down { background: rgba(125, 255, 107, 0.35); }
+  .tp-dpad { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 58px); gap: 6px; }
+  .tp-up { grid-column: 2; grid-row: 1; } .tp-left { grid-column: 1; grid-row: 2; } .tp-down { grid-column: 2; grid-row: 2; } .tp-right { grid-column: 3; grid-row: 2; }
+  .tp-acts { display: flex; gap: 10px; }
+  #touchPad .tp-use, #touchPad .tp-zap { width: 92px; height: 92px; border-radius: 50%; font-size: 1.15rem; }
+  #touchPad .tp-zap { border-color: rgba(120, 200, 255, 0.8); }
 </style>
 </head>
 <body>
@@ -63,6 +76,13 @@
     <p class="note">Turn your sound on. Best played with headphones… if you dare.</p>
     <div class="row"><button id="btnStart">Start</button><button id="btnSkip" class="secondary">Skip the intro</button></div>
   </div>
+</div>
+<div id="touchPad" aria-hidden="true">
+  <div class="tp-dpad">
+    <button data-key="ArrowUp" class="tp-up">▲</button><button data-key="ArrowLeft" class="tp-left">◀</button>
+    <button data-key="ArrowDown" class="tp-down">▼</button><button data-key="ArrowRight" class="tp-right">▶</button>
+  </div>
+  <div class="tp-acts"><button data-key="e" class="tp-use">Use</button><button data-key=" " class="tp-zap">Zap</button></div>
 </div>
 <a class="exit-btn" id="exitBtn" href="../../index.html" aria-label="Exit to the arcade">✕ Exit</a>
 <div class="exit-ask" id="exitAsk" role="dialog" aria-modal="true" aria-labelledby="exitAskTitle" hidden>
@@ -1383,6 +1403,33 @@ window.addEventListener("keydown", (e) => {
   if (n === 3) { player.x = 21.5; player.y = 10.5; }
   mode = "fade"; fadeT = 0;
 });
+// ---------- touch screens: on-screen buttons press the same keys ----------
+const touchPad = document.getElementById("touchPad");
+touchPad.querySelectorAll("button").forEach((b) => {
+  const key = b.dataset.key;
+  const send = (type) => window.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true }));
+  b.addEventListener("pointerdown", (e) => { e.preventDefault(); b.classList.add("down"); audio(); send("keydown"); try { b.setPointerCapture(e.pointerId); } catch (err) {} });
+  const up = () => { if (!b.classList.contains("down")) return; b.classList.remove("down"); send("keyup"); };
+  b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up); b.addEventListener("lostpointercapture", up);
+});
+setInterval(() => touchPad.classList.toggle("on", mode === "play" || mode === "qte"), 250);
+// long messages wrap onto two lines instead of running off narrow (portrait) screens
+{
+  const rawFill = CanvasRenderingContext2D.prototype.fillText;
+  ctx.fillText = function (text, x, y, maxW) {
+    if (maxW === undefined && this.textAlign === "center" && typeof text === "string" && text.indexOf(" ") > 0) {
+      const max = W * 0.92;
+      if (this.measureText(text).width > max) {
+        const words = text.split(" "); let a = "", b = "";
+        for (const w of words) { if (this.measureText((a ? a + " " : "") + w).width <= this.measureText(text).width / 2 + 20 && !b) a += (a ? " " : "") + w; else b += (b ? " " : "") + w; }
+        const m = /(\d+(?:\.\d+)?)px/.exec(this.font), lh = (m ? parseFloat(m[1]) : 16) * 1.2;
+        rawFill.call(this, a, x, y - lh / 2, max); rawFill.call(this, b, x, y + lh / 2, max);
+        return;
+      }
+    }
+    return rawFill.call(this, text, x, y, maxW);
+  };
+}
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 canvas.addEventListener("pointerdown", (e) => {
   if (mode === "intro") { if (e.button === 0) advanceIntro(); return; }

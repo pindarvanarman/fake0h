@@ -46,6 +46,16 @@
   /* the sign is just glowing neon letters on the wall now: no frame, no bulbs */
   #hanging .sign { max-width: none; padding: 0; background: transparent; box-shadow: none; border-radius: 0; }
   #hanging .bulbs { display: none; }
+  /* blinking dots on both sides of the sign */
+  #hanging .sdots { position: absolute; top: 0.62em; display: flex; gap: 0.32em; transform: translateY(-50%); }
+  #hanging .sdots.l { right: calc(100% + 0.5em); flex-direction: row-reverse; }
+  #hanging .sdots.r { left: calc(100% + 0.5em); }
+  #hanging .sdots i { width: 0.26em; height: 0.26em; border-radius: 50%; background: var(--bulb);
+    box-shadow: 0 0 8px var(--bulb), 0 0 16px rgba(255, 210, 63, 0.6); animation: sdot 1.2s steps(1) infinite; }
+  #hanging .sdots i:nth-child(2) { animation-delay: 0.4s; }
+  #hanging .sdots i:nth-child(3) { animation-delay: 0.8s; }
+  @keyframes sdot { 0% { opacity: 1; } 33% { opacity: 0.15; box-shadow: none; } }
+  @media (prefers-reduced-motion: reduce) { #hanging .sdots i { animation: none; } }
   #hanging .sign h1 { text-shadow: 0 0 10px rgba(255, 210, 63, 0.8), 0 0 28px rgba(255, 210, 63, 0.45); }
   #hanging .sign h1 { font-size: 1em; white-space: nowrap; }
   #hanging .sign h1 span { display: inline; margin: 0 0 0 0.3em; }
@@ -307,8 +317,15 @@
   }
   .notice.show { display: block; }
 
+  /* tablets standing up: the room and the name buttons sit together in the middle of the screen */
+  body.portrait { align-content: center; grid-template-rows: auto auto !important; }
+  /* bigger name buttons for fingers */
+  @media (pointer: coarse) {
+    .players { gap: 8px; }
+    .players button { font-size: 1rem; padding: 8px 16px; min-height: 40px; }
+  }
   /* One screen on computer monitors */
-  @media (min-width: 900px) and (min-height: 620px) {
+  @media (min-width: 700px) and (min-height: 620px) {
     html, body { height: 100%; }
     body { overflow: hidden; display: grid; grid-template-rows: minmax(0, 1fr) auto; }
     .room { min-height: 0; }
@@ -332,7 +349,9 @@
   <header id="hanging">
     <div class="sign" id="sign">
       <div class="bulbs" id="bulbs" aria-hidden="true"></div>
+      <span class="sdots l" aria-hidden="true"><i></i><i></i><i></i></span>
       <h1>fake0hs<span>Arcade</span></h1>
+      <span class="sdots r" aria-hidden="true"><i></i><i></i><i></i></span>
       <small class="copy">© 2026</small>
     </div>
   </header>
@@ -938,17 +957,29 @@
   var wallL = document.getElementById("wallL"), wallR = document.getElementById("wallR");
   var floorEl = document.getElementById("floor"), backEl = document.getElementById("back");
   var canvas = document.getElementById("crowd"), ctx = canvas.getContext("2d");
-  var fitMQ = window.matchMedia("(min-width: 900px) and (min-height: 620px)");
+  var pcanvas = document.createElement("canvas"), pctx = pcanvas.getContext("2d");   // the people get their own layer (for the glitch)
+  var fitMQ = window.matchMedia("(min-width: 700px) and (min-height: 620px)");
   var G = null;
   var backSign = backEl.querySelector("span");
 
-  function layout() {
+  // extra = how much taller to build the room, so the bit above the ceiling's front edge can be cut off the top
+  // layout(shift): build the room, slid up by "shift" pixels.
+  // Returns where the ceiling meets the front of the room (y on screen), or null on phones.
+  function layout(shift) {
+    shift = shift || 0;
     var fit = fitMQ.matches;
+    room.style.marginTop = "0px";
     if (!fit) room.style.height = Math.round(Math.min(700, Math.max(420, window.innerWidth * 1.1))) + "px";
-    else room.style.height = "";
+    else {
+      // tall portrait screens (tablets standing up): keep the room a sensible shape and center it with the buttons
+      var availH = window.innerHeight - playersEl.offsetHeight, portrait = availH > room.clientWidth * 1.1;
+      document.body.classList.toggle("portrait", portrait);
+      room.style.height = portrait ? Math.round(room.clientWidth * 0.8) + "px" : "";
+    }
+    var fitErr = null, frontRoom = 0;
     var rw = room.clientWidth, rh = room.clientHeight;
     // machine size: tall enough to read, narrow enough that 5 fit on the back wall
-    var cw = Math.min(rh * 0.54 / 2.3, Math.max(rw / 7.4, Math.min(rw / 5.2, 96)));
+    var cw = Math.min(rh * 0.6 / 2.3, Math.max(rw / 6.0, Math.min(rw / 5.2, 96)));   // as big as the screen allows
     var P = Math.max(700, rw * 1.15);                            // farther camera = gentler perspective
     var spacing, d0, D, theta, Dz, bw, grow;
     // The back machines are sized to look exactly as tall as the innermost side machines.
@@ -967,7 +998,7 @@
       cw *= Math.max(0.85, maxB / (cw * grow));
     }
     var ch = cw * 2.3;
-    var yFloor = rh * 0.97, wallH = yFloor;
+    var yFloor = rh * 0.97 - shift, wallH = yFloor;
     var ox = rw / 2, oy = yFloor - ch * 0.62;
     var cot = Math.cos(theta) / Math.sin(theta);
     // Back-wall machines: sized so their tops line up with the tops of the side machines
@@ -1055,6 +1086,14 @@
       });
       // the ceiling reaches forward from the back wall until it fills the top of the screen
       var cy = yFloor - wallH2;
+      fitErr = cy;
+      // the floor reaches toward you to fill the bottom of the page (since the room slid up)
+      var kBot = rh > yFloor + 1 ? (rh - oy) / (yFloor - oy) : 1;
+      var zb = Math.max(0, Math.min(P * 0.9, P * (1 - 1 / kBot))), eb = zb * cot, fw = rw + 2 * eb;
+      frontRoom = zb;
+      floorEl.style.left = (-eb) + "px"; floorEl.style.width = fw + "px"; floorEl.style.height = (Dz + zb) + "px";
+      floorEl.style.transform = "translateZ(" + zb + "px) rotateX(-90deg)";
+      floorEl.style.clipPath = "polygon(0 0, " + fw + "px 0, " + (fw - eb - inset) + "px " + (Dz + zb) + "px, " + (eb + inset) + "px " + (Dz + zb) + "px)";
       var kTop = cy < oy - 1 ? oy / (oy - cy) : 1;
       var zf = Math.max(0, Math.min(P * 0.9, P * (1 - 1 / kTop))), ext = zf * cot, cw2 = rw + 2 * ext;
       ceil.style.left = (-ext) + "px"; ceil.style.width = cw2 + "px"; ceil.style.top = cy + "px"; ceil.style.height = (Dz + zf) + "px";
@@ -1062,12 +1101,14 @@
       ceil.style.clipPath = "polygon(0 0, " + cw2 + "px 0, " + (cw2 - ext - inset) + "px " + (Dz + zf) + "px, " + (ext + inset) + "px " + (Dz + zf) + "px)";
     }
 
-    G = { rw: rw, rh: rh, ch: ch, cw: cw, bcw: bcw, bch: bch, P: P, ox: ox, oy: oy, yFloor: yFloor, theta: theta, cot: cot, Dz: Dz, spots: spots };
+    G = { rw: rw, rh: rh, ch: ch, cw: cw, bcw: bcw, bch: bch, P: P, ox: ox, oy: oy, yFloor: yFloor, theta: theta, cot: cot, Dz: Dz, spots: spots, front: frontRoom };
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = rw * dpr; canvas.height = rh * dpr;
+    pcanvas.width = rw * dpr; pcanvas.height = rh * dpr; pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     canvas.style.width = rw + "px"; canvas.style.height = rh + "px";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     people.forEach(function (p) { var s = randomSpot(); p.x = s[0]; p.z = s[1]; p.path = []; });
+    return fitErr;
   }
 
   // project a floor point to the screen
@@ -1078,6 +1119,7 @@
   // walkable corridor between the walls at depth z
   function corridor(z) {
     var inset = (-z) * G.cot, m = G.cw * 0.78;          // stay clear of the 3D cabinets
+    if (z > 0) { inset = 0; m = G.cw * 1.4; }           // out on the front floor: stay on screen
     return [inset + m, G.rw - inset - m];
   }
 
@@ -1093,13 +1135,31 @@
   var hover = -1;
 
   function randomSpot() {
-    var z = -rand(G.cw * 0.45, Math.min(G.Dz * 0.9, G.Dz - G.bcw * 0.62 - G.cw * 0.35)), c = corridor(z);
+    var far = Math.min(G.Dz * 0.9, G.Dz - G.bcw * 0.62 - G.cw * 0.35), near = (G.front || 0) * 0.7;
+    var z = -rand(-near, far), c = corridor(z);
     return [rand(c[0], Math.max(c[0], c[1])), z];
+  }
+  // where to stand to play machine i (right in front of it)
+  function playSpot(i) {
+    var sp = G.spots[i];
+    if (sp.wall === "B") return [sp.x, -G.Dz + G.bcw * 0.62 + G.cw * 0.22];
+    var z = -sp.d * Math.sin(G.theta), c = corridor(z);
+    return [sp.left ? c[0] + G.cw * 0.12 : c[1] - G.cw * 0.12, z];
+  }
+  function freeGames() {
+    var taken = {};
+    people.forEach(function (q) { if (q.playing >= 0) taken[q.playing] = true; });
+    var out = [];
+    GAMES.forEach(function (g, i) { if (g && g.ready && !taken[i] && i < TOTAL) out.push(i); });
+    return out;
   }
   function wander(p) {
     if (reduceMotion) { p.idle = 999; return; }
-    var s = randomSpot();
-    p.path = [s]; p.run = false;
+    p.playing = -1; p.atMachine = false; p.run = false;
+    // usually go look for a free game; sometimes just stroll
+    var free = Math.random() < 0.65 ? freeGames() : [];
+    if (free.length) { p.playing = free[Math.floor(Math.random() * free.length)]; p.path = [playSpot(p.playing)]; return; }
+    p.path = [randomSpot()];
   }
   function makePeople() {
     var n = fitMQ.matches ? 14 : 9;
@@ -1110,7 +1170,7 @@
         phase: Math.random() * 6, idle: rand(0, 2), run: false, rush: false, cheer: false, shrug: false,
         walkSpeed: rand(70, 110), runSpeed: rand(420, 560), seed: Math.random() * 10,
         shirt: pick(SHIRTS), pants: pick(PANTS), skin: pick(SKINS), hair: pick(HAIR), size: rand(0.88, 1.1),
-        joins: Math.random() < 0.88,
+        joins: Math.random() < 0.88, playing: -1, atMachine: false, playT: 0,
         kind: ["alien", "robot", "plant", "wheelchair", "wheelchair"][i] || "human",   // special visitors
         hairStyle: pick(HAIR_STYLES), wheelA: 0
       });
@@ -1151,6 +1211,7 @@
         p.face = sp.left ? -1 : 1;
       }
       p.rush = true; p.run = !reduceMotion; p.cheer = false; p.shrug = false;
+      p.playing = -1; p.atMachine = false;
       p.path = [[x, z]];
     });
   }
@@ -1183,11 +1244,14 @@
             var g = GAMES[hover];
             if (g && g.ready) p.cheer = true; else p.shrug = true;
             p.dir = p.face;
-          } else p.idle = rand(0.6, 3.2);
+          } else if (p.playing >= 0) { p.atMachine = true; p.playT = rand(4, 11); }   // found a game: play it for a bit
+          else p.idle = rand(0.6, 3.2);
         }
       } else {
         p.moving = false;
-        if (!p.rush) { p.idle -= dt; if (p.idle <= 0) wander(p); }
+        if (p.rush) return;
+        if (p.atMachine) { p.playT -= dt; if (p.playT <= 0) { p.atMachine = false; p.playing = -1; wander(p); } }
+        else { p.idle -= dt; if (p.idle <= 0) wander(p); }
       }
     });
   }
@@ -1541,6 +1605,15 @@
     [0.9, 0.86], [0.9, 1.0], [0, 1.0]                            // marquee overhang, top, back
   ];
   var FACE = { body: [1, 2], under: [2, 3], lip: [3, 4], panel: [4, 5], screen: [5, 6], hood: [6, 7], marquee: [7, 8], top: [8, 9] };
+  // every machine glows in a red, orange or purple
+  var CAB_NEONS = [
+    { neon: "#ff3048", body: "#2e0810", hi: "#4a1020", accent: "#ff3048" },
+    { neon: "#ff8c26", body: "#2e1506", hi: "#4a240a", accent: "#ff8c26" },
+    { neon: "#a855ff", body: "#1c0a33", hi: "#2e1450", accent: "#a855ff" },
+    { neon: "#ff5a3a", body: "#2e0c08", hi: "#4a1810", accent: "#ff5a3a" },
+    { neon: "#c77dff", body: "#22103a", hi: "#341a58", accent: "#c77dff" },
+    { neon: "#ffad33", body: "#2e1c06", hi: "#4a2e0a", accent: "#ffad33" }
+  ];
   var artImgs = {};
   Object.keys(ARTS).forEach(function (k) {
     var svg = ARTS[k].replace("<svg ", '<svg width="200" height="240" ');
@@ -1624,8 +1697,10 @@
   function drawCabinet(i, t) {
     var f = cabFrame(i), sp = G.spots[i];
     var broken = !!SLOTS[i].broken, g = broken ? null : GAMES[i], ready = !!(g && g.ready);
-    var col = ready && CAB_COLORS[g.art] ? CAB_COLORS[g.art] : { body: "#2a2840", hi: "#3a3858", accent: "#8a86b0", neon: broken ? "#ff6a7a" : "#9a96c8" };
+    var col = CAB_NEONS[i % CAB_NEONS.length];
+    if (broken) col = CAB_NEONS[0];
     var hot = hover === i || document.activeElement === cabs[i];
+    var picked = touchSel === i;
     var done = cabs[i].classList.contains("done");
     var flick = broken ? (Math.sin(t * 23) > 0.6 ? 0.35 : 1) : 1;
     var L = PROFILE.map(function (p, k) { return prof(f, -f.w / 2, k); });
@@ -1677,7 +1752,7 @@
     // marquee: lit-up game title
     var mq = faceQuad(f, FACE.marquee, 0.04, 0.96, 0.12, 0.88);
     poly(mq, hexA(col.body, 0.95));
-    textOnQuad(ready ? g.title : broken ? "Out of order" : "Coming soon", mq, ready ? col.neon : "#b0acd0", ready && hot ? col.neon : null);
+    textOnQuad(ready ? g.title : broken ? "Out of order" : "Coming soon", mq, col.neon, hot ? col.neon : null);
     // joystick and buttons on the control panel
     var stick = onFace(f, FACE.panel, 0.25, 0.5), top = f.at(-0.25 * f.w, PROFILE[4][1] * f.h + f.h * 0.07, (PROFILE[4][0] + PROFILE[5][0]) / 2 * f.dp);
     ctx.strokeStyle = "#222"; ctx.lineWidth = Math.max(1.5, 3 * k0); ctx.beginPath(); ctx.moveTo(stick[0], stick[1]); ctx.lineTo(top[0], top[1]); ctx.stroke();
@@ -1713,6 +1788,15 @@
     strokeAll(hexA(neon, hot ? 0.35 : 0.18), lw * 4);              // soft glow
     strokeAll(hexA(neon, 0.95), lw);                                // crisp neon line
     if (hot) strokeAll("rgba(255,255,255,0.7)", lw * 0.45);
+    if (picked) {   // tapped once: a white glow says "tap again to play"
+      var wp = 0.6 + Math.sin(t * 6) * 0.25;
+      strokeAll("rgba(255,255,255," + (0.25 * wp) + ")", lw * 10);
+      strokeAll("rgba(255,255,255," + (0.5 * wp) + ")", lw * 5);
+      strokeAll("rgba(255,255,255,0.95)", lw * 1.2);
+      var tag = f.at(0, f.h * 1.12, f.dp * 0.5);
+      ctx.font = "900 " + Math.max(10, Math.round(f.w * tag[3] * 0.16)) + "px Nunito, sans-serif"; ctx.textAlign = "center";
+      ctx.fillStyle = "#fff"; ctx.shadowColor = "#fff"; ctx.shadowBlur = 10; ctx.fillText("Tap again to play", tag[0], tag[1]); ctx.shadowBlur = 0;
+    }
     ctx.globalAlpha = 1;
     // keyboard focus: a dashed ring around the machine
     if (document.activeElement === cabs[i]) {
@@ -1740,14 +1824,22 @@
     if (i >= 0) { setHover(i); room.style.cursor = "pointer"; }
     else { if (hover >= 0) clearHover(); room.style.cursor = ""; }
   });
-  room.addEventListener("pointerleave", function () { if (hover >= 0) clearHover(); });
-  room.addEventListener("pointerdown", function (e) { var i = cabAt(e); if (i >= 0) cabs[i]._touched = e.pointerType !== "mouse"; });
+  room.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse" && hover >= 0) clearHover(); });
+  var lastPointer = "mouse", touchSel = -1;
+  room.addEventListener("pointerdown", function (e) { lastPointer = e.pointerType; });
   room.addEventListener("click", function (e) {
     if (btpAt(e)) return;
     var i = cabAt(e);
-    if (i < 0) return;
+    if (i < 0) { if (touchSel >= 0) { touchSel = -1; clearHover(); } return; }
     e.preventDefault(); e.stopPropagation();
-    cabs[i].click();
+    cabs[i]._touched = false;
+    if (lastPointer !== "mouse" && touchSel !== i) {
+      // touch screens: the first tap picks the machine (it glows white and the crowd runs over)
+      touchSel = i; setHover(i);
+      return;
+    }
+    touchSel = -1;
+    cabs[i].click();              // the second tap (or any mouse click) plays
   }, true);
 
   // =================================================================
@@ -1767,6 +1859,10 @@
     var vx = p.x - p.lx, vz = p.z - p.lz; p.lx = p.x; p.lz = p.z;
     var want = p.yaw;
     if (p.moving && Math.hypot(vx, vz) > 0.05) want = Math.atan2(vx, vz);
+    else if (p.atMachine && p.playing >= 0 && G.spots[p.playing]) {
+      var spm = G.spots[p.playing], sm = Math.sin(G.theta), cm = Math.cos(G.theta);
+      want = spm.wall === "B" ? Math.PI : spm.left ? Math.atan2(-sm, -cm) : Math.atan2(sm, -cm);
+    }
     else if (p.rush && hover >= 0 && G.spots[hover]) {
       var sp = G.spots[hover], s0 = Math.sin(G.theta), c0 = Math.cos(G.theta);
       want = sp.wall === "B" ? Math.PI : sp.left ? Math.atan2(-s0, -c0) : Math.atan2(s0, -c0);
@@ -1777,7 +1873,10 @@
     var bounce = p.moving ? Math.abs(Math.cos(p.phase)) * (p.run ? 0.05 : 0.02) : 0;
     if (p.cheer) bounce = Math.abs(Math.sin(T * 9 + p.seed)) * 0.1;
     // local point (x right, y up, z forward; in body heights) -> screen
-    function L(x, y, z) { return P3(p.x + (x * rx + z * fx) * S, (y + bounce) * S, p.z + (x * rz + z * fz) * S); }
+    function L(x, y, z) {
+      if (glitchOn) { x += (Math.random() - 0.5) * 0.18; y += (Math.random() - 0.5) * 0.14; z += (Math.random() - 0.5) * 0.18; }   // scrambled!
+      return P3(p.x + (x * rx + z * fx) * S, (y + bounce) * S, p.z + (x * rz + z * fz) * S);
+    }
     var segs = {};                      // color -> list of [a, b]
     function seg(a, b, col) { (segs[col] = segs[col] || []).push([a, b]); }
     function chain(pts, col) { for (var k = 0; k < pts.length - 1; k++) seg(pts[k], pts[k + 1], col); }
@@ -1835,6 +1934,7 @@
         var sx = sd * 0.11;
         if (p.cheer) { var wv = Math.sin(T * 12 + p.seed) * 0.03; chain([L(sx, 0.64, 0), L(sd * 0.16, 0.78, 0.02), L(sd * 0.19 + wv, 0.92, 0.03)], skin); }
         else if (p.shrug) chain([L(sx, 0.64, 0), L(sd * 0.18, 0.55, 0.06), L(sd * 0.24, 0.62, 0.12)], skin);
+        else if (p.atMachine) chain([L(sx, 0.64, 0), L(sd * 0.13, 0.6, 0.16), L(sd * 0.07, 0.62 + Math.sin(T * 15 + sd * 2 + p.seed) * 0.025, 0.3)], skin);   // playing from the chair
         else { var push = p.moving ? Math.sin(p.phase * 0.9) * 0.1 : 0; chain([L(sx, 0.64, 0), L(sd * 0.15, 0.48, -0.04 + push), L(sd * 0.16, R * 1.75, -0.04 + push * 1.5)], skin); }
       });
     } else if (kind === "plant") {
@@ -1874,6 +1974,7 @@
         var el, hd;
         if (p.cheer) { var wv = Math.sin(T * 12 + p.seed) * 0.03; el = [sd * 0.17, 0.95, 0.03]; hd = [sd * 0.2 + wv, 1.08, 0.05]; }
         else if (p.shrug) { el = [sd * 0.18, 0.7, 0.06]; hd = [sd * 0.25, 0.8, 0.12]; }
+        else if (p.atMachine) { el = [sd * 0.13, 0.68, 0.14]; hd = [sd * 0.07, 0.72 + Math.sin(T * 15 + sd * 2 + p.seed) * 0.025, 0.27]; }   // playing!
         else { el = [sd * 0.13, 0.66, -sw * 0.12]; hd = [sd * 0.13, 0.52, -sw * 0.2 + 0.04]; }
         chain([L(sx, 0.82, 0), L(el[0], el[1], el[2]), L(hd[0], hd[1], hd[2])], skin);
         if (kind === "robot") ring(hd[0], hd[1], hd[2], 0.025, "xy", "#cfe0ff", 6);
@@ -1980,6 +2081,37 @@
     }
   }
 
+  // every once in a while the crowd glitches out
+  var glitchOn = false, glitchEnd = 0, nextGlitch = performance.now() + 6000 + Math.random() * 8000;
+  function glitchTick(now) {
+    if (reduceMotion) { glitchOn = false; return; }
+    if (!glitchOn && now > nextGlitch) { glitchOn = true; glitchEnd = now + 250 + Math.random() * 450; }
+    if (glitchOn && now > glitchEnd) { glitchOn = false; nextGlitch = now + 7000 + Math.random() * 14000; scramblePeople(); }
+  }
+  // after a glitch, everybody has jumped to a new spot
+  function scramblePeople() {
+    people.forEach(function (p) {
+      if (p.rush) return;
+      var s = randomSpot();
+      p.x = s[0]; p.z = s[1]; p.lx = p.x; p.lz = p.z; p.path = [];
+      p.playing = -1; p.atMachine = false; p.idle = rand(0.3, 1.6); p.cheer = false; p.shrug = false;
+    });
+  }
+  function glitchSlices() {
+    // shove random horizontal strips of the crowd sideways, plus a few colored scan bars (people layer only)
+    var canvas = pcanvas, dpr = canvas.width / G.rw;
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    for (var k = 0; k < 7; k++) {
+      var y = Math.random() * canvas.height * 0.9, hh = (4 + Math.random() * 26) * dpr, dx = (Math.random() - 0.5) * 60 * dpr;
+      ctx.drawImage(canvas, 0, y, canvas.width, hh, dx, y, canvas.width, hh);
+    }
+    for (var k = 0; k < 4; k++) {
+      ctx.fillStyle = ["rgba(255,0,200,0.18)", "rgba(0,255,255,0.18)", "rgba(255,255,255,0.12)"][k % 3];
+      ctx.fillRect(0, Math.random() * canvas.height, canvas.width, (1 + Math.random() * 3) * dpr);
+    }
+    ctx.restore();
+  }
+
   var last = performance.now();
   function loop(now) {
     var dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -1987,7 +2119,14 @@
       update(dt);
       ctx.clearRect(0, 0, G.rw, G.rh);
       drawCabinets(now / 1000);
+      glitchTick(now);
+      // people are drawn on their own layer, so the glitch only scrambles them (not the machines)
+      var mainCtx = ctx;
+      pctx.clearRect(0, 0, G.rw, G.rh); ctx = pctx;
       people.slice().sort(function (a, b) { return a.z - b.z; }).forEach(function (p) { drawPerson3D(p, now / 1000); });
+      if (glitchOn) glitchSlices();
+      ctx = mainCtx;
+      ctx.drawImage(pcanvas, 0, 0, G.rw, G.rh);
     }
     requestAnimationFrame(loop);
   }
@@ -2039,7 +2178,14 @@
     pts.forEach(function (p) { var b = document.createElement("span"); b.className = "bulb"; b.style.left = p[0] + "%"; b.style.top = p[1] + "%"; bulbs.appendChild(b); });
   }
 
-  function relayout() { layout(); placeBulbs(); }
+  // build the room, then build it again a little taller and slide it up so the top of the page
+  // is exactly where the ceiling lines meet the front of the room
+  function relayout() {
+    // build it once, then slide everything up so the page starts exactly where the ceiling meets the front
+    var cy = layout(0);
+    if (cy != null && cy > 0.5) layout(cy);
+    placeBulbs();
+  }
   window.addEventListener("resize", relayout);
   relayout();
   makePeople();
