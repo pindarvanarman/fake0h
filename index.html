@@ -725,7 +725,14 @@
   // Records live in this browser's storage (shared with the games on the same site).
   // The chosen player lasts for this visit only, so every new visit starts in free play.
   // Games report a win with ArcadeProgress.complete() from arcade-progress.js.
-  var PLAYERS = ["fakeOh", "Avery", "Corinne", "Hunter", "Joy", "Dante", "Omeira", "Ray", "Jessie", "Bonnie", "Pindar", "Darius", "Andy"];
+  var PLAYERS = ["fakeOh", "Avery", "Corinne", "Hunter", "Joy", "Dante", "Marisol", "Ray", "Jessie", "Bonnie", "Pindar", "Darius", "Andy"];
+  // Omeira was renamed Marisol: move any saved stars and trophies over (once)
+  try {
+    ["fake0hArcade.records", "fake0hArcade.clears"].forEach(function (k) {
+      var d = JSON.parse(localStorage.getItem(k) || "{}");
+      if (d.Omeira && !d.Marisol) { d.Marisol = d.Omeira; delete d.Omeira; localStorage.setItem(k, JSON.stringify(d)); }
+    });
+  } catch (e) {}
   var CLEAR_KEY = "fake0hArcade.clears";   // { name: { count: times every game was beaten, counted: this round already counted } }
   function readClears() { try { return JSON.parse(localStorage.getItem(CLEAR_KEY)) || {}; } catch (e) { return {}; } }
   function writeClears(c) { try { localStorage.setItem(CLEAR_KEY, JSON.stringify(c)); } catch (e) {} }
@@ -1128,6 +1135,8 @@
   var PANTS = ["#4f7aff", "#c04fff", "#2ad0ff", "#ff4fa0", "#7aff4f", "#ffb84f"];
   var SKINS = ["#f1c7a3", "#d9a37a", "#a8714a", "#7a4a2a", "#ffdfc4", "#c68b5c"];
   var HAIR = ["#2b1a12", "#5a3a2a", "#e0b03a", "#1d1a26", "#c4482b", "#8a6a3a", "#c77dff"];
+  var OLD_SHIRTS = ["#ff4f8b", "#4fd6ff", "#ffd23f", "#5ad17a", "#c77dff", "#ff8a3d", "#ffffff", "#e0402a"];   // the original (pre-wireframe) clothes
+  var OLD_PANTS = ["#2a3a6a", "#1d1a26", "#5a3a2a", "#3a5a8a", "#4a4560"];
   var HAIR_STYLES = ["short", "mohawk", "long", "ponytail", "buns", "afro", "spiky", "bob", "curly", "braids", "topknot", "flattop"];
   var pick = function (a) { return a[Math.floor(Math.random() * a.length)]; };
   var rand = function (a, b) { return a + Math.random() * (b - a); };
@@ -1172,7 +1181,8 @@
         shirt: pick(SHIRTS), pants: pick(PANTS), skin: pick(SKINS), hair: pick(HAIR), size: rand(0.88, 1.1),
         joins: Math.random() < 0.88, playing: -1, atMachine: false, playT: 0,
         kind: ["alien", "robot", "plant", "wheelchair", "wheelchair"][i] || "human",   // special visitors
-        hairStyle: pick(HAIR_STYLES), wheelA: 0
+        hairStyle: pick(HAIR_STYLES), wheelA: 0,
+        oldShirt: pick(OLD_SHIRTS), oldPants: pick(OLD_PANTS)
       });
     }
     // make sure the fun haircuts all show up
@@ -1182,7 +1192,7 @@
     people.forEach(function (q) { q.mohawk = pick(["#ff4f8b", "#4fd6ff", "#5ad17a", "#ffd23f", q.hair]); });
     // the Beta Theta Why? brother: baseball cap, "BTP" shirt. Click him to play his game!
     var bro = people[8];
-    if (bro) { bro.btp = true; bro.kind = "human"; bro.hairStyle = "short"; bro.shirt = "#4f7aff"; bro.pants = "#2ad0ff"; bro.joins = true; }
+    if (bro) { bro.btp = true; bro.kind = "human"; bro.hairStyle = "short"; bro.shirt = "#4f7aff"; bro.pants = "#2ad0ff"; bro.oldShirt = "#2a3a8a"; bro.oldPants = "#3a3a4a"; bro.joins = true; }
     people[0].joins = people[1].joins = people[2].joins = true;
     people[2].petal = pick(["#ff7ab8", "#ffd23f", "#c77dff"]);
   }
@@ -2081,6 +2091,17 @@
     }
   }
 
+  // the original flat people, in their original clothes
+  function drawClassic(p, T) {
+    var ns = p.shirt, np = p.pants, nd = p.dir;
+    p.shirt = p.oldShirt || ns; p.pants = p.oldPants || np;
+    if (p.atMachine && p.playing >= 0 && G.spots[p.playing]) {   // turn toward the machine they're playing
+      var spm = G.spots[p.playing];
+      if (spm.wall !== "B") p.dir = spm.left ? -1 : 1;
+    }
+    try { drawPerson(p, T); } finally { p.shirt = ns; p.pants = np; if (!p.moving) p.dir = nd; }
+  }
+
   // every once in a while the crowd glitches out
   var glitchOn = false, glitchEnd = 0, nextGlitch = performance.now() + 6000 + Math.random() * 8000;
   function glitchTick(now) {
@@ -2123,7 +2144,11 @@
       // people are drawn on their own layer, so the glitch only scrambles them (not the machines)
       var mainCtx = ctx;
       pctx.clearRect(0, 0, G.rw, G.rh); ctx = pctx;
-      people.slice().sort(function (a, b) { return a.z - b.z; }).forEach(function (p) { drawPerson3D(p, now / 1000); });
+      // Corinne likes the original look, so when she's picked everyone goes back to their classic selves
+      var classic = getPlayer() === "Corinne";
+      people.slice().sort(function (a, b) { return a.z - b.z; }).forEach(function (p) {
+        if (classic) drawClassic(p, now / 1000); else drawPerson3D(p, now / 1000);
+      });
       if (glitchOn) glitchSlices();
       ctx = mainCtx;
       ctx.drawImage(pcanvas, 0, 0, G.rw, G.rh);
