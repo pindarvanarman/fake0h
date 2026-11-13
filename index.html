@@ -43,7 +43,10 @@
   /* ---------- Neon sign on the wall ---------- */
   /* the title sign hangs on the back wall, just above the machines */
   #hanging { position: absolute; z-index: 4; pointer-events: none; display: grid; place-items: center; }
-  #hanging .sign { max-width: none; padding: 0.55em 1.3em; }
+  /* the sign is just glowing neon letters on the wall now: no frame, no bulbs */
+  #hanging .sign { max-width: none; padding: 0; background: transparent; box-shadow: none; border-radius: 0; }
+  #hanging .bulbs { display: none; }
+  #hanging .sign h1 { text-shadow: 0 0 10px rgba(255, 210, 63, 0.8), 0 0 28px rgba(255, 210, 63, 0.45); }
   #hanging .sign h1 { font-size: 1em; white-space: nowrap; }
   #hanging .sign h1 span { display: inline; margin: 0 0 0 0.3em; }
   .sign {
@@ -79,6 +82,7 @@
     --who-fs: 26px; --info-fs: 13px;
   }
   #topText .wall-text { position: static; }
+  .who.wall-text { bottom: calc(100% - var(--stripe-top) + 0.43em); line-height: 1; }
   .who .lbl { font: 900 0.3em Nunito, sans-serif; letter-spacing: 0.2em; text-transform: uppercase; color: #b8a6e0; }
   .who b {
     font-family: "Bungee", Impact, sans-serif; font-weight: 400; color: #5aff8a; white-space: nowrap;
@@ -90,6 +94,10 @@
     color: var(--bulb); text-shadow: 0 0 12px rgba(255, 210, 63, 0.55);
   }
   .info .needs { display: block; color: #4fd6ff; margin-top: 0.3em; }
+  .info .byline + .needs { margin-top: 0; }               /* title + maker sit snug on the last line */
+  .info .byline { display: block; margin: -0.15em 0 0.05em; line-height: 1.1; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.8em; color: #ff8fd8; text-shadow: 0 0 10px rgba(255, 79, 216, 0.6); }
+  /* game descriptions never run longer than 4 lines */
+  .info .desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; max-height: 4.8em; }
 
   /* ---------- The room ---------- */
   .room {
@@ -106,7 +114,6 @@
   .floor {
     transform-origin: 50% 0; backface-visibility: visible;
     background-color: var(--carpet);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cg fill='none' stroke-width='4' stroke-linecap='round'%3E%3Cpath d='M14 30l10-10 10 10 10-10' stroke='%23ff4f8b' stroke-opacity='.5'/%3E%3Ccircle cx='110' cy='34' r='9' stroke='%234fd6ff' stroke-opacity='.45'/%3E%3Cpath d='M60 96l12-20 12 20z' stroke='%23ffd23f' stroke-opacity='.45'/%3E%3Cpath d='M120 120q10-14 20 0t20 0' stroke='%235ad17a' stroke-opacity='.45'/%3E%3Cpath d='M20 130h18' stroke='%23c77dff' stroke-opacity='.5'/%3E%3C/g%3E%3Ccircle cx='86' cy='146' r='3' fill='%23ffd23f' fill-opacity='.55'/%3E%3Ccircle cx='140' cy='70' r='3' fill='%23ff4f8b' fill-opacity='.55'/%3E%3Ccircle cx='34' cy='76' r='3' fill='%234fd6ff' fill-opacity='.55'/%3E%3C/svg%3E");
     background-size: 120px 120px;
   }
   .floor::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(5,2,15,0.75) 100%); }
@@ -140,6 +147,8 @@
   }
 
   /* ---------- Arcade cabinets ---------- */
+  /* the flat cabinets are now invisible stand-ins: the 3D wireframe cabinets are drawn on the canvas */
+  .side .cab, .back .cab { opacity: 0 !important; pointer-events: none !important; }
   .cab {
     --body: #3a3550; --body-hi: #4d4768; --accent: #5a5470; --neon: #8a84a8;
     position: relative; flex: none; width: var(--cw); height: var(--ch);
@@ -641,6 +650,12 @@
     space: { body: "#2b4a7a", hi: "#3f66a0", accent: "#4fd6ff", neon: "#7fe4ff" }
   };
   var READY_COUNT = GAMES.filter(function (g) { return g.ready; }).length;
+  // who made each game (shown on the right wall when you point at a machine)
+  var AUTHORS = {
+    "cactus-run": "fake0h", "home-for-leo": "Corinne", "sunny-spot": "Bonnie", "stick-fight": "fake0h",
+    "touchdown-toss": "Avery", "junk-mountain": "Corinne", "bloom-and-grow": "Corinne", "abducted": "Corinne",
+    "piano-party": "Pindar"
+  };
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // ---------- Build the cabinets ----------
@@ -677,7 +692,7 @@
     var s = document.createElement("strong");
     if (g && g.ready) {
       s.textContent = g.title; info.appendChild(s);
-      info.appendChild(document.createTextNode(g.desc));
+      if (AUTHORS[g.id]) { var by = document.createElement("span"); by.className = "byline"; by.textContent = "Made by " + AUTHORS[g.id]; info.appendChild(by); }
       var n = document.createElement("span"); n.className = "needs"; n.textContent = g.needs.join(" · "); info.appendChild(n);
     } else if (i === BROKEN) {
       s.textContent = "Out of order"; info.appendChild(s);
@@ -842,9 +857,8 @@
     resetBox.hidden = !cur;
     whoEl.innerHTML = "";
     if (cur) {
-      var lb = document.createElement("span"); lb.className = "lbl"; lb.textContent = "Now playing";
       var nm = document.createElement("b"); nm.textContent = cur;
-      whoEl.append(lb, nm);
+      whoEl.append(nm);
     }
     if (!cur) showAsk(false);
     cabs.forEach(function (cab, i) {
@@ -956,12 +970,17 @@
     var yFloor = rh * 0.97, wallH = yFloor;
     var ox = rw / 2, oy = yFloor - ch * 0.62;
     var cot = Math.cos(theta) / Math.sin(theta);
+    // Back-wall machines: sized so their tops line up with the tops of the side machines
+    // where the side walls meet the back wall (same proportions as the side machines).
+    var sideShift = cw * 0.3;                                             // side machines sit a bit closer to you
+    var zFar = (d0 - sideShift + 2 * spacing + cw / 2) * Math.sin(theta);  // the innermost side machine's far corner
+    var bch = ch * (0.62 + 0.38 * (P + Dz) / (P + zFar)), bcw = bch / 2.3;
 
     room.style.perspective = P + "px";
     room.style.perspectiveOrigin = ox + "px " + oy + "px";
 
     // one neon line runs along both side walls and across the back wall, just above the back machines
-    var stripeTop = wallH - (14 + cw * grow * 2.3 + 26);
+    var stripeTop = wallH - (14 + bch + 26);
     var narrow = rw < 640, topText = document.getElementById("topText");
     var whoNode = document.getElementById("who"), infoNode = document.getElementById("info");
     if (narrow) { topText.append(whoNode, infoNode); }
@@ -988,8 +1007,7 @@
     backEl.style.left = inset + "px"; backEl.style.width = bw + "px";
     backEl.style.top = (yFloor - wallH) + "px"; backEl.style.height = wallH + "px";
     backEl.style.transform = "translateZ(" + (-Dz) + "px)";
-    var bcw = cw * grow, bch = bcw * 2.3;
-    var step = Math.min(bcw * 1.45, (bw - bcw * 1.3) / 4);
+    var step = Math.min(bcw * 1.14, (bw - bcw * 1.3) / 4);            // back machines close together
     backSign.style.bottom = (bch + 44) + "px";
 
     var spots = [];
@@ -1003,7 +1021,7 @@
         backEl.appendChild(cab);
         spots.push({ wall: "B", x: inset + lx });
       } else {
-        var left = s.wall === "L", d = d0 + s.n * spacing;
+        var left = s.wall === "L", d = d0 - sideShift + s.n * spacing;
         cab.style.left = (left ? d - cw / 2 : D - d - cw / 2) + "px";
         (left ? wallL : wallR).appendChild(cab);
         spots.push({ wall: s.wall, left: left, d: d });
@@ -1025,7 +1043,26 @@
     hang.style.top = Math.max(8, topY - sign.offsetHeight) + "px";
     topText.style.bottom = (rh - Math.max(8, topY - sign.offsetHeight) + 14) + "px";
 
-    G = { rw: rw, rh: rh, ch: ch, cw: cw, P: P, ox: ox, oy: oy, yFloor: yFloor, theta: theta, cot: cot, Dz: Dz, spots: spots };
+    // Lower the ceiling so it sits exactly as far above the sign as the neon line sits below it.
+    // (Phones keep the tall room, because the name and status float above the sign there.)
+    if (!narrow) {
+      var signTop = Math.max(8, topY - sign.offsetHeight), gap = 40;   // space between the sign and the ceiling
+      var hs = 14 + bch + 26;                                     // neon line height above the floor
+      var wallH2 = Math.max(hs + 60, Math.min(yFloor, (yFloor - oy) - (signTop - gap - oy) / kb));
+      var st2 = wallH2 - hs;
+      [wallL, wallR, backEl].forEach(function (w) {
+        w.style.top = (yFloor - wallH2) + "px"; w.style.height = wallH2 + "px"; w.style.setProperty("--stripe-top", st2 + "px");
+      });
+      // the ceiling reaches forward from the back wall until it fills the top of the screen
+      var cy = yFloor - wallH2;
+      var kTop = cy < oy - 1 ? oy / (oy - cy) : 1;
+      var zf = Math.max(0, Math.min(P * 0.9, P * (1 - 1 / kTop))), ext = zf * cot, cw2 = rw + 2 * ext;
+      ceil.style.left = (-ext) + "px"; ceil.style.width = cw2 + "px"; ceil.style.top = cy + "px"; ceil.style.height = (Dz + zf) + "px";
+      ceil.style.transform = "translateZ(" + zf + "px) rotateX(-90deg)";
+      ceil.style.clipPath = "polygon(0 0, " + cw2 + "px 0, " + (cw2 - ext - inset) + "px " + (Dz + zf) + "px, " + (ext + inset) + "px " + (Dz + zf) + "px)";
+    }
+
+    G = { rw: rw, rh: rh, ch: ch, cw: cw, bcw: bcw, bch: bch, P: P, ox: ox, oy: oy, yFloor: yFloor, theta: theta, cot: cot, Dz: Dz, spots: spots };
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = rw * dpr; canvas.height = rh * dpr;
     canvas.style.width = rw + "px"; canvas.style.height = rh + "px";
@@ -1040,13 +1077,13 @@
   }
   // walkable corridor between the walls at depth z
   function corridor(z) {
-    var inset = (-z) * G.cot, m = G.cw * 0.3;
+    var inset = (-z) * G.cot, m = G.cw * 0.78;          // stay clear of the 3D cabinets
     return [inset + m, G.rw - inset - m];
   }
 
   // ---------- The crowd ----------
-  var SHIRTS = ["#ff4f8b", "#4fd6ff", "#ffd23f", "#5ad17a", "#c77dff", "#ff8a3d", "#ffffff", "#e0402a"];
-  var PANTS = ["#2a3a6a", "#1d1a26", "#5a3a2a", "#3a5a8a", "#4a4560"];
+  var SHIRTS = ["#ff4fd8", "#4fd6ff", "#ffe14f", "#5aff8a", "#b46aff", "#ff8a3d", "#3affd2", "#ff4f6b"];   // neon!
+  var PANTS = ["#4f7aff", "#c04fff", "#2ad0ff", "#ff4fa0", "#7aff4f", "#ffb84f"];
   var SKINS = ["#f1c7a3", "#d9a37a", "#a8714a", "#7a4a2a", "#ffdfc4", "#c68b5c"];
   var HAIR = ["#2b1a12", "#5a3a2a", "#e0b03a", "#1d1a26", "#c4482b", "#8a6a3a", "#c77dff"];
   var HAIR_STYLES = ["short", "mohawk", "long", "ponytail", "buns", "afro", "spiky", "bob", "curly", "braids", "topknot", "flattop"];
@@ -1056,7 +1093,7 @@
   var hover = -1;
 
   function randomSpot() {
-    var z = -rand(G.cw * 0.45, G.Dz * 0.9), c = corridor(z);
+    var z = -rand(G.cw * 0.45, Math.min(G.Dz * 0.9, G.Dz - G.bcw * 0.62 - G.cw * 0.35)), c = corridor(z);
     return [rand(c[0], Math.max(c[0], c[1])), z];
   }
   function wander(p) {
@@ -1085,7 +1122,7 @@
     people.forEach(function (q) { q.mohawk = pick(["#ff4f8b", "#4fd6ff", "#5ad17a", "#ffd23f", q.hair]); });
     // the Beta Theta Why? brother: baseball cap, "BTP" shirt. Click him to play his game!
     var bro = people[8];
-    if (bro) { bro.btp = true; bro.kind = "human"; bro.hairStyle = "short"; bro.shirt = "#2a3a8a"; bro.pants = "#3a3a4a"; bro.joins = true; }
+    if (bro) { bro.btp = true; bro.kind = "human"; bro.hairStyle = "short"; bro.shirt = "#4f7aff"; bro.pants = "#2ad0ff"; bro.joins = true; }
     people[0].joins = people[1].joins = people[2].joins = true;
     people[2].petal = pick(["#ff7ab8", "#ffd23f", "#c77dff"]);
   }
@@ -1102,7 +1139,7 @@
       // gather on the floor in front of the machine
       var x, z;
       if (sp.wall === "B") {
-        z = -G.Dz + rand(G.cw * 0.35, G.cw * 1.4);
+        z = -G.Dz + G.bcw * 0.62 + rand(G.cw * 0.25, G.cw * 1.2);
         var cb = corridor(z);
         x = Math.min(cb[1], Math.max(cb[0], sp.x + (Math.random() - 0.5) * G.cw * 1.6));
         p.face = Math.random() < 0.5 ? -1 : 1;
@@ -1492,13 +1529,465 @@
     ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("?", hx, qy + 1);
   }
 
+  // =================================================================
+  // 3D WIREFRAME CABINETS
+  // Drawn with the same perspective as the room, standing on the floor
+  // and sticking out from the walls. The game's picture plays on the screen.
+  // =================================================================
+  // side-view shape of a cabinet: [depth out from the wall, height] as fractions
+  var PROFILE = [
+    [0, 0], [0.8, 0], [0.8, 0.40], [1.0, 0.43], [1.0, 0.48],   // base, front, control panel lip
+    [0.66, 0.53], [0.58, 0.83],                                 // control panel top, screen (tilted back)
+    [0.9, 0.86], [0.9, 1.0], [0, 1.0]                            // marquee overhang, top, back
+  ];
+  var FACE = { body: [1, 2], under: [2, 3], lip: [3, 4], panel: [4, 5], screen: [5, 6], hood: [6, 7], marquee: [7, 8], top: [8, 9] };
+  var artImgs = {};
+  Object.keys(ARTS).forEach(function (k) {
+    var svg = ARTS[k].replace("<svg ", '<svg width="200" height="240" ');
+    if (svg.indexOf("xmlns=") < 0) svg = svg.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ');
+    var im = new Image(); im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg); artImgs[k] = im;
+  });
+  var cabHull = [], cabDepth = [];
+
+  function P3(X, Y, Z) {
+    var k = G.P / (G.P - Z);
+    return [G.ox + (X - G.ox) * k, G.oy + (G.yFloor - Y - G.oy) * k, Z, k];
+  }
+  // a cabinet's own coordinates: u = across (centred), v = up, w = out from the wall
+  function cabFrame(i) {
+    var sp = G.spots[i], th = G.theta, c = Math.cos(th), s = Math.sin(th);
+    var back = sp.wall === "B", w = back ? G.bcw : G.cw, h = back ? G.bch : G.ch, dp = w * 0.62;
+    var X0, Z0, ax, az, nx, nz;
+    if (back) { X0 = sp.x; Z0 = -G.Dz; ax = 1; az = 0; nx = 0; nz = 1; }
+    else if (sp.left) { X0 = sp.d * c; Z0 = -sp.d * s; ax = c; az = -s; nx = s; nz = c; }
+    else { X0 = G.rw - sp.d * c; Z0 = -sp.d * s; ax = c; az = s; nx = -s; nz = c; }   // "across" always runs to the right as you face the machine
+    return { w: w, h: h, dp: dp, at: function (u, v, wo) { return P3(X0 + ax * u + nx * wo, v, Z0 + az * u + nz * wo); } };
+  }
+  function prof(f, u, idx) { var p = PROFILE[idx]; return f.at(u, p[1] * f.h, p[0] * f.dp); }
+  // a point on a front face: s = across (0..1), t = along the face from its first to second corner (0..1)
+  function onFace(f, face, s, t) {
+    var a = PROFILE[face[0]], b = PROFILE[face[1]];
+    return f.at((s - 0.5) * f.w, (a[1] + (b[1] - a[1]) * t) * f.h, (a[0] + (b[0] - a[0]) * t) * f.dp);
+  }
+  function poly(pts, fill) { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (var k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]); ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } }
+  function faceQuad(f, face, s0, s1, t0, t1) { return [onFace(f, face, s0, t0), onFace(f, face, s1, t0), onFace(f, face, s1, t1), onFace(f, face, s0, t1)]; }
+  // draw an image onto a 3D quad, in thin slices so the perspective looks right
+  function imageOnQuad(img, q, iw, ih) {
+    // q = [bottom-left, bottom-right, top-right, top-left]
+    var N = 12;
+    ctx.save(); poly(q); ctx.clip();
+    for (var k = 0; k < N; k++) {
+      var u0 = k / N, u1 = (k + 1) / N;
+      var tl = [q[3][0] + (q[2][0] - q[3][0]) * u0, q[3][1] + (q[2][1] - q[3][1]) * u0];
+      var tr = [q[3][0] + (q[2][0] - q[3][0]) * u1, q[3][1] + (q[2][1] - q[3][1]) * u1];
+      var bl = [q[0][0] + (q[1][0] - q[0][0]) * u0, q[0][1] + (q[1][1] - q[0][1]) * u0];
+      var sx = iw * u0, sw = iw / N;
+      ctx.save();
+      ctx.transform((tr[0] - tl[0]) / sw, (tr[1] - tl[1]) / sw, (bl[0] - tl[0]) / ih, (bl[1] - tl[1]) / ih, tl[0], tl[1]);
+      ctx.drawImage(img, sx, 0, sw, ih, 0, 0, sw * 1.04, ih);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+  // text painted on a 3D quad (the marquee)
+  function textOnQuad(txt, q, color, glow) {
+    var tl = q[3], tr = q[2], bl = q[0], W0 = 200, H0 = 40;
+    ctx.save();
+    ctx.transform((tr[0] - tl[0]) / W0, (tr[1] - tl[1]) / W0, (bl[0] - tl[0]) / H0, (bl[1] - tl[1]) / H0, tl[0], tl[1]);
+    ctx.font = "26px Bungee, Impact, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    var tw = ctx.measureText(txt).width, sc = Math.min(1, 186 / tw);
+    ctx.translate(100, 21); ctx.scale(sc, 1);
+    if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 8; }
+    ctx.fillStyle = color; ctx.fillText(txt, 0, 0);
+    ctx.restore();
+  }
+  function hull(pts) {
+    var p = pts.map(function (q) { return [q[0], q[1]]; }).sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    var cross = function (o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); };
+    var lo = [], up = [];
+    p.forEach(function (q) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); });
+    for (var k = p.length - 1; k >= 0; k--) { var q = p[k]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+    return lo.slice(0, -1).concat(up.slice(0, -1));
+  }
+  function inPoly(x, y, pts) {
+    var inside = false;
+    for (var a = 0, b = pts.length - 1; a < pts.length; b = a++) {
+      if ((pts[a][1] > y) !== (pts[b][1] > y) && x < (pts[b][0] - pts[a][0]) * (y - pts[a][1]) / (pts[b][1] - pts[a][1]) + pts[a][0]) inside = !inside;
+    }
+    return inside;
+  }
+  function hexA(hex, a) {
+    var n = parseInt(hex.slice(1), 16);
+    return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + a + ")";
+  }
+
+  function drawCabinet(i, t) {
+    var f = cabFrame(i), sp = G.spots[i];
+    var broken = !!SLOTS[i].broken, g = broken ? null : GAMES[i], ready = !!(g && g.ready);
+    var col = ready && CAB_COLORS[g.art] ? CAB_COLORS[g.art] : { body: "#2a2840", hi: "#3a3858", accent: "#8a86b0", neon: broken ? "#ff6a7a" : "#9a96c8" };
+    var hot = hover === i || document.activeElement === cabs[i];
+    var done = cabs[i].classList.contains("done");
+    var flick = broken ? (Math.sin(t * 23) > 0.6 ? 0.35 : 1) : 1;
+    var L = PROFILE.map(function (p, k) { return prof(f, -f.w / 2, k); });
+    var R = PROFILE.map(function (p, k) { return prof(f, f.w / 2, k); });
+    var zL = L.reduce(function (a, p) { return a + p[2]; }, 0), zR = R.reduce(function (a, p) { return a + p[2]; }, 0);
+    var near = zL > zR ? L : R, far = near === L ? R : L;
+    var k0 = near[0][3];
+    cabHull[i] = hull(L.concat(R)); cabDepth[i] = (zL + zR) / 2;
+
+    // floor shadow
+    poly([f.at(-f.w / 2 - 4, 0, -2), f.at(f.w / 2 + 4, 0, -2), f.at(f.w / 2 + 4, 0, f.dp * 1.05), f.at(-f.w / 2 - 4, 0, f.dp * 1.05)], "rgba(0,0,0,0.35)");
+    // far side, then the front faces, then the screen
+    poly(far, hexA(col.body, 0.5));
+    ["body", "under", "lip", "hood", "top"].forEach(function (k) { var fc = FACE[k]; poly([prof(f, -f.w / 2, fc[0]), prof(f, f.w / 2, fc[0]), prof(f, f.w / 2, fc[1]), prof(f, -f.w / 2, fc[1])], hexA(col.body, 0.62)); });
+    poly([prof(f, -f.w / 2, 4), prof(f, f.w / 2, 4), prof(f, f.w / 2, 5), prof(f, -f.w / 2, 5)], hexA(col.hi, 0.75));   // control panel
+    poly([prof(f, -f.w / 2, 5), prof(f, f.w / 2, 5), prof(f, f.w / 2, 6), prof(f, -f.w / 2, 6)], "rgba(6,4,14,0.95)");   // screen bezel
+
+    // the screen: game picture ("video") or static / tape
+    var scr = faceQuad(f, FACE.screen, 0.12, 0.88, 0.1, 0.92);
+    var img = ready && artImgs[g.art];
+    if (img && img.complete && img.naturalWidth) {
+      imageOnQuad(img, scr, 200, 240);
+    } else {
+      poly(scr, broken ? "#05030c" : "#1a1830");
+      if (!broken) {   // TV static for "coming soon"
+        ctx.save(); poly(scr); ctx.clip();
+        var bb = cabHull[i], minx = 1e9, maxx = -1e9, miny = 1e9, maxy = -1e9;
+        scr.forEach(function (q) { minx = Math.min(minx, q[0]); maxx = Math.max(maxx, q[0]); miny = Math.min(miny, q[1]); maxy = Math.max(maxy, q[1]); });
+        for (var n = 0; n < 40; n++) { ctx.fillStyle = "rgba(255,255,255," + (Math.random() * 0.25) + ")"; ctx.fillRect(minx + Math.random() * (maxx - minx), miny + Math.random() * (maxy - miny), 2 + Math.random() * 6, 1.5); }
+        ctx.restore();
+      }
+    }
+    // screen glow, scanlines and a moving glare (the "video" look)
+    ctx.save(); poly(scr); ctx.clip();
+    for (var sl = 0; sl < 14; sl++) { var a = onFace(f, FACE.screen, 0, 0.1 + sl / 14 * 0.82), b = onFace(f, FACE.screen, 1, 0.1 + sl / 14 * 0.82); ctx.strokeStyle = "rgba(0,0,0,0.18)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+    var gl = ((t * 0.35 + i * 0.17) % 1.6) - 0.3;
+    var g1 = onFace(f, FACE.screen, gl, 0.1), g2 = onFace(f, FACE.screen, gl + 0.25, 0.92);
+    var grad = ctx.createLinearGradient(g1[0], g1[1], g2[0], g2[1]);
+    grad.addColorStop(0, "rgba(255,255,255,0)"); grad.addColorStop(0.5, "rgba(255,255,255," + (hot ? 0.22 : 0.12) + ")"); grad.addColorStop(1, "rgba(255,255,255,0)");
+    poly(scr, grad);
+    if (!ready) {   // tape across the screen
+      var tq = faceQuad(f, FACE.screen, 0.02, 0.98, 0.42, 0.6);
+      poly(tq, broken ? "#ff3b3b" : "#ffd23f");
+      textOnQuad(broken ? "OUT OF ORDER" : "COMING SOON", [tq[0], tq[1], tq[2], tq[3]], broken ? "#fff" : "#2a1a00");
+    }
+    if (broken) poly(scr, "rgba(0,0,0," + (1 - flick) * 0.6 + ")");
+    ctx.restore();
+
+    // marquee: lit-up game title
+    var mq = faceQuad(f, FACE.marquee, 0.04, 0.96, 0.12, 0.88);
+    poly(mq, hexA(col.body, 0.95));
+    textOnQuad(ready ? g.title : broken ? "Out of order" : "Coming soon", mq, ready ? col.neon : "#b0acd0", ready && hot ? col.neon : null);
+    // joystick and buttons on the control panel
+    var stick = onFace(f, FACE.panel, 0.25, 0.5), top = f.at(-0.25 * f.w, PROFILE[4][1] * f.h + f.h * 0.07, (PROFILE[4][0] + PROFILE[5][0]) / 2 * f.dp);
+    ctx.strokeStyle = "#222"; ctx.lineWidth = Math.max(1.5, 3 * k0); ctx.beginPath(); ctx.moveTo(stick[0], stick[1]); ctx.lineTo(top[0], top[1]); ctx.stroke();
+    ctx.fillStyle = "#ff3b3b"; ctx.beginPath(); ctx.arc(top[0], top[1], Math.max(2, 5 * k0), 0, 7); ctx.fill();
+    ["#ffd23f", "#4fd6ff", "#5ad17a"].forEach(function (bc, n) { var b = onFace(f, FACE.panel, 0.5 + n * 0.15, 0.45); ctx.fillStyle = bc; ctx.beginPath(); ctx.ellipse(b[0], b[1], Math.max(2, 5 * b[3]), Math.max(1, 2.6 * b[3]), 0, 0, 7); ctx.fill(); });
+    // coin door
+    var door = faceQuad(f, FACE.body, 0.36, 0.64, 0.25, 0.62);
+    poly(door, "rgba(0,0,0,0.5)");
+    [0.44, 0.56].forEach(function (s) { poly(faceQuad(f, FACE.body, s - 0.03, s + 0.03, 0.42, 0.52), ready ? "#ff3b3b" : "#552020"); });
+
+    // near side panel (see-through, so it still looks like a wireframe)
+    poly(near, hexA(col.body, 0.38));
+    // side art stripe
+    var st = [f.at(near === L ? -f.w / 2 : f.w / 2, f.h * 0.08, f.dp * 0.1), f.at(near === L ? -f.w / 2 : f.w / 2, f.h * 0.08, f.dp * 0.7), f.at(near === L ? -f.w / 2 : f.w / 2, f.h * 0.36, f.dp * 0.7), f.at(near === L ? -f.w / 2 : f.w / 2, f.h * 0.36, f.dp * 0.1)];
+    poly(st, hexA(col.accent || "#ffffff", 0.18));
+
+    // the glowing wireframe edges
+    var edges = [];
+    // side-wall machines skip the two up-and-down lines along their backs (against the wall)
+    var skipBack = sp.wall !== "B";
+    [L, R].forEach(function (S) { for (var k = 0; k < S.length; k++) { if (skipBack && k === S.length - 1) continue; edges.push([S[k], S[(k + 1) % S.length]]); } });
+    for (var k = 0; k < L.length; k++) edges.push([L[k], R[k]]);
+    var neon = done ? "#5aff8a" : col.neon;
+    var pulse = done ? 0.6 + Math.sin(t * 3) * 0.3 : 1;
+    var lw = Math.max(1, (hot ? 2.6 : 1.7) * k0);
+    function strokeAll(style, width) {
+      ctx.strokeStyle = style; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.beginPath();
+      edges.forEach(function (e) { ctx.moveTo(e[0][0], e[0][1]); ctx.lineTo(e[1][0], e[1][1]); });
+      ctx.stroke();
+    }
+    ctx.globalAlpha = flick;
+    if (done) strokeAll(hexA("#5aff8a", 0.25 * pulse), lw * 7);     // green halo for games you've beaten
+    strokeAll(hexA(neon, hot ? 0.35 : 0.18), lw * 4);              // soft glow
+    strokeAll(hexA(neon, 0.95), lw);                                // crisp neon line
+    if (hot) strokeAll("rgba(255,255,255,0.7)", lw * 0.45);
+    ctx.globalAlpha = 1;
+    // keyboard focus: a dashed ring around the machine
+    if (document.activeElement === cabs[i]) {
+      ctx.setLineDash([6, 5]); ctx.strokeStyle = "#ffd23f"; ctx.lineWidth = 2;
+      poly(cabHull[i]); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+  function drawCabinets(t) {
+    // far ones first
+    var order = SLOTS.map(function (s, i) { return i; });
+    var depth = function (i) { var sp = G.spots[i]; return sp.wall === "B" ? -G.Dz : -sp.d * Math.sin(G.theta); };
+    order.sort(function (a, b) { return depth(a) - depth(b); }).forEach(function (i) { drawCabinet(i, t); });
+  }
+
+  // pointing at and clicking the 3D cabinets
+  function cabAt(e) {
+    var r = room.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, best = -1, bz = -1e9;
+    cabHull.forEach(function (hl, i) { if (hl && hl.length > 2 && inPoly(x, y, hl) && cabDepth[i] > bz) { bz = cabDepth[i]; best = i; } });
+    return best;
+  }
+  room.addEventListener("pointermove", function (e) {
+    if (e.pointerType !== "mouse") return;
+    if (btpHover) return;
+    var i = cabAt(e);
+    if (i >= 0) { setHover(i); room.style.cursor = "pointer"; }
+    else { if (hover >= 0) clearHover(); room.style.cursor = ""; }
+  });
+  room.addEventListener("pointerleave", function () { if (hover >= 0) clearHover(); });
+  room.addEventListener("pointerdown", function (e) { var i = cabAt(e); if (i >= 0) cabs[i]._touched = e.pointerType !== "mouse"; });
+  room.addEventListener("click", function (e) {
+    if (btpAt(e)) return;
+    var i = cabAt(e);
+    if (i < 0) return;
+    e.preventDefault(); e.stopPropagation();
+    cabs[i].click();
+  }, true);
+
+  // =================================================================
+  // 3D WIRE PEOPLE
+  // Each person is built in 3D (wire box body, wire-sphere head, glowing limbs),
+  // turned to face where they're going, then drawn with the room's perspective.
+  // =================================================================
+  function glowHair(c) {   // dark hair would vanish as a wire, so brighten it
+    var n = parseInt(c.slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+    var m = function (v) { return Math.round(v + (255 - v) * 0.45); };
+    return "rgb(" + m(r) + "," + m(g) + "," + m(b) + ")";
+  }
+  function drawPerson3D(p, T) {
+    var kind = p.kind, S = G.ch * 0.55 * p.size * 1.3;            // 30% taller than before
+    // which way they face: where they're walking, at the machine they're crowding, or toward you
+    if (p.lx == null) { p.lx = p.x; p.lz = p.z; p.yaw = 0; }
+    var vx = p.x - p.lx, vz = p.z - p.lz; p.lx = p.x; p.lz = p.z;
+    var want = p.yaw;
+    if (p.moving && Math.hypot(vx, vz) > 0.05) want = Math.atan2(vx, vz);
+    else if (p.rush && hover >= 0 && G.spots[hover]) {
+      var sp = G.spots[hover], s0 = Math.sin(G.theta), c0 = Math.cos(G.theta);
+      want = sp.wall === "B" ? Math.PI : sp.left ? Math.atan2(-s0, -c0) : Math.atan2(s0, -c0);
+    } else if (!p.moving) want = (p.seed % 1 - 0.5) * 1.2;
+    var dy = Math.atan2(Math.sin(want - p.yaw), Math.cos(want - p.yaw));
+    p.yaw += dy * 0.15;
+    var fx = Math.sin(p.yaw), fz = Math.cos(p.yaw), rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
+    var bounce = p.moving ? Math.abs(Math.cos(p.phase)) * (p.run ? 0.05 : 0.02) : 0;
+    if (p.cheer) bounce = Math.abs(Math.sin(T * 9 + p.seed)) * 0.1;
+    // local point (x right, y up, z forward; in body heights) -> screen
+    function L(x, y, z) { return P3(p.x + (x * rx + z * fx) * S, (y + bounce) * S, p.z + (x * rz + z * fz) * S); }
+    var segs = {};                      // color -> list of [a, b]
+    function seg(a, b, col) { (segs[col] = segs[col] || []).push([a, b]); }
+    function chain(pts, col) { for (var k = 0; k < pts.length - 1; k++) seg(pts[k], pts[k + 1], col); }
+    function ring(cx, cy, cz, r, plane, col, n, from, to) {
+      n = n || 14; from = from || 0; to = to == null ? Math.PI * 2 : to;
+      var pts = [];
+      for (var k = 0; k <= n; k++) {
+        var a = from + (to - from) * k / n, c = Math.cos(a) * r, s = Math.sin(a) * r;
+        pts.push(plane === "xy" ? L(cx + c, cy + s, cz) : plane === "xz" ? L(cx + c, cy, cz + s) : L(cx, cy + s, cz + c));
+      }
+      chain(pts, col);
+    }
+    function box(x0, x1, y0, y1, z0, z1, col, topW) {   // wire box (topW lets the top be wider, for shoulders)
+      var tw = topW || 1, c = [
+        L(x0, y0, z0), L(x1, y0, z0), L(x1, y0, z1), L(x0, y0, z1),
+        L(x0 * tw, y1, z0), L(x1 * tw, y1, z0), L(x1 * tw, y1, z1), L(x0 * tw, y1, z1)];
+      [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]].forEach(function (e) { seg(c[e[0]], c[e[1]], col); });
+      return c;
+    }
+    var reveal = false;
+    if (kind === "alien") { var cyc = p.cheer || p.shrug ? 2.6 : 6.5; reveal = ((T + p.seed * 3) % cyc) < 0.5; }
+    var shirt = p.shirt, pants = p.pants, skin = p.skin, hair = glowHair(p.hair);
+    if (kind === "robot") { shirt = "#b8c8ff"; pants = "#8aa0d0"; skin = "#cfe0ff"; }
+    if (kind === "plant") { pants = "#a0b0c0"; skin = "#5aff6a"; }
+    if (reveal) skin = "#7dff6b";
+
+    // floor shadow
+    var sh = [L(-0.14, 0, -0.1), L(0.14, 0, -0.1), L(0.14, 0, 0.12), L(-0.14, 0, 0.12)];
+    ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.moveTo(sh[0][0], sh[0][1]); sh.forEach(function (q) { ctx.lineTo(q[0], q[1]); }); ctx.fill();
+
+    var amp = p.moving ? (p.run ? 0.75 : 0.42) : 0;
+    if (kind === "robot") amp *= 0.6;
+    var a = Math.sin(p.phase) * amp;
+    var headY = 0.93, headC = null;
+
+    if (kind === "wheelchair") {
+      // the chair: two big wire wheels with spokes, seat, backrest, footrest, little casters
+      if (p.moving) p.wheelA = (p.wheelA || 0) + 0.12;
+      var R = 0.19, spin = p.wheelA || 0, frame = "#e0e8ff";
+      [-0.16, 0.16].forEach(function (wx) {
+        ring(wx, R, -0.04, R, "yz", "#ffffff", 18);
+        ring(wx, R, -0.04, R * 0.8, "yz", "#4fd6ff", 18);
+        for (var k = 0; k < 6; k++) { var an = spin + k * Math.PI / 3; seg(L(wx, R, -0.04), L(wx, R + Math.sin(an) * R * 0.95, -0.04 + Math.cos(an) * R * 0.95), "#4fd6ff"); }
+        ring(wx, 0.04, 0.22, 0.04, "yz", frame, 8);
+        seg(L(wx, 0.3, -0.12), L(wx, 0.3, 0.14), frame); seg(L(wx, 0.3, 0.14), L(wx, 0.06, 0.22), frame);
+        seg(L(wx, 0.3, -0.12), L(wx, 0.62, -0.15), frame); seg(L(wx, 0.62, -0.15), L(wx, 0.64, -0.24), frame);
+      });
+      seg(L(-0.16, 0.3, -0.12), L(0.16, 0.3, -0.12), frame); seg(L(-0.16, 0.3, 0.14), L(0.16, 0.3, 0.14), frame);
+      seg(L(-0.1, 0.07, 0.26), L(0.1, 0.07, 0.26), frame);
+      // seated person
+      [-0.06, 0.06].forEach(function (lx) { chain([L(lx, 0.33, 0), L(lx, 0.35, 0.2), L(lx, 0.08, 0.25)], pants); });
+      box(-0.1, 0.1, 0.33, 0.66, -0.06, 0.05, shirt, 1.1);
+      headY = 0.76;
+      [-1, 1].forEach(function (sd) {
+        var sx = sd * 0.11;
+        if (p.cheer) { var wv = Math.sin(T * 12 + p.seed) * 0.03; chain([L(sx, 0.64, 0), L(sd * 0.16, 0.78, 0.02), L(sd * 0.19 + wv, 0.92, 0.03)], skin); }
+        else if (p.shrug) chain([L(sx, 0.64, 0), L(sd * 0.18, 0.55, 0.06), L(sd * 0.24, 0.62, 0.12)], skin);
+        else { var push = p.moving ? Math.sin(p.phase * 0.9) * 0.1 : 0; chain([L(sx, 0.64, 0), L(sd * 0.15, 0.48, -0.04 + push), L(sd * 0.16, R * 1.75, -0.04 + push * 1.5)], skin); }
+      });
+    } else if (kind === "plant") {
+      // flowerpot body on metal legs, vine arms with leaves, and a flower head with a spinning gear
+      [-0.05, 0.05].forEach(function (lx, n) { var sw = (n ? -a : a); chain([L(lx, 0.32, 0), L(lx, 0.16, sw * 0.12), L(lx, 0.01, sw * 0.24)], pants); });
+      ring(0, 0.32, 0, 0.08, "xz", "#ff8a4f", 12); ring(0, 0.6, 0, 0.12, "xz", "#ff8a4f", 12);
+      for (var k = 0; k < 6; k++) { var an = k * Math.PI / 3; seg(L(Math.cos(an) * 0.08, 0.32, Math.sin(an) * 0.08), L(Math.cos(an) * 0.12, 0.6, Math.sin(an) * 0.12), "#ff8a4f"); }
+      seg(L(0, 0.6, 0), L(0, 0.86, 0.02), "#5aff6a");
+      [-1, 1].forEach(function (sd) {
+        var hand = p.cheer ? L(sd * 0.22, 0.95, 0.04) : p.shrug ? L(sd * 0.26, 0.72, 0.1) : L(sd * 0.2, 0.5 - sd * a * 0.05, sd * a * 0.08);
+        chain([L(sd * 0.08, 0.58, 0), L(sd * 0.16, 0.62, 0.02), hand], "#5aff6a");
+        var hl = p.cheer ? [sd * 0.22, 0.95, 0.04] : p.shrug ? [sd * 0.26, 0.72, 0.1] : [sd * 0.2, 0.5, 0];
+        ring(hl[0], hl[1], hl[2], 0.035, "xy", "#5aff6a", 8);
+      });
+      var spin = T * (p.moving ? 4 : 1) + p.seed;
+      for (var k = 0; k < 7; k++) { var an = spin * 0.3 + k / 7 * Math.PI * 2; ring(Math.cos(an) * 0.08, 0.92 + Math.sin(an) * 0.08, 0.03, 0.035, "xy", p.petal || "#ff7ab8", 8); }
+      ring(0, 0.92, 0.03, 0.05, "xy", "#cfd8e8", 10);
+      for (var k = 0; k < 8; k++) { var an = spin + k / 8 * Math.PI * 2; seg(L(Math.cos(an) * 0.05, 0.92 + Math.sin(an) * 0.05, 0.03), L(Math.cos(an) * 0.064, 0.92 + Math.sin(an) * 0.064, 0.03), "#cfd8e8"); }
+      headY = -1;   // no human head
+      headC = L(0, 0.92, 0.06);
+    } else {
+      // legs: thigh + shin swinging, pants in neon
+      [-0.06, 0.06].forEach(function (lx, n) {
+        var sw = n ? -a : a, hip = [lx, 0.5, 0];
+        var knee = [lx, 0.5 - 0.25 * Math.cos(sw), 0.25 * Math.sin(sw)];
+        var bend = Math.max(0, -sw) * 0.9 + (p.moving ? 0.15 : 0);
+        var foot = [lx, knee[1] - 0.25 * Math.cos(sw - bend), knee[2] + 0.25 * Math.sin(sw - bend)];
+        chain([L(hip[0], hip[1], hip[2]), L(knee[0], knee[1], knee[2]), L(foot[0], foot[1], foot[2])], pants);
+        seg(L(foot[0], foot[1], foot[2]), L(foot[0], foot[1], foot[2] + 0.06), pants);
+      });
+      // torso: a wire box, wider at the shoulders (robots are boxier)
+      var tc = kind === "robot" ? box(-0.12, 0.12, 0.48, 0.84, -0.07, 0.07, shirt, 1.05) : box(-0.08, 0.08, 0.5, 0.84, -0.05, 0.05, shirt, 1.4);
+      seg(L(-0.08, 0.6, 0.05), L(0.08, 0.6, 0.05), shirt);   // a stripe across the shirt
+      // arms
+      [-1, 1].forEach(function (sd) {
+        var sx = sd * (kind === "robot" ? 0.13 : 0.11), sw = sd < 0 ? -a : a;
+        var el, hd;
+        if (p.cheer) { var wv = Math.sin(T * 12 + p.seed) * 0.03; el = [sd * 0.17, 0.95, 0.03]; hd = [sd * 0.2 + wv, 1.08, 0.05]; }
+        else if (p.shrug) { el = [sd * 0.18, 0.7, 0.06]; hd = [sd * 0.25, 0.8, 0.12]; }
+        else { el = [sd * 0.13, 0.66, -sw * 0.12]; hd = [sd * 0.13, 0.52, -sw * 0.2 + 0.04]; }
+        chain([L(sx, 0.82, 0), L(el[0], el[1], el[2]), L(hd[0], hd[1], hd[2])], skin);
+        if (kind === "robot") ring(hd[0], hd[1], hd[2], 0.025, "xy", "#cfe0ff", 6);
+      });
+      if (kind === "robot") {
+        // chest lights and a box head with an antenna
+        var blink = Math.floor(T * 3 + p.seed) % 3;
+        ["#ff3b3b", "#ffd23f", "#5aff8a"].forEach(function (cl, n) { var q = L(-0.05 + n * 0.05, 0.7, 0.075); ctx.fillStyle = n === blink ? cl : "#333a50"; ctx.beginPath(); ctx.arc(q[0], q[1], Math.max(1.5, S * q[3] * 0.012), 0, 7); ctx.fill(); });
+        box(-0.08, 0.08, 0.86, 1.02, -0.07, 0.07, "#cfe0ff");
+        seg(L(-0.04, 0.95, 0.072), L(-0.01, 0.95, 0.072), "#4fd6ff"); seg(L(0.01, 0.95, 0.072), L(0.04, 0.95, 0.072), "#4fd6ff");
+        seg(L(0, 1.02, 0), L(0, 1.1, 0), "#cfe0ff");
+        var tip = L(0, 1.11, 0); ctx.fillStyle = Math.sin(T * 6 + p.seed) > 0 ? "#ff3b3b" : "#552020"; ctx.beginPath(); ctx.arc(tip[0], tip[1], Math.max(2, S * tip[3] * 0.018), 0, 7); ctx.fill();
+        headY = -1; headC = L(0, 0.95, 0.08);
+      }
+    }
+
+    // a wire-sphere head, hair, and the BTP guy's cap
+    if (headY > 0) {
+      var hr = 0.075;
+      if (reveal) {
+        ring(0, headY, 0, hr * 1.15, "xy", "#7dff6b", 14); ring(0, headY, 0, hr * 1.15, "yz", "#7dff6b", 14);
+        seg(L(-0.03, headY + 0.07, 0), L(-0.07, headY + 0.17, 0), "#7dff6b"); seg(L(0.03, headY + 0.07, 0), L(0.07, headY + 0.17, 0), "#7dff6b");
+        ring(-0.07, headY + 0.18, 0, 0.015, "xy", "#d0ff9a", 6); ring(0.07, headY + 0.18, 0, 0.015, "xy", "#d0ff9a", 6);
+      } else {
+        ring(0, headY, 0, hr, "xy", skin, 14); ring(0, headY, 0, hr, "yz", skin, 14); ring(0, headY, 0, hr, "xz", skin, 14);
+        var st = p.btp ? "cap" : p.hairStyle;
+        if (st === "cap") {
+          ring(0, headY + 0.01, 0, hr * 1.05, "xy", "#ff4f4f", 10, 0, Math.PI); ring(0, headY + 0.01, 0, hr * 1.05, "yz", "#ff4f4f", 10, 0, Math.PI);
+          ring(0, headY + 0.01, 0, hr * 1.05, "xz", "#ff4f4f", 14);
+          ring(0, headY + 0.01, hr * 1.2, hr * 0.9, "xz", "#ff4f4f", 10, Math.PI, Math.PI * 2);   // brim
+        } else if (st === "mohawk") {
+          var mc = glowHair(p.mohawk || p.hair);
+          for (var k = 0; k < 5; k++) { var z = -0.06 + k * 0.03; seg(L(0, headY + 0.05, z), L(0, headY + 0.16 - Math.abs(k - 2) * 0.02, z - 0.01), mc); }
+          seg(L(0, headY + 0.05, -0.07), L(0, headY + 0.05, 0.06), mc);
+        } else if (st === "afro") {
+          ring(0, headY + 0.03, -0.01, hr * 1.55, "xy", hair, 16); ring(0, headY + 0.03, -0.01, hr * 1.55, "yz", hair, 16); ring(0, headY + 0.03, -0.01, hr * 1.55, "xz", hair, 16);
+        } else if (st === "spiky") {
+          ring(0, headY + 0.02, 0, hr * 1.02, "xz", hair, 12);
+          for (var k = 0; k < 7; k++) { var an = k / 7 * Math.PI * 2; seg(L(Math.cos(an) * hr * 0.8, headY + 0.05, Math.sin(an) * hr * 0.8), L(Math.cos(an) * hr * 1.4, headY + 0.13, Math.sin(an) * hr * 1.4), hair); }
+        } else if (st === "flattop") {
+          box(-hr, hr, headY + 0.03, headY + 0.11, -hr, hr, hair);
+        } else {
+          // most styles start with a cap of hair over the top of the head
+          ring(0, headY + 0.01, 0, hr * 1.06, "xy", hair, 10, 0, Math.PI); ring(0, headY + 0.01, 0, hr * 1.06, "yz", hair, 10, 0, Math.PI);
+          ring(0, headY + 0.02, 0, hr * 1.04, "xz", hair, 12);
+          if (st === "long" || st === "bob") {
+            var len = st === "long" ? 0.2 : 0.09;
+            [-0.06, -0.02, 0.02, 0.06].forEach(function (x) { seg(L(x, headY, -0.05), L(x * 1.2, headY - len, -0.07), hair); });
+          } else if (st === "ponytail") {
+            var swy = Math.sin(T * 6 + p.seed) * 0.03;
+            chain([L(0, headY + 0.04, -hr), L(swy, headY - 0.02, -hr - 0.06), L(swy * 1.5, headY - 0.12, -hr - 0.06)], hair);
+            ring(0, headY + 0.04, -hr - 0.005, 0.02, "xy", "#ff4fd8", 6);
+          } else if (st === "buns") {
+            ring(-0.065, headY + 0.07, 0, 0.03, "xy", hair, 8); ring(0.065, headY + 0.07, 0, 0.03, "xy", hair, 8);
+          } else if (st === "topknot") {
+            ring(0, headY + 0.11, -0.01, 0.03, "xy", hair, 8); ring(0, headY + 0.11, -0.01, 0.03, "yz", hair, 8);
+          } else if (st === "braids") {
+            [-1, 1].forEach(function (sd) { chain([L(sd * 0.07, headY, -0.01), L(sd * 0.08, headY - 0.12, 0), L(sd * 0.08, headY - 0.2, 0.01)], hair); ring(sd * 0.08, headY - 0.21, 0.01, 0.015, "xy", "#ffd23f", 6); });
+          } else if (st === "curly") {
+            for (var k = 0; k < 6; k++) { var an = Math.PI * (k / 5); ring(Math.cos(an) * hr, headY + Math.sin(an) * hr, 0, 0.022, "xy", hair, 6); }
+          }
+          if (kind === "alien") { var q = L(-0.03, headY + 0.09, -0.02); ctx.fillStyle = "#b8ff6b"; ctx.beginPath(); ctx.arc(q[0], q[1], Math.max(1.5, S * q[3] * 0.012), 0, 7); ctx.fill(); }
+        }
+      }
+      // eyes on the front of the face (you only see them when they look your way)
+      var e1 = L(-0.025, headY + 0.005, hr * 0.92), e2 = L(0.025, headY + 0.005, hr * 0.92), hc = L(0, headY, 0);
+      if (Math.cos(p.yaw) > 0.1) {
+        ctx.fillStyle = reveal ? "#000" : "#ffffff";
+        [e1, e2].forEach(function (e) { ctx.beginPath(); ctx.arc(e[0], e[1], Math.max(1.2, S * e[3] * (reveal ? 0.022 : 0.011)), 0, 7); ctx.fill(); });
+      }
+      headC = hc;
+    }
+
+    // draw every wire with a neon glow: a soft wide pass, then a bright thin one
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    var k0 = P3(p.x, 0, p.z)[3], lw = Math.max(1.1, S * k0 * 0.016);
+    Object.keys(segs).forEach(function (col) {
+      var list = segs[col];
+      ctx.strokeStyle = col; ctx.globalAlpha = 0.2; ctx.lineWidth = lw * 3.4;
+      ctx.beginPath(); list.forEach(function (sg) { ctx.moveTo(sg[0][0], sg[0][1]); ctx.lineTo(sg[1][0], sg[1][1]); }); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.lineWidth = lw;
+      ctx.beginPath(); list.forEach(function (sg) { ctx.moveTo(sg[0][0], sg[0][1]); ctx.lineTo(sg[1][0], sg[1][1]); }); ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+
+    // the BTP guy: letters on his chest, clickable area, and the "Pledge?" bubble
+    if (p.btp) {
+      var chest = L(0, 0.68, 0.06);
+      ctx.fillStyle = "#ffe14f"; ctx.font = "900 " + Math.max(7, Math.round(S * chest[3] * 0.07)) + "px Nunito, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("BTP", chest[0], chest[1]); ctx.textBaseline = "alphabetic";
+      var top = L(0, 1.05, 0), foot = L(0, 0, 0), wpx = S * foot[3] * 0.3;
+      p.hit = { x: foot[0] - wpx, y: top[1], w: wpx * 2, h: foot[1] - top[1] };
+      if (btpHover) {
+        var fs = Math.max(10, Math.round(S * top[3] * 0.09));
+        ctx.font = "900 " + fs + "px Nunito, sans-serif";
+        var bt = "Pledge? Click me!", bw = ctx.measureText(bt).width + 14, by = top[1] - fs * 1.2;
+        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.roundRect(top[0] - bw / 2, by - fs * 0.8, bw, fs * 1.6, 8); ctx.fill();
+        ctx.fillStyle = "#2a1a10"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(bt, top[0], by); ctx.textBaseline = "alphabetic";
+      }
+    }
+    if (p.shrug && headC) {
+      var qs = S * headC[3];
+      drawQuestion(p, headC[0], headC[1] - qs * 0.05, qs * 0.9, T);
+    }
+  }
+
   var last = performance.now();
   function loop(now) {
     var dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (G) {
       update(dt);
       ctx.clearRect(0, 0, G.rw, G.rh);
-      people.slice().sort(function (a, b) { return a.z - b.z; }).forEach(function (p) { drawPerson(p, now / 1000); });
+      drawCabinets(now / 1000);
+      people.slice().sort(function (a, b) { return a.z - b.z; }).forEach(function (p) { drawPerson3D(p, now / 1000); });
     }
     requestAnimationFrame(loop);
   }
