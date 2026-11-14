@@ -316,6 +316,71 @@
     box-shadow: 0 8px 0 rgba(0,0,0,0.3); display: none; z-index: 20;
   }
   .notice.show { display: block; }
+  .notice { z-index: 40; }
+
+  /* ---------- zooming out: the night outside the arcade ---------- */
+  #outside { position: fixed; inset: 0; z-index: 0; opacity: 0; pointer-events: none; transition: opacity 0.4s;
+    background: radial-gradient(1.5px 1.5px at 12% 18%, #fff, transparent), radial-gradient(1px 1px at 33% 9%, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 71% 14%, #fff, transparent), radial-gradient(1px 1px at 88% 30%, #fff, transparent),
+      radial-gradient(1px 1px at 52% 4%, #fff, transparent), radial-gradient(1.5px 1.5px at 6% 52%, #fff, transparent),
+      radial-gradient(1px 1px at 94% 62%, #fff, transparent), radial-gradient(1px 1px at 24% 38%, #fff, transparent),
+      linear-gradient(180deg, #05021a 0%, #120838 70%, #1b0d2e 70%, #0c0618 100%); }
+  body.zoomed #outside { opacity: 1; pointer-events: auto; }
+  #outside .moon { position: absolute; top: 5%; right: 7%; width: 7vmin; height: 7vmin; border-radius: 50%; background: #fff6d6; box-shadow: 0 0 30px rgba(255,246,214,0.6), inset -1.6vmin -0.8vmin 0 #e8dcb0; }
+  #outside .out-hint { position: absolute; bottom: 2%; left: 0; right: 0; margin: 0; text-align: center; font-weight: 800; font-size: 0.85rem; color: rgba(255,255,255,0.55); }
+  #secretHouse { display: none; position: absolute; left: 4%; bottom: 9%; width: clamp(46px, 7vmin, 70px); padding: 0; border: none; background: none; cursor: pointer; }
+  body.secret-house #secretHouse { display: block; }
+  #secretHouse svg { display: block; width: 100%; overflow: visible; filter: drop-shadow(0 0 6px rgba(255,154,60,0.6)); }
+  #secretHouse .win { animation: housewin 3s steps(1) infinite; }
+  @keyframes housewin { 0%, 70% { fill: #ffd23f; } 71% { fill: #3a2a10; } }
+  #secretHouse .key { opacity: 0; }
+  #secretHouse .door { transform-origin: 31px 44px; transition: transform 0.5s; }
+  #secretHouse.open .door { transform: scaleX(0.15); }
+  #secretHouse.open .key { opacity: 1; animation: keyup 1.4s ease-out forwards; }
+  @keyframes keyup { from { transform: translateY(0); } to { transform: translateY(-34px); } }
+  #secretHouse.taken .key { display: none; }
+  .room, .players { transition: transform 0.45s ease, opacity 0.45s; }
+  .room { z-index: 1; transform-origin: 50% 45%; }
+  body.zoomed .room { pointer-events: none; box-shadow: 0 0 0 3px #ff4f8b, 0 0 40px rgba(255,79,139,0.5); }
+  body.zoomed .players { opacity: 0; pointer-events: none; }
+
+  /* ---------- Corinne's secret slot machine ---------- */
+  #slots { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 14px; background: rgba(8, 3, 18, 0.78); }
+  #slots[hidden] { display: none; }
+  .sm { position: relative; width: min(460px, 100%); max-height: 94vh; overflow: auto; text-align: center; color: #fff6d6;
+        background: linear-gradient(180deg, #3a1060, #1a0630); border: 4px solid #ffd23f; border-radius: 26px 26px 14px 14px;
+        padding: 18px 18px 16px; box-shadow: 0 0 40px rgba(255, 210, 63, 0.45), inset 0 0 0 4px #7a2ab0; }
+  .sm h2 { margin: 0; font: 400 clamp(1.6rem, 6vw, 2.2rem) "Bungee Shade", "Bungee", Impact, sans-serif; color: #ffd23f; text-shadow: 0 0 14px rgba(255, 210, 63, 0.7); }
+  .sm-sub { margin: 2px 0 12px; font-weight: 800; font-size: 0.85rem; color: #ffb3e6; }
+  .sm-x { position: absolute; top: 10px; right: 12px; font: 900 1rem Nunito, sans-serif; color: #fff; background: rgba(0,0,0,0.35); border: 2px solid rgba(255,255,255,0.5); border-radius: 50%; width: 34px; height: 34px; cursor: pointer; }
+  .sm-body { display: flex; align-items: center; justify-content: center; gap: 12px; }
+  .sm-reels { display: flex; gap: 8px; padding: 10px; background: #0d0420; border-radius: 14px; border: 3px solid #ff4f8b; box-shadow: inset 0 0 18px rgba(0,0,0,0.8); }
+  .reel { width: clamp(64px, 20vw, 88px); height: clamp(76px, 24vw, 100px); display: grid; place-items: center; overflow: hidden; border-radius: 10px;
+          background: linear-gradient(180deg, #d8d0e8, #fff 40%, #fff 60%, #d8d0e8); font-size: clamp(2.4rem, 11vw, 3.2rem); }
+  .reel.spin span { animation: reelspin 0.12s linear infinite; filter: blur(1.5px); }
+  @keyframes reelspin { from { transform: translateY(-40%); } to { transform: translateY(40%); } }
+  .reel.win { box-shadow: 0 0 0 4px #5aff8a, 0 0 18px #5aff8a; }
+  .sm-lever { position: relative; width: 26px; height: 120px; border: none; background: none; cursor: pointer; padding: 0; }
+  .sm-lever::before { content: ""; position: absolute; left: 10px; bottom: 6px; width: 6px; height: 96px; background: #c9c3d6; border-radius: 3px; transform-origin: bottom center; transition: transform 0.25s; }
+  .sm-lever i { position: absolute; left: 1px; top: 0; width: 24px; height: 24px; border-radius: 50%; background: #ff3b3b; box-shadow: inset -3px -3px 0 rgba(0,0,0,0.3); transition: transform 0.25s; }
+  .sm-lever.pulled::before { transform: scaleY(-0.6); } .sm-lever.pulled i { transform: translateY(78px); }
+  .sm-msg { min-height: 2.8em; margin: 12px 0 8px; font-weight: 900; font-size: 1.05rem; line-height: 1.35; }
+  .sm-row { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+  .sm-coins { font-weight: 900; font-size: 1.1rem; color: #ffd23f; }
+  .sm-spin { font: 400 1.1rem "Bungee", Impact, sans-serif; color: #2a0a40; background: #ffd23f; border: none; border-radius: 12px; padding: 10px 22px; cursor: pointer; box-shadow: 0 5px 0 #b8860b; }
+  .sm-spin:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8860b; }
+  .sm-spin:disabled { opacity: 0.45; cursor: not-allowed; }
+  .sm h3 { margin: 16px 0 6px; font-size: 0.95rem; color: #ffb3e6; }
+  .sm-hint { font-weight: 700; opacity: 0.75; font-size: 0.8rem; }
+  .sm-skins { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .sm-skins button { font: 800 0.85rem Nunito, sans-serif; color: #fff; background: #2a1650; border: 2px solid #5a3a90; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+  .sm-skins button.on { background: #1d5a34; border-color: #5aff8a; box-shadow: 0 0 10px rgba(90,255,138,0.6); }
+  .sm-skins button.locked { opacity: 0.4; cursor: default; }
+  .sm button:focus-visible { outline: 3px solid #5aff8a; outline-offset: 2px; }
+  /* the disco skin makes the whole arcade cycle through colors */
+  .room.disco { animation: disco 6s linear infinite; }
+  @keyframes disco { from { filter: hue-rotate(0deg) saturate(1.4); } to { filter: hue-rotate(360deg) saturate(1.4); } }
+  @media (prefers-reduced-motion: reduce) { .room.disco { animation: none; filter: saturate(1.4); } .reel.spin span { animation: none; } }
 
   /* tablets standing up: the room and the name buttons sit together in the middle of the screen */
   body.portrait { align-content: center; grid-template-rows: auto auto !important; }
@@ -338,6 +403,20 @@
 </style>
 </head>
 <body>
+<div id="outside" aria-hidden="true">
+  <div class="moon"></div>
+  <button type="button" id="secretHouse" tabindex="-1" aria-label="A tiny house">
+    <svg viewBox="0 0 60 56" xmlns="http://www.w3.org/2000/svg">
+      <path d="M6 26 L30 6 L54 26" fill="#5a2a7a" stroke="#ff9a3c" stroke-width="2.5" stroke-linejoin="round"/>
+      <rect x="40" y="8" width="6" height="12" fill="#5a2a7a" stroke="#ff9a3c" stroke-width="2"/>
+      <rect x="11" y="25" width="38" height="28" fill="#2a1240" stroke="#ff9a3c" stroke-width="2.5"/>
+      <rect x="16" y="31" width="9" height="8" fill="#ffd23f" class="win"/>
+      <g class="door"><rect x="31" y="35" width="11" height="18" fill="#c0392b" stroke="#ff9a3c" stroke-width="2"/><circle cx="39.5" cy="45" r="1.2" fill="#ffd23f"/></g>
+      <text x="36.5" y="49" class="key" text-anchor="middle" font-size="12">🔑</text>
+    </svg>
+  </button>
+  <p class="out-hint">scroll up or pinch to go back inside</p>
+</div>
 <main class="room" id="room">
   <div class="scene" id="scene">
     <div class="plane floor" id="floor"></div>
@@ -360,6 +439,24 @@
 </main>
 <nav class="players" id="players" aria-label="Who's playing?"></nav>
 <div class="notice" id="notice" role="status" aria-live="polite"></div>
+<div id="slots" hidden role="dialog" aria-modal="true" aria-labelledby="slotsTitle">
+  <div class="sm">
+    <button type="button" class="sm-x" id="slotsClose" aria-label="Close">✕</button>
+    <h2 id="slotsTitle">LUCKY SKINS</h2>
+    <p class="sm-sub">Corinne's secret machine · 1 Cactus Run coin per spin</p>
+    <div class="sm-body">
+      <div class="sm-reels" id="reels"><div class="reel"><span>🌵</span></div><div class="reel"><span>🎈</span></div><div class="reel"><span>🦍</span></div></div>
+      <button type="button" class="sm-lever" id="lever" aria-label="Pull the lever to spin"><i></i></button>
+    </div>
+    <p class="sm-msg" id="slotMsg" aria-live="polite">Three in a row wins a new arcade skin!</p>
+    <div class="sm-row">
+      <span class="sm-coins" id="coinBox">🪙 <b id="coinCount">0</b> coins</span>
+      <button type="button" class="sm-spin" id="spinBtn">SPIN (1 🪙)</button>
+    </div>
+    <h3>Your skins <span class="sm-hint">(tap one to wear it)</span></h3>
+    <div class="sm-skins" id="skinList"></div>
+  </div>
+</div>
 <script src="arcade-progress.js"></script>
 
 <script>
@@ -713,6 +810,10 @@
       s.textContent = g.title; info.appendChild(s);
       if (AUTHORS[g.id]) { var by = document.createElement("span"); by.className = "byline"; by.textContent = "Made by " + AUTHORS[g.id]; info.appendChild(by); }
       var n = document.createElement("span"); n.className = "needs"; n.textContent = g.needs.join(" · "); info.appendChild(n);
+    } else if (i === BROKEN && secretOpen()) {
+      s.textContent = "Lucky Skins"; info.appendChild(s);
+      var by2 = document.createElement("span"); by2.className = "byline"; by2.textContent = "Corinne's secret machine"; info.appendChild(by2);
+      var n2 = document.createElement("span"); n2.className = "needs"; n2.textContent = hasKey() ? "🔑 Secret key: free spins!" : "1 Cactus Run coin per spin · You have " + coins(); info.appendChild(n2);
     } else if (i === BROKEN) {
       s.textContent = "Out of order"; info.appendChild(s);
       info.appendChild(document.createTextNode("This one has been broken forever. Sorry!"));
@@ -745,6 +846,7 @@
   function setPlayer(p) {
     try { if (p) sessionStorage.setItem(PLAYER_KEY, p); else sessionStorage.removeItem(PLAYER_KEY); } catch (e) {}
     refreshProgress(); defaultInfo();
+    if (typeof applySkin === "function") applySkin();
   }
   var doneList = function (p) { var r = readRecords(); return p && Array.isArray(r[p]) ? r[p] : []; };
   function doneCount(p) {
@@ -1252,7 +1354,7 @@
           p.moving = false;
           if (p.rush && hover >= 0) {
             var g = GAMES[hover];
-            if (g && g.ready) p.cheer = true; else p.shrug = true;
+            if ((g && g.ready) || (hover === BROKEN && secretOpen())) p.cheer = true; else p.shrug = true;
             p.dir = p.face;
           } else if (p.playing >= 0) { p.atMachine = true; p.playT = rand(4, 11); }   // found a game: play it for a bit
           else p.idle = rand(0.6, 3.2);
@@ -1709,6 +1811,7 @@
     var broken = !!SLOTS[i].broken, g = broken ? null : GAMES[i], ready = !!(g && g.ready);
     var col = CAB_NEONS[i % CAB_NEONS.length];
     if (broken) col = CAB_NEONS[0];
+    if (broken && secretOpen()) { broken = false; ready = true; g = SECRET_GAME; col = { neon: "#ffd23f", body: "#2e1c06", hi: "#4a2e0a", accent: "#ffd23f" }; }   // Corinne's secret machine
     var hot = hover === i || document.activeElement === cabs[i];
     var picked = touchSel === i;
     var done = cabs[i].classList.contains("done");
@@ -2102,6 +2205,206 @@
     try { drawPerson(p, T); } finally { p.shirt = ns; p.pants = np; if (!p.moving) p.dir = nd; }
   }
 
+  // =================================================================
+  // CORINNE'S SECRET MACHINE: "Lucky Skins"
+  // On Corinne's arcade only, the out-of-order machine opens once she has beaten every game.
+  // Each spin costs one coin she collected in Cactus Run. Three in a row wins a new arcade skin.
+  // =================================================================
+  var SECRET_PLAYER = "Corinne", COIN_KEY = "fake0hArcade.coins", SKIN_KEY = "fake0hArcade.skins";
+  var SKINS = [
+    { id: "classic",  name: "Classic",        people: "classic" },
+    { id: "neon",     name: "Neon Wireframe", people: "wire" },
+    { id: "retro",    name: "Retro Green",    people: "classic", filter: "grayscale(1) sepia(1) hue-rotate(55deg) saturate(3.5) brightness(0.95)" },
+    { id: "candy",    name: "Candyland",      people: "classic", filter: "hue-rotate(295deg) saturate(1.8) brightness(1.12)" },
+    { id: "midnight", name: "Midnight Ghosts", people: "wire", filter: "hue-rotate(170deg) brightness(0.85) saturate(1.2)", ghost: true },
+    { id: "gold",     name: "Gold Rush",      people: "classic", filter: "sepia(0.85) saturate(2.4) hue-rotate(-12deg) brightness(1.05)" },
+    { id: "tiny",     name: "Tiny Town",      people: "classic", scale: 0.6 },
+    { id: "giant",    name: "Giant Guests",   people: "wire", scale: 1.35 },
+    { id: "disco",    name: "Disco Fever",    people: "wire", disco: true }
+  ];
+  var SECRET_GAME = { title: "Lucky Skins", art: "slots" };
+  function readJ(k) { try { return JSON.parse(localStorage.getItem(k) || "{}") || {}; } catch (e) { return {}; } }
+  function writeJ(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function coins() { return readJ(COIN_KEY)[SECRET_PLAYER] || 0; }
+  function canSpin() { return hasKey() || coins() > 0; }
+  function addCoins(n) { var a = readJ(COIN_KEY); a[SECRET_PLAYER] = Math.max(0, (a[SECRET_PLAYER] || 0) + n); writeJ(COIN_KEY, a); }
+  function skinState() {
+    var a = readJ(SKIN_KEY), s = a[SECRET_PLAYER] || {};
+    if (!Array.isArray(s.owned)) s.owned = ["classic"];
+    if (!s.on || s.owned.indexOf(s.on) < 0) s.on = "classic";
+    return s;
+  }
+  function saveSkins(s) { var a = readJ(SKIN_KEY); a[SECRET_PLAYER] = s; writeJ(SKIN_KEY, a); }
+  // the machine only exists for Corinne, and only after she has beaten every game
+  function secretOpen() {
+    var p = getPlayer();
+    return p === SECRET_PLAYER && (hasKey() || (READY_COUNT > 0 && (doneCount(p) === READY_COUNT || trophies(p) > 0)));
+  }
+  // the key from the secret house outside: opens the machine and makes every spin free
+  function hasKey() { return !!skinState().key; }
+  // the skin to use right now (only Corinne wears skins; everyone else sees the normal arcade)
+  function currentSkin() {
+    if (getPlayer() !== SECRET_PLAYER) return null;
+    var on = skinState().on;
+    return SKINS.filter(function (k) { return k.id === on; })[0] || SKINS[0];
+  }
+  function applySkin() {
+    document.body.classList.toggle("secret-house", getPlayer() === SECRET_PLAYER);
+    var hb = document.getElementById("secretHouse");
+    hb.classList.toggle("taken", getPlayer() === SECRET_PLAYER && hasKey());
+    hb.setAttribute("tabindex", document.body.classList.contains("zoomed") && getPlayer() === SECRET_PLAYER ? "0" : "-1");
+    var bc = typeof cabs !== "undefined" && cabs[BROKEN];
+    if (bc) {
+      if (secretOpen()) { bc.setAttribute("aria-label", "Play Lucky Skins, Corinne's secret slot machine"); bc.setAttribute("role", "button"); bc.tabIndex = 0; }
+      else { bc.setAttribute("aria-label", "A broken machine. Out of order"); bc.removeAttribute("role"); bc.removeAttribute("tabindex"); }
+    }
+    var k = currentSkin();
+    room.style.filter = k && k.filter ? k.filter : "";
+    room.classList.toggle("disco", !!(k && k.disco));
+  }
+  var slotArt =
+    '<svg viewBox="0 0 100 120" width="200" height="240" xmlns="http://www.w3.org/2000/svg">' +
+    '<rect width="100" height="120" fill="#2a0a40"/>' +
+    '<text x="50" y="22" text-anchor="middle" font-family="Bungee, Impact, sans-serif" font-size="11" fill="#ffd23f">LUCKY</text>' +
+    '<text x="50" y="34" text-anchor="middle" font-family="Bungee, Impact, sans-serif" font-size="11" fill="#ff4f8b">SKINS</text>' +
+    '<rect x="10" y="44" width="80" height="36" rx="6" fill="#fff" stroke="#ff4f8b" stroke-width="3"/>' +
+    '<line x1="37" y1="44" x2="37" y2="80" stroke="#d8d0e8" stroke-width="2"/><line x1="63" y1="44" x2="63" y2="80" stroke="#d8d0e8" stroke-width="2"/>' +
+    '<text x="23.5" y="70" text-anchor="middle" font-size="20">🌵</text><text x="50" y="70" text-anchor="middle" font-size="20">🌵</text><text x="76.5" y="70" text-anchor="middle" font-size="20">🌵</text>' +
+    '<circle cx="30" cy="98" r="7" fill="#ffd23f"/><text x="30" y="102" text-anchor="middle" font-family="Nunito, sans-serif" font-weight="900" font-size="9" fill="#7a5a00">1</text>' +
+    '<text x="62" y="102" text-anchor="middle" font-family="Bungee, Impact, sans-serif" font-size="8" fill="#5aff8a">= SPIN!</text>' +
+    '</svg>';
+  (function () { var im = new Image(); im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(slotArt); artImgs.slots = im; })();
+
+  // ---------- the slot machine ----------
+  var slotsEl = document.getElementById("slots"), reelEls = [].slice.call(document.querySelectorAll("#reels .reel"));
+  var slotMsg = document.getElementById("slotMsg"), spinBtn = document.getElementById("spinBtn"), lever = document.getElementById("lever");
+  var SYMBOLS = ["🌵", "🎈", "🦍", "🍟", "🐟", "🤖", "🌻", "👽"];
+  var JOKES_LOSE = ["The machine burped. No prize.", "So close! The gorilla ate your coin.", "Nope! The fish says try again.", "Womp womp. The robot is laughing at you.",
+                    "Almost! A cactus poked the reels.", "The machine says: 'lol'.", "No luck. Frank is watching TV on reel 3."];
+  var JOKES_PAIR = ["Two of a kind! Here's your coin back.", "A pair! Coin refunded. The machine respects you.", "Two match! Free spin coin returned."];
+  var spinning = false;
+  function openSlots() {
+    if (!secretOpen()) return;
+    slotsEl.hidden = false; refreshSlots();
+    slotMsg.textContent = hasKey() ? "🔑 You have the secret key: every spin is FREE! Three in a row wins a skin." :
+      coins() ? "Three in a row wins a new arcade skin!" : "No coins yet! Grab coins in Cactus Run, then come back.";
+    spinBtn.focus();
+  }
+  function closeSlots() { slotsEl.hidden = true; }
+  function refreshSlots() {
+    document.getElementById("coinBox").innerHTML = hasKey() ? "🔑 <b id=\"coinCount\">Free spins</b>" : "🪙 <b id=\"coinCount\">" + coins() + "</b> coins";
+    document.querySelector(".sm-sub").textContent = hasKey() ? "Corinne's secret machine · you found the key!" : "Corinne's secret machine · 1 Cactus Run coin per spin";
+    spinBtn.textContent = hasKey() ? "SPIN (FREE 🔑)" : "SPIN (1 🪙)";
+    spinBtn.disabled = spinning || !canSpin();
+    var st = skinState(), list = document.getElementById("skinList");
+    list.innerHTML = "";
+    SKINS.forEach(function (k) {
+      var owned = st.owned.indexOf(k.id) >= 0, b = document.createElement("button");
+      b.type = "button"; b.textContent = owned ? k.name : "🔒 ???";
+      b.className = (owned ? "" : "locked") + (st.on === k.id ? " on" : "");
+      if (owned) b.addEventListener("click", function () { var s = skinState(); s.on = k.id; saveSkins(s); applySkin(); refreshSlots(); });
+      else b.setAttribute("aria-label", "Locked skin");
+      list.appendChild(b);
+    });
+  }
+  function spin() {
+    if (spinning || !canSpin()) return;
+    var free = hasKey();
+    spinning = true; if (!free) addCoins(-1); refreshSlots();
+    lever.classList.add("pulled"); setTimeout(function () { lever.classList.remove("pulled"); }, 400);
+    reelEls.forEach(function (r) { r.classList.remove("win"); r.classList.add("spin"); });
+    slotMsg.textContent = ["Spinning…", "Here we go!", "Come on, cactus!", "Rattle rattle…"][Math.floor(Math.random() * 4)];
+    // pick the result first: about 3 in 10 spins win, 3 in 10 get the coin back
+    var st = skinState(), locked = SKINS.filter(function (k) { return st.owned.indexOf(k.id) < 0; });
+    var r = Math.random(), result;
+    var A = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)], B;
+    do { B = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]; } while (B === A);
+    if (r < 0.3) result = [A, A, A];
+    else if (r < 0.6) result = Math.random() < 0.5 ? [A, A, B] : [B, A, A];
+    else { var C; do { C = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]; } while (C === A || C === B); result = [A, B, C]; }
+    reelEls.forEach(function (el, n) {
+      setTimeout(function () { el.classList.remove("spin"); el.querySelector("span").textContent = result[n]; tone(300 + n * 120, 0.08); }, 700 + n * 450);
+    });
+    setTimeout(function () {
+      spinning = false;
+      if (result[0] === result[1] && result[1] === result[2]) {
+        reelEls.forEach(function (el) { el.classList.add("win"); });
+        if (locked.length) {
+          var won = locked[Math.floor(Math.random() * locked.length)];
+          st.owned.push(won.id); st.on = won.id; saveSkins(st); applySkin();
+          slotMsg.textContent = "JACKPOT! You won the “" + won.name + "” skin! It's on now.";
+        } else { addCoins(3); slotMsg.textContent = "JACKPOT! You already own every skin, so here are 3 coins!"; }
+        [523, 659, 784, 1047].forEach(function (f, n) { setTimeout(function () { tone(f, 0.15); }, n * 110); });
+      } else if (result[0] === result[1] || result[1] === result[2]) {
+        if (free) slotMsg.textContent = ["Two of a kind! So close!", "A pair! The machine winks at you.", "Two match! One more and it's yours!"][Math.floor(Math.random() * 3)];
+        else { addCoins(1); slotMsg.textContent = JOKES_PAIR[Math.floor(Math.random() * JOKES_PAIR.length)]; }
+      } else {
+        slotMsg.textContent = JOKES_LOSE[Math.floor(Math.random() * JOKES_LOSE.length)]; tone(150, 0.3);
+      }
+      if (!canSpin()) slotMsg.textContent += " (Out of coins! Go grab more in Cactus Run.)";
+      refreshSlots();
+    }, 700 + 2 * 450 + 250);
+  }
+  var slotAudio = null;
+  function tone(f, d) {
+    try {
+      slotAudio = slotAudio || new (window.AudioContext || window.webkitAudioContext)();
+      var o = slotAudio.createOscillator(), g = slotAudio.createGain(), t0 = slotAudio.currentTime;
+      o.type = "square"; o.frequency.value = f; g.gain.setValueAtTime(0.05, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+      o.connect(g).connect(slotAudio.destination); o.start(t0); o.stop(t0 + d + 0.05);
+    } catch (e) {}
+  }
+  // ---------- zoom out to see outside the arcade (mouse wheel, pinch, or the - and + keys) ----------
+  var zoom = 1, ZMIN = 0.5;
+  function setZoom(z) {
+    zoom = Math.max(ZMIN, Math.min(1, z));
+    room.style.transform = zoom < 1 ? "scale(" + zoom.toFixed(3) + ")" : "";
+    var was = document.body.classList.contains("zoomed");
+    document.body.classList.toggle("zoomed", zoom < 0.97);
+    if (was !== document.body.classList.contains("zoomed")) applySkin();
+  }
+  window.addEventListener("wheel", function (e) {
+    if (!slotsEl.hidden) return;
+    var scrollable = document.documentElement.scrollHeight > innerHeight + 4;
+    // zoom when the page can't scroll, when already zoomed, or with ctrl (browser zoom gesture)
+    if (!e.ctrlKey && scrollable && zoom === 1) return;
+    if (zoom === 1 && e.deltaY < 0 && !e.ctrlKey) return;
+    e.preventDefault();
+    setZoom(zoom - e.deltaY * 0.0015);
+  }, { passive: false });
+  var pinch0 = 0, pinchZ = 1;
+  function tdist(t) { return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY); }
+  window.addEventListener("touchstart", function (e) { if (e.touches.length === 2) { pinch0 = tdist(e.touches); pinchZ = zoom; } }, { passive: true });
+  window.addEventListener("touchmove", function (e) {
+    if (e.touches.length === 2 && pinch0 && slotsEl.hidden) { e.preventDefault(); setZoom(pinchZ * tdist(e.touches) / pinch0); }
+  }, { passive: false });
+  window.addEventListener("touchend", function (e) { if (e.touches.length < 2) pinch0 = 0; }, { passive: true });
+  window.addEventListener("keydown", function (e) {
+    if (!slotsEl.hidden || e.ctrlKey || e.metaKey) return;
+    if (e.key === "-" || e.key === "_") setZoom(zoom - 0.25);
+    else if (e.key === "=" || e.key === "+") setZoom(zoom + 0.25);
+    else if (e.key === "Escape" && zoom < 1) setZoom(1);
+  });
+  // tap the night sky to go back inside
+  document.getElementById("outside").addEventListener("click", function (e) { if (!e.target.closest("#secretHouse")) setZoom(1); });
+  document.getElementById("secretHouse").addEventListener("click", function () {
+    if (getPlayer() !== SECRET_PLAYER) return;
+    var hb = this, s = skinState();
+    if (s.key) { showNotice("The little house is empty now. You already have the key!"); return; }
+    hb.classList.add("open");
+    s.key = true; saveSkins(s);
+    tone(784, 0.12); setTimeout(function () { tone(1047, 0.2); }, 140);
+    showNotice("🔑 You found the secret key! The Lucky Skins machine is open, and your spins are free!");
+    setTimeout(function () { hb.classList.remove("open"); hb.classList.add("taken"); setZoom(1); defaultInfo(); }, 2600);
+  });
+
+  spinBtn.addEventListener("click", spin);
+  lever.addEventListener("click", spin);
+  document.getElementById("slotsClose").addEventListener("click", closeSlots);
+  slotsEl.addEventListener("click", function (e) { if (e.target === slotsEl) closeSlots(); });
+  window.addEventListener("keydown", function (e) { if (!slotsEl.hidden && e.key === "Escape") closeSlots(); });
+  window.addEventListener("storage", function (e) { if (e.key === COIN_KEY && !slotsEl.hidden) refreshSlots(); });
+
   // every once in a while the crowd glitches out
   var glitchOn = false, glitchEnd = 0, nextGlitch = performance.now() + 6000 + Math.random() * 8000;
   function glitchTick(now) {
@@ -2145,10 +2448,14 @@
       var mainCtx = ctx;
       pctx.clearRect(0, 0, G.rw, G.rh); ctx = pctx;
       // Corinne likes the original look, so when she's picked everyone goes back to their classic selves
-      var classic = getPlayer() === "Corinne";
+      var skin = currentSkin(), classic = skin && skin.people === "classic", sc = skin && skin.scale || 1;
+      if (skin && skin.ghost) ctx.globalAlpha = 0.55;
       people.slice().sort(function (a, b) { return a.z - b.z; }).forEach(function (p) {
+        var s0 = p.size; p.size = s0 * sc;
         if (classic) drawClassic(p, now / 1000); else drawPerson3D(p, now / 1000);
+        p.size = s0;
       });
+      ctx.globalAlpha = 1;
       if (glitchOn) glitchSlices();
       ctx = mainCtx;
       ctx.drawImage(pcanvas, 0, 0, G.rw, G.rh);
@@ -2170,6 +2477,7 @@
     cab.addEventListener("focus", function () { setHover(i); });
     cab.addEventListener("blur", function () { clearHover(i); });
     cab.addEventListener("click", function (e) {
+      if (i === BROKEN && secretOpen()) { e.preventDefault(); openSlots(); return; }   // Corinne's secret machine
       if (!ready) {
         e.preventDefault(); setHover(i);
         cab.classList.remove("nope"); void cab.offsetWidth; cab.classList.add("nope");
@@ -2187,6 +2495,7 @@
       }
     });
     cab.addEventListener("pointerdown", function (e) { cab._touched = e.pointerType !== "mouse"; });
+    cab.addEventListener("keydown", function (e) { if ((e.key === "Enter" || e.key === " ") && i === BROKEN && secretOpen()) { e.preventDefault(); openSlots(); } });
   });
 
   // Marquee bulbs around the sign
@@ -2230,7 +2539,8 @@
     }, 500);
   }
   celebrate();
-  window.addEventListener("pageshow", function (e) { if (e.persisted) celebrate(); });
+  applySkin();
+  window.addEventListener("pageshow", function (e) { if (e.persisted) celebrate(); applySkin(); });
   requestAnimationFrame(loop);
 })();
 </script>

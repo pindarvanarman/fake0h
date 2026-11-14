@@ -612,6 +612,17 @@ let keyboardMode = false;
 const keys = {};
 let playerX = W / 2, targetX = W / 2;
 let objects = [], popups = [], particles = [];
+// Coins you pick up are saved for whoever is playing, so they can be spent in the arcade.
+// (The Shift+number world-jump test keys don't affect this.)
+function bankCoin() {
+  try {
+    const p = window.ArcadeProgress && ArcadeProgress.player();
+    if (!p) return;                                  // free play: nothing is saved
+    const all = JSON.parse(localStorage.getItem("fake0hArcade.coins") || "{}");
+    all[p] = (all[p] || 0) + 1;
+    localStorage.setItem("fake0hArcade.coins", JSON.stringify(all));
+  } catch (e) {}
+}
 let score = 0, totalCoins = 0, charge = 0, lives = 3, best = 0, level = 1;
 let speed = 0.38, elapsed = 0, invuln = 0;
 let cactusTimer = 0, coinTimer = 1.5;
@@ -862,6 +873,7 @@ function update(dt) {
         }
       } else if (dx < H * COIN_SIZE + BODY_HALF() * 1.1) {
         o.collected = true; totalCoins += 1; score += 50;
+        bankCoin();   // every coin is saved to the player's coin purse (spent on the arcade's secret machine)
         const wasFull = charge >= CHARGE_MAX;
         charge = Math.min(CHARGE_MAX, charge + 1);
         sfx.coin();
