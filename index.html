@@ -2211,7 +2211,7 @@
   // Each spin costs one coin she collected in Cactus Run. Three in a row wins a new arcade skin.
   // =================================================================
   var SECRET_PLAYER = "Corinne", COIN_KEY = "fake0hArcade.coins", SKIN_KEY = "fake0hArcade.skins";
-  var SKINS = [
+  var ARCADE_SKINS = [
     { id: "classic",  name: "Classic",        people: "classic" },
     { id: "neon",     name: "Neon Wireframe", people: "wire" },
     { id: "retro",    name: "Retro Green",    people: "classic", filter: "grayscale(1) sepia(1) hue-rotate(55deg) saturate(3.5) brightness(0.95)" },
@@ -2246,7 +2246,7 @@
   function currentSkin() {
     if (getPlayer() !== SECRET_PLAYER) return null;
     var on = skinState().on;
-    return SKINS.filter(function (k) { return k.id === on; })[0] || SKINS[0];
+    return ARCADE_SKINS.filter(function (k) { return k.id === on; })[0] || ARCADE_SKINS[0];
   }
   function applySkin() {
     document.body.classList.toggle("secret-house", getPlayer() === SECRET_PLAYER);
@@ -2266,7 +2266,7 @@
     '<svg viewBox="0 0 100 120" width="200" height="240" xmlns="http://www.w3.org/2000/svg">' +
     '<rect width="100" height="120" fill="#2a0a40"/>' +
     '<text x="50" y="22" text-anchor="middle" font-family="Bungee, Impact, sans-serif" font-size="11" fill="#ffd23f">LUCKY</text>' +
-    '<text x="50" y="34" text-anchor="middle" font-family="Bungee, Impact, sans-serif" font-size="11" fill="#ff4f8b">SKINS</text>' +
+    '<text x="50" y="34" text-anchor="middle" font-family="Bungee, Impact, sans-serif" font-size="11" fill="#ff4f8b">ARCADE_SKINS</text>' +
     '<rect x="10" y="44" width="80" height="36" rx="6" fill="#fff" stroke="#ff4f8b" stroke-width="3"/>' +
     '<line x1="37" y1="44" x2="37" y2="80" stroke="#d8d0e8" stroke-width="2"/><line x1="63" y1="44" x2="63" y2="80" stroke="#d8d0e8" stroke-width="2"/>' +
     '<text x="23.5" y="70" text-anchor="middle" font-size="20">🌵</text><text x="50" y="70" text-anchor="middle" font-size="20">🌵</text><text x="76.5" y="70" text-anchor="middle" font-size="20">🌵</text>' +
@@ -2298,7 +2298,7 @@
     spinBtn.disabled = spinning || !canSpin();
     var st = skinState(), list = document.getElementById("skinList");
     list.innerHTML = "";
-    SKINS.forEach(function (k) {
+    ARCADE_SKINS.forEach(function (k) {
       var owned = st.owned.indexOf(k.id) >= 0, b = document.createElement("button");
       b.type = "button"; b.textContent = owned ? k.name : "🔒 ???";
       b.className = (owned ? "" : "locked") + (st.on === k.id ? " on" : "");
@@ -2315,7 +2315,7 @@
     reelEls.forEach(function (r) { r.classList.remove("win"); r.classList.add("spin"); });
     slotMsg.textContent = ["Spinning…", "Here we go!", "Come on, cactus!", "Rattle rattle…"][Math.floor(Math.random() * 4)];
     // pick the result first: about 3 in 10 spins win, 3 in 10 get the coin back
-    var st = skinState(), locked = SKINS.filter(function (k) { return st.owned.indexOf(k.id) < 0; });
+    var st = skinState(), locked = ARCADE_SKINS.filter(function (k) { return st.owned.indexOf(k.id) < 0; });
     var r = Math.random(), result;
     var A = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)], B;
     do { B = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]; } while (B === A);
@@ -2448,12 +2448,14 @@
       var mainCtx = ctx;
       pctx.clearRect(0, 0, G.rw, G.rh); ctx = pctx;
       // Corinne likes the original look, so when she's picked everyone goes back to their classic selves
+      var corinne = getPlayer() === SECRET_PLAYER;
       var skin = currentSkin(), classic = skin && skin.people === "classic", sc = skin && skin.scale || 1;
       if (skin && skin.ghost) ctx.globalAlpha = 0.55;
       people.slice().sort(function (a, b) { return a.z - b.z; }).forEach(function (p) {
-        var s0 = p.size; p.size = s0 * sc;
+        var s0 = p.size, k0 = p.kind; p.size = s0 * sc;
+        if (corinne && k0 === "robot") p.kind = "human";   // on Corinne's page the robot is a regular person
         if (classic) drawClassic(p, now / 1000); else drawPerson3D(p, now / 1000);
-        p.size = s0;
+        p.size = s0; p.kind = k0;
       });
       ctx.globalAlpha = 1;
       if (glitchOn) glitchSlices();
